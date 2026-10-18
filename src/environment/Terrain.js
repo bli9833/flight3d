@@ -88,6 +88,30 @@ export class Terrain {
       baseH = baseH * (1.0 - flatten * 0.85);
     }
 
+    // Runway approach corridor clearance (Runway 09L / 27R extended centerline along Z = 0)
+    // Ensures obstacle clearance below the standard 3.0° glideslope (ICAO Annex 14 / TERPS OFZ)
+    const corridorHalfWidth = 650.0;
+    if (Math.abs(z) < corridorHalfWidth) {
+      const zFactor = 1.0 - Math.abs(z) / corridorHalfWidth;
+      const smoothZ = zFactor * zFactor * (3.0 - 2.0 * zFactor);
+
+      if (x < -1350 && x > -8500) {
+        // West approach: 3° glideslope clearance slope (0.022 allows 1.25° safety margin below 3° / 0.0524)
+        const distFromThreshold = -1350 - x;
+        const maxClearanceH = this.airportElevation + distFromThreshold * 0.022;
+        if (baseH > maxClearanceH) {
+          baseH = baseH * (1.0 - smoothZ) + maxClearanceH * smoothZ;
+        }
+      } else if (x > 1350 && x < 8500) {
+        // East departure: climb corridor clearance
+        const distFromThreshold = x - 1350;
+        const maxClearanceH = this.airportElevation + distFromThreshold * 0.030;
+        if (baseH > maxClearanceH) {
+          baseH = baseH * (1.0 - smoothZ) + maxClearanceH * smoothZ;
+        }
+      }
+    }
+
     // Ocean floor clamp
     const naturalHeight = Math.max(-45.0, baseH);
 

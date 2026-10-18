@@ -84,9 +84,9 @@ export class Aerodynamics {
     this.Cl_da = aero.clDa || 0.19;
     this.Cl_p = aero.clP || -0.52;
 
-    this.Cn_b = aero.cnBeta || 0.17;
-    this.Cn_dr = aero.cnDr || -0.11;
-    this.Cn_r = aero.cnR || -0.24;
+    this.Cn_b = -Math.abs(aero.cnBeta !== undefined ? aero.cnBeta : 0.22);
+    this.Cn_dr = aero.cnDr || -0.12;
+    this.Cn_r = aero.cnR || -0.32;
   }
 
   setFlapPosition(index) {
@@ -306,12 +306,12 @@ export class Aerodynamics {
     // Includes dihedral effect (Cl_b), aileron input, roll damping (Cl_p), and differential spoiler roll
     const aileronRad = this.aileron * maxAileronRad * this.tuning.aileronSensitivity;
     const spoilerRoll = aileronRad > 0.02 ? aileronRad * 0.05 : (aileronRad < -0.02 ? aileronRad * 0.05 : 0);
-    const cl_roll = this.Cl_b * this.beta + this.Cl_da * (aileronRad + spoilerRoll) + this.Cl_p * pHat;
+    const cl_roll = this.Cl_b * this.beta + this.Cl_da * (aileronRad + spoilerRoll) + Math.abs(this.Cl_p) * pHat;
 
     // Yawing moment coefficient Cn:
     // Directional stability (Cn_b), rudder input, yaw damping (Cn_r), and adverse yaw from ailerons
     const rudderRad = this.rudder * maxRudderRad * this.tuning.rudderSensitivity;
-    const adverseYaw = -0.025 * aileronRad;
+    const adverseYaw = 0.025 * aileronRad;
     const cn = this.Cn_b * this.beta + this.Cn_dr * rudderRad + this.Cn_r * rHat + adverseYaw;
 
     // Moments in Body Frame (Newton-meters)

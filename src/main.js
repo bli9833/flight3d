@@ -587,10 +587,12 @@ class FlightSimulator {
   stepSimulation(simSeconds) {
     const numSubsteps = Math.max(1, Math.round(simSeconds * this.physicsHz));
     for (let i = 0; i < numSubsteps; i++) {
+      if (this.demoDirector && this.demoDirector.isActive) {
+        this.demoDirector.update(this.physicsDt);
+      }
       this.integratePhysics(this.physicsDt);
       this.totalSimTime += this.physicsDt;
     }
-    this.demoDirector.update(simSeconds);
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     this.aircraft.setCockpitMode(isCockpit);
     this.aircraft.update(this.physicsDt, this.telemetry);
@@ -616,12 +618,18 @@ class FlightSimulator {
 
     // High-rate substepping for rock-solid flight physics
     while (this.physicsAccumulator >= this.physicsDt) {
+      if (this.demoDirector && this.demoDirector.isActive) {
+        this.demoDirector.update(this.physicsDt);
+      }
       this.integratePhysics(this.physicsDt);
       this.physicsAccumulator -= this.physicsDt;
     }
 
     // 1. Update 3D Aircraft Model & Articulations
     this.aircraft.update(frameDelta, this.telemetry);
+    this.aircraft.group.position.copy(this.position);
+    this.aircraft.group.quaternion.copy(this.quaternion);
+    this.aircraft.group.updateMatrixWorld(true);
 
     // 2. Update Flight Instrument Canvas Displays
     this.pfdCanvas.updateData(this.telemetry);
@@ -644,10 +652,7 @@ class FlightSimulator {
     this.sky.updateSun(this.position);
     this.explosionSystem.update(frameDelta);
 
-    // 4. Update Demo Director (Controls flight autopilot & camera view selection per stage)
-    this.demoDirector.update(frameDelta);
-
-    // 5. Update Cockpit Visibility & Audio
+    // 4. Update Cockpit Visibility & Audio
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     this.aircraft.setCockpitMode(isCockpit);
     this.audio.update(frameDelta, this.telemetry, isCockpit);

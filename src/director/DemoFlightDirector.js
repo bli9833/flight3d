@@ -224,12 +224,21 @@ export class DemoFlightDirector {
       // STAGE 1: Rotation & Climb
       // -------------------------------------------------------------
       case DemoFlightDirector.STAGES.ROTATION_CLIMB: {
-        // Once liftoff confirmed, retract gear and relax pitch
+        // Wings-level stabilization during climb with roll-rate damping
+        const rollRateDeg = -THREE.MathUtils.radToDeg(this.sim.angularVelocity.z);
+        const rollErr = 0.0 - tel.rollDeg;
+        const aileronCmd = rollErr * 0.035 - rollRateDeg * 0.02;
+        this.sim.controls.setVirtualInput('aileron', Math.max(-0.2, Math.min(0.2, aileronCmd)));
+
+        // Once liftoff confirmed, retract gear and hold 12° climb pitch
         if (!tel.onGround && tel.radioAltFt > 10.0) {
           if (tel.gearState > 0.1 && !tel.isTransit) {
             this.sim.gear.setGearTarget(false);
           }
-          this.sim.controls.setVirtualInput('elevator', 0.22);
+          const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
+          const pitchErr = 12.0 - tel.pitchDeg;
+          const elevatorCmd = 0.18 + pitchErr * 0.035 - pitchRateDeg * 0.02;
+          this.sim.controls.setVirtualInput('elevator', Math.max(0.08, Math.min(0.35, elevatorCmd)));
         }
 
         // Switch to exterior chase camera at 2.5s to show gear retraction
@@ -252,17 +261,20 @@ export class DemoFlightDirector {
         const targetHeading = 155.0;
         const hdgDiff = ((targetHeading - tel.headingDeg + 540) % 360) - 180;
 
-        if (Math.abs(hdgDiff) > 8.0) {
-          // Bank right
-          this.sim.controls.setVirtualInput('aileron', 0.24);
-          this.sim.controls.setVirtualInput('elevator', 0.14); // Back-pressure for level turn
-          this.sim.controls.setVirtualInput('rudder', 0.05);
-        } else {
-          // Roll wings level
-          this.sim.controls.setVirtualInput('aileron', -tel.rollDeg * 0.04);
-          this.sim.controls.setVirtualInput('elevator', 0.08);
-          this.sim.controls.setVirtualInput('rudder', 0.0);
-        }
+        // Closed-loop bank angle target clamped between -20° and +20°
+        const targetBankDeg = Math.max(-20.0, Math.min(20.0, hdgDiff * 0.65));
+        const rollRateDeg = -THREE.MathUtils.radToDeg(this.sim.angularVelocity.z);
+        const rollErr = targetBankDeg - tel.rollDeg;
+        const aileronCmd = rollErr * 0.035 - rollRateDeg * 0.025;
+        this.sim.controls.setVirtualInput('aileron', Math.max(-0.25, Math.min(0.25, aileronCmd)));
+
+        // Back-pressure elevator to hold ~10° climb pitch and maintain altitude
+        const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
+        const targetPitch = 10.0;
+        const pitchErr = targetPitch - tel.pitchDeg;
+        const elevatorCmd = 0.12 + pitchErr * 0.035 - pitchRateDeg * 0.02;
+        this.sim.controls.setVirtualInput('elevator', Math.max(-0.15, Math.min(0.25, elevatorCmd)));
+        this.sim.controls.setVirtualInput('rudder', Math.max(-0.10, Math.min(0.10, targetBankDeg * 0.005)));
 
         // Gradually transition time-of-day towards sunset
         const sunTime = 7.2 + Math.min(10.0, this.stageTimer * 0.8);
@@ -282,8 +294,19 @@ export class DemoFlightDirector {
         // Fly level over bay at 1,200ft, speed 205 knots
         const targetAlt = 1200;
         const altErr = targetAlt - tel.altitudeFt;
-        this.sim.controls.setVirtualInput('elevator', Math.max(-0.15, Math.min(0.15, altErr * 0.002)));
-        this.sim.controls.setVirtualInput('aileron', -tel.rollDeg * 0.05); // Keep wings level
+        const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
+        const elevatorCmd = altErr * 0.002 - pitchRateDeg * 0.02;
+        this.sim.controls.setVirtualInput('elevator', Math.max(-0.15, Math.min(0.20, elevatorCmd)));
+
+        // Heading 155° tracking with bank clamped to safe ±12°
+        const targetHeading = 155.0;
+        const hdgDiff = ((targetHeading - tel.headingDeg + 540) % 360) - 180;
+        const targetBankDeg = Math.max(-12.0, Math.min(12.0, hdgDiff * 0.5));
+        const rollRateDeg = -THREE.MathUtils.radToDeg(this.sim.angularVelocity.z);
+        const rollErr = targetBankDeg - tel.rollDeg;
+        const aileronCmd = rollErr * 0.035 - rollRateDeg * 0.025;
+        this.sim.controls.setVirtualInput('aileron', Math.max(-0.25, Math.min(0.25, aileronCmd)));
+        this.sim.controls.setVirtualInput('rudder', 0.0);
         this.sim.controls.setVirtualInput('throttle', 0.65);
 
         // Switch to chase camera halfway through ocean cruise
@@ -310,12 +333,16 @@ export class DemoFlightDirector {
         const altDiff = idealAltFt - tel.altitudeFt;
         const targetPitchDeg = Math.max(0.5, Math.min(4.0, 2.5 + altDiff * 0.02));
         const pitchDiff = targetPitchDeg - tel.pitchDeg;
-        this.sim.controls.setVirtualInput('elevator', Math.max(-0.25, Math.min(0.25, pitchDiff * 0.08)));
+        const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
+        const elevatorCmd = pitchDiff * 0.06 - pitchRateDeg * 0.02;
+        this.sim.controls.setVirtualInput('elevator', Math.max(-0.25, Math.min(0.25, elevatorCmd)));
 
         // Lateral guidance (keep z centered on runway centerline 0)
         const targetRoll = Math.max(-10.0, Math.min(10.0, -this.sim.position.z * 0.15));
         const rollDiff = targetRoll - tel.rollDeg;
-        this.sim.controls.setVirtualInput('aileron', Math.max(-0.25, Math.min(0.25, rollDiff * 0.05)));
+        const rollRateDeg = -THREE.MathUtils.radToDeg(this.sim.angularVelocity.z);
+        const aileronCmd = rollDiff * 0.035 - rollRateDeg * 0.025;
+        this.sim.controls.setVirtualInput('aileron', Math.max(-0.20, Math.min(0.20, aileronCmd)));
 
         // Throttle management for V_ref (142 KT)
         const speedErr = 142 - tel.iasKnots;

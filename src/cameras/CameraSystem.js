@@ -21,6 +21,7 @@ export class CameraSystem {
     // Cockpit Head Dynamics & Look-Around
     this.cockpitHeadOffset = new THREE.Vector3(-0.48, 0.82, -12.02); // Captain eye
     this.headGForceOffset = new THREE.Vector3();
+    this.touchJoltOffset = 0;
     this.lookYaw = 0;
     this.lookPitch = -0.18; // Natural pilot head tilt showing MCP, instruments & runway horizon
 
@@ -134,26 +135,28 @@ export class CameraSystem {
       case CameraSystem.MODES.COCKPIT: {
         // First-Person Cockpit View
         // 1. Calculate head displacement from G-forces & buffeting
-        const gForce = flightState.gForce || 1.0;
-        const targetGOffset = -(gForce - 1.0) * 0.04;
-        this.headGForceOffset.y += (targetGOffset - this.headGForceOffset.y) * Math.min(1.0, dt * 10.0);
+        // On ground, ignore landing gear suspension spring oscillation to prevent instrument jitter
+        const gForce = flightState.onGround ? 1.0 : (flightState.gForce || 1.0);
+        const targetGOffset = Math.max(-0.02, Math.min(0.02, -(gForce - 1.0) * 0.015));
+        this.headGForceOffset.y += (targetGOffset - this.headGForceOffset.y) * Math.min(1.0, dt * 4.0);
 
-        // Stall Buffeting Shake (high frequency vibration)
-        let buffetX = 0, buffetY = 0;
-        if (flightState.isStalled) {
-          const t = performance.now() * 0.035;
-          buffetX = (Math.sin(t * 1.7) + Math.cos(t * 3.1)) * 0.015 * flightState.buffetVibration;
-          buffetY = (Math.cos(t * 2.3) + Math.sin(t * 4.2)) * 0.015 * flightState.buffetVibration;
+        // Smooth Touchdown Jolt with exponential decay
+        this.touchJoltOffset = (this.touchJoltOffset || 0) * Math.max(0.0, 1.0 - dt * 6.0);
+        if (flightState.touchdown) {
+          this.touchJoltOffset = -0.025;
         }
 
-        // Touchdown Jolt
-        let touchJolt = 0;
-        if (flightState.touchdown) {
-          touchJolt = -0.05;
+        // Stall Buffeting Shake (airborne only, restrained amplitude)
+        let buffetX = 0, buffetY = 0;
+        if (flightState.isStalled && !flightState.onGround) {
+          const t = performance.now() * 0.03;
+          const severity = flightState.buffetVibration || 0.5;
+          buffetX = (Math.sin(t * 1.7) + Math.cos(t * 3.1)) * 0.005 * severity;
+          buffetY = (Math.cos(t * 2.3) + Math.sin(t * 4.2)) * 0.005 * severity;
         }
 
         const eyeLocal = this.cockpitHeadOffset.clone();
-        eyeLocal.y += this.headGForceOffset.y + buffetY + touchJolt;
+        eyeLocal.y += this.headGForceOffset.y + buffetY + this.touchJoltOffset;
         eyeLocal.x += buffetX;
 
         // Transform eye point to world space

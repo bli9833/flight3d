@@ -62,7 +62,7 @@ export const BOEING_737_800 = {
     clBeta: -0.14,         // Dihedral effect / sweepback roll (dCl/dBeta)
     clDa: 0.18,            // Aileron roll control authority (dCl/dDa per rad)
     clP: -0.65,            // Roll rate damping derivative
-    cnBeta: 0.18,          // Directional weathercock stability (dCn/dBeta)
+    cnBeta: -0.22,         // Directional weathercock stability (dCn/dBeta < 0 in Three.js Y-up)
     cnDr: -0.12,           // Rudder yaw control authority (dCn/dDr per rad)
     cnR: -0.32,            // Yaw rate damping derivative
     adverseYaw: -0.025,    // Adverse yaw coupling from aileron deflection
