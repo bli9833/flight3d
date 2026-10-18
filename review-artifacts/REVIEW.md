@@ -1,5 +1,7 @@
 # 데모 비행 검토
 
+> 최신 main `1f6f20b`의 수정 확인 및 남은 문제는 [최신 재검증 보고서](latest-main/RECHECK.md)를 참고하세요. 아래 내용은 수정 전 `b491a6a`의 기록입니다.
+
 검토 기준: `b491a6a`, 브랜치 `review/demo-flight`, worktree `/home/stlim/flight3d-demo-review`.
 원본 작업 디렉토리의 미커밋 변경은 포함하지 않았다. 다른 에이전트의 진행 중인 수정에 대한 판정이 아니다.
 
