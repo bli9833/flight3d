@@ -20,6 +20,29 @@ export class Airport {
     this.approachStrobes = [];
     this.beaconLights = [];
 
+    // Collision metadata for control tower, terminal concourse, and maintenance hangars
+    this.controlTowerData = {
+      x: 120,
+      y: this.elevation,
+      z: 280,
+      radius: 11.5,
+      height: 85.0
+    };
+
+    this.terminalData = {
+      x: -80,
+      y: this.elevation,
+      z: 340,
+      width: 350,
+      height: 22,
+      depth: 70
+    };
+
+    this.hangarsData = [
+      { x: -450, y: this.elevation, z: 310, width: 90, height: 35, depth: 70 },
+      { x: -580, y: this.elevation, z: 310, width: 90, height: 35, depth: 70 }
+    ];
+
     this.initAirport();
   }
 

@@ -185,12 +185,33 @@ The decoupled event bus allows external telemetry loggers, multiplayer sockets, 
 - `flight:takeoff`: Emitted when all landing gear leaves ground contact.
 - `flight:touchdown`: Emitted with vertical descent velocity and G-load on touchdown.
 - `flight:stall`: Emitted with stall severity percentage.
+- `flight:crashed`: Emitted with collision telemetry (type, speed, impact point, obstacle description).
+- `flight:reset`: Emitted when user initiates instant repair and runway alignment.
 - `aircraft:gearTransit`: Emitted during gear up/down cycles.
 - `aircraft:tune`: Emitted when live tuning sliders are adjusted.
 
+### 4.4 Multi-Obstacle Collision Detection (`src/physics/CollisionDetector.js`)
+The collision pipeline runs on every 120Hz physics sub-step:
+1. **8-Point Aircraft Transform Matrix:**
+   - Evaluates world coordinates of 8 critical fuselage locations: Nose Radome, Tail Cone, Vertical Fin, Left/Right Wingtips, Left/Right CFM56 Engine Nacelles, and Belly Keel.
+2. **Spatial Hash Grid Broadphase ($150\text{m} \times 150\text{m}$ Cells):**
+   - Indexes 3,500+ procedural trees and 550+ city skyscrapers into constant-time lookup buckets, keeping collision overhead below $0.02\text{ ms}$ per physics substep.
+3. **Runway Operational Envelope Protection:**
+   - Normal takeoff rotation (pitch $-5.5^\circ \sim +14.5^\circ$), oleo strut landing compression, and wings-level roll ($\le 16.5^\circ$) on the airport plateau are safeguarded to ensure authentic touch-and-go and ILS landings without false alarms.
+   - Detects extreme structural failures: vertical slam ($V_y < -12.5\text{ m/s}$), wingtip ground strikes, inverted nose dives, tail strikes, or gear-up belly collisions.
+
+### 4.5 Procedural Particle Explosion & Audio Synthesis Engine (`src/effects/ExplosionSystem.js`)
+1. **Point Light Flash:** $15,000\text{ lm}$ instant incandescent flash illuminating local geometry with exponential decay.
+2. **Expanding Fireball Core:** Procedural radial gradient billboard particles expanding to $28\text{m}$ with combustion turbulence.
+3. **Buoyant Plume Smoke:** $40\sim 60$ dense carbonaceous smoke particles driven by upward buoyancy ($1.8\text{m/s}$) and atmospheric wind.
+4. **Ballistic Shrapnel & Sparks:** High-velocity shrapnel ($25\sim 45\text{m/s}$) with gravity and ground bounce damping.
+5. **Shockwave Ring:** Fast planar supersonic compression ring expanding to $60\text{m}$.
+6. **Water Splash Geysers:** 40+ hydro-ballistic white foam particles erupted $35\text{m}$ upward during maritime ditching.
+7. **Procedural Web Audio API Sound:** Sub-bass low-pass shockwave thump ($30\sim 80\text{Hz}$) + broadband crunch noise burst with instant jet engine silence.
+
 ---
 
-## 5. Autonomous Flight Testing & Issue Reproduction (`scripts/test-flight-agent.js`)
+## 5. Autonomous Flight & Crash Testing Framework
 
 To ensure rapid iteration and enable AI agents and human developers to autonomously verify aerodynamics and reproduce issues without manual flying:
 
@@ -207,13 +228,17 @@ To ensure rapid iteration and enable AI agents and human developers to autonomou
   Runs pure 120Hz physics substepping in discrete 250ms chunks, completely decoupling physics numerical precision from software WebGL rendering speeds.
 - **Virtual Control Injections (`window.simulator.controls.setVirtualInput(axis, val)`)**:
   Allows programmatic yoke, throttle, rudder, and brake actuation while preserving realistic control stiffness and actuator latency.
-- **Autonomous Scenarios**:
-  1. **Takeoff & Initial Climb**: TOGA throttle, Vr rotation at 133 KT, positive climb rate confirmation, gear retraction.
-  2. **High-Altitude Stall & Recovery**: Induction of aerodynamic separation at AoA > 15°, stall warning assertion, nose-down yoke + TOGA recovery.
-  3. **Approach, Touchdown & Braking**: 0.3 NM short final on 3° glideslope, 25 FT AGL flare, main gear touchdown, spoiler deployment, reverse thrust, and anti-skid deceleration to 0 KT on runway centerline.
-  4. **Preset & Multi-Camera Stress**: Rapid cycling through all airport/flight presets and 5 camera modes to detect state corruption or NaN vectors.
-- **Execution Command**:
-  ```bash
-  export PATH="/opt/node/bin:$PATH"
-  npm run test:flight
-  ```
+
+### 5.2 Autonomous Flight Scenarios (`npm run test:flight`)
+1. **Takeoff & Initial Climb**: TOGA throttle, Vr rotation at 133 KT, positive climb rate confirmation, gear retraction.
+2. **High-Altitude Stall & Recovery**: Induction of aerodynamic separation at AoA > 15°, stall warning assertion, nose-down yoke + TOGA recovery.
+3. **Approach, Touchdown & Braking**: 0.3 NM short final on 3° glideslope, 25 FT AGL flare, main gear touchdown, spoiler deployment, reverse thrust, and anti-skid deceleration to 0 KT on runway centerline.
+4. **Preset & Multi-Camera Stress**: Rapid cycling through all airport/flight presets and 5 camera modes to detect state corruption or NaN vectors.
+5. **Autonomous Demo Director & User Handover**: 6-stage demo state machine progression and immediate human pilot takeover upon control input.
+
+### 5.3 Autonomous Crash & Explosion Scenarios (`npm run test:crash`)
+1. **Control Tower Collision**: Cylinder proximity intersection at 85 KT with debris eruption.
+2. **Ocean Water Ditching**: High-speed maritime impact with geyser water plume.
+3. **Mountain Ridge Collision**: Alpine rocky peak collision on the 20km terrain.
+4. **City Skyscraper Collision**: Glass facade skyscraper collision in metropolitan downtown.
+5. **Tree Strike & Quick Restart**: Forest canopy clipping with instant state reconstruction and clean runway reset via <kbd>Space</kbd>/<kbd>R</kbd>.

@@ -31,4 +31,6 @@ lerna-debug.log*
 
 # Automated flight test dynamic captures (prevents dirty git tree on test runs)
 test_*.png
+crash_*.png
 cockpit_view_swift.png
+

@@ -9,6 +9,9 @@ export class FoliageAndCities {
     this.terrain = terrain;
     this.group = new THREE.Group();
 
+    this.treeData = [];
+    this.buildingData = [];
+
     this.initFoliage();
     this.initCities();
   }
@@ -67,6 +70,15 @@ export class FoliageAndCities {
 
       trunkInst.setMatrixAt(placed, dummy.matrix);
       foliageInst.setMatrixAt(placed, dummy.matrix);
+
+      this.treeData.push({
+        x,
+        y,
+        z,
+        height: 10.5 * scale,
+        radius: 3.5 * scale
+      });
+
       placed++;
     }
 
@@ -143,6 +155,15 @@ export class FoliageAndCities {
         dummy.updateMatrix();
 
         bldgInst.setMatrixAt(placed, dummy.matrix);
+
+        this.buildingData.push({
+          x,
+          y: groundY,
+          z,
+          width,
+          height,
+          depth
+        });
 
         // Pick color
         const c = colorVariants[Math.floor(Math.random() * colorVariants.length)];

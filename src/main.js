@@ -21,6 +21,8 @@ import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
 import { DemoFlightDirector } from './director/DemoFlightDirector.js';
+import { CollisionDetector } from './physics/CollisionDetector.js';
+import { ExplosionSystem } from './effects/ExplosionSystem.js';
 
 // Expose THREE globally for test harness and browser console debugging
 if (typeof window !== 'undefined') {
@@ -98,7 +100,19 @@ class FlightSimulator {
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
 
-    // 7. Rigid Body Physics State
+    // 7. Collision Detection & Explosion Particle Systems
+    this.collisionDetector = new CollisionDetector(
+      this.terrain,
+      this.airport,
+      this.foliage,
+      this.ships,
+      this.water
+    );
+    this.explosionSystem = new ExplosionSystem(this.scene, this.terrain);
+    this.isCrashed = false;
+    this.crashResult = null;
+
+    // 8. Rigid Body Physics State
     // Linear state
     this.position = new THREE.Vector3();
     this.linearVelocity = new THREE.Vector3(); // world m/s
@@ -215,6 +229,16 @@ class FlightSimulator {
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
     }
+
+    if (this.isCrashed) {
+      this.isCrashed = false;
+      this.crashResult = null;
+      this.explosionSystem.clear();
+      this.aircraft.resetCrashVisuals();
+      const crashEl = document.getElementById('crash-overlay');
+      if (crashEl) crashEl.style.display = 'none';
+    }
+
     if (type === 'runway') {
       // Aligned on Runway 09L Threshold (Heading 090° East)
       // West threshold is at x = -1350m, y = airport elevation (12.0m) + gear height (2.1m)
@@ -286,6 +310,19 @@ class FlightSimulator {
    * Physics Integration Substep (120 Hz)
    */
   integratePhysics(dt) {
+    // If crashed, damp out velocities and rest on terrain
+    if (this.isCrashed) {
+      this.linearVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 2.8));
+      this.angularVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 3.5));
+      this.position.addScaledVector(this.linearVelocity, dt);
+      const groundH = this.terrain ? this.terrain.getHeight(this.position.x, this.position.z) : 0.0;
+      if (this.position.y < groundH + 0.8) {
+        this.position.y = groundH + 0.8;
+      }
+      this.aircraft.group.position.copy(this.position);
+      return;
+    }
+
     // 1. Controls processing
     this.controls.update(dt, this.telemetry.iasKnots);
     this.aero.elevator = this.controls.elevator;
@@ -456,6 +493,82 @@ class FlightSimulator {
       x: this.position.x,
       z: this.position.z
     };
+
+    // 11. Check Multi-Obstacle Collisions (Terrain, Water, Tower, Buildings, Trees, Ships)
+    if (!this.isCrashed) {
+      const crash = this.collisionDetector.checkCollision(
+        this.position,
+        this.quaternion,
+        this.linearVelocity,
+        gearResult.gearState,
+        pitchDeg,
+        rollDeg
+      );
+
+      if (crash) {
+        this.triggerCrash(crash);
+      }
+    }
+  }
+
+  triggerCrash(crashResult) {
+    if (this.isCrashed) return;
+    this.isCrashed = true;
+    this.crashResult = crashResult;
+
+    // 1. Spawn Visual Explosion Particles, Fireball, Smoke & Dynamic Light Flash
+    this.explosionSystem.spawnExplosion(crashResult);
+
+    // 2. Procedural Audio Detonation & Metal Crunch Sound
+    this.audio.playExplosion(crashResult.type === 'WATER');
+
+    // 3. Aircraft Structural Damage Visuals
+    this.aircraft.triggerCrashVisuals(crashResult.type);
+
+    // 4. Catastrophic Camera Trauma Shake
+    this.cameraSystem.addTrauma(1.0);
+
+    // 5. Halt Demo Flight if active
+    if (this.demoDirector && this.demoDirector.isActive) {
+      this.demoDirector.stop();
+    }
+
+    // 6. Kill Engines and Damp Kinetic Energy
+    this.engines.setThrottle(0.0);
+    this.controls.throttle = 0.0;
+    this.linearVelocity.multiplyScalar(0.25);
+    if (this.linearVelocity.y < 0) this.linearVelocity.y = 0;
+
+    // 7. Show Crash UI Overlay
+    this.showCrashUI(crashResult);
+  }
+
+  resetCrash() {
+    this.isCrashed = false;
+    this.crashResult = null;
+    this.explosionSystem.clear();
+    this.aircraft.resetCrashVisuals();
+
+    const crashEl = document.getElementById('crash-overlay');
+    if (crashEl) crashEl.style.display = 'none';
+
+    this.setPreset('runway');
+    this.showToast('기체 수리 완료: 활주로 09L에서 재시작되었습니다.');
+  }
+
+  showCrashUI(crashResult) {
+    const overlay = document.getElementById('crash-overlay');
+    const title = document.getElementById('crash-title');
+    const desc = document.getElementById('crash-desc');
+    const speed = document.getElementById('crash-speed');
+    const type = document.getElementById('crash-type');
+
+    if (title) title.textContent = crashResult.name;
+    if (desc) desc.textContent = crashResult.description;
+    if (speed) speed.textContent = `${Math.round(crashResult.speedKnots)} KT`;
+    if (type) type.textContent = crashResult.type;
+
+    if (overlay) overlay.style.display = 'flex';
   }
 
   /**
@@ -476,6 +589,7 @@ class FlightSimulator {
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry);
     this.demoDirector.update(simSeconds);
+    this.explosionSystem.update(simSeconds);
     this.updateHUD();
     return this.telemetry;
   }
@@ -513,10 +627,11 @@ class FlightSimulator {
     this.isfdCanvas.updateData(this.telemetry);
     this.cduCanvas.updateData(this.telemetry);
 
-    // 3. Update Environment Animations
+    // 3. Update Environment Animations & Explosion Particles
     this.water.update(frameDelta);
     this.airport.update(frameDelta, this.position);
     this.ships.update(frameDelta, this.totalSimTime);
+    this.explosionSystem.update(frameDelta);
 
     // 4. Update Audio System & Cockpit Visibility
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
@@ -615,6 +730,17 @@ class FlightSimulator {
     });
     document.getElementById('btn-help-close')?.addEventListener('click', () => {
       helpModal?.classList.remove('visible');
+    });
+
+    // Crash Restart Button & Keyboard Shortcuts [Space / R / Enter]
+    document.getElementById('btn-crash-restart')?.addEventListener('click', () => {
+      this.resetCrash();
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (this.isCrashed && (e.code === 'Space' || e.code === 'KeyR' || e.code === 'Enter')) {
+        this.resetCrash();
+      }
     });
   }
 

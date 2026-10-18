@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
 
+function mulberry32(a) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
 /**
  * Procedural Terrain with Rolling Hills, Coastal Mountains, and Flat Airport Mesa
  * Generates an expansive 20km x 20km landscape with height queries for physics and foliage placement.
@@ -9,7 +18,8 @@ export class Terrain {
   constructor(size = 20000, segments = 256) {
     this.size = size;
     this.segments = segments;
-    this.simplex = new SimplexNoise();
+    // Deterministic seeded PRNG (seed 424242) ensures identical repeatable world geometry across all sessions and tests
+    this.simplex = new SimplexNoise({ random: mulberry32(424242) });
 
     // Airport zone definition (flat plateau at y = 12m)
     this.airportCenter = new THREE.Vector2(0, 0);
@@ -61,10 +71,14 @@ export class Terrain {
     let n3 = this.simplex.noise(nx * 8.0, nz * 8.0) * 0.25;
     let n4 = this.simplex.noise(nx * 18.0, nz * 18.0) * 0.1;
 
-    let baseH = (n1 * 180.0 + ridges * 380.0 + (n2 + n3 + n4) * 80.0);
+    // Coastal ocean factor: mountains in North (negative Z), tapering toward South bay (z > 1200)
+    const southFactor = Math.max(0.0, Math.min(1.0, (1500.0 - z) / 2200.0));
+    const mountainScale = 0.15 + 0.85 * southFactor;
+
+    let baseH = (n1 * 180.0 + ridges * 380.0 + (n2 + n3 + n4) * 80.0) * mountainScale;
 
     // Coastal gradient: lower elevation toward the ocean (South / East bay)
-    const oceanFalloff = (z - 1000.0) * 0.035;
+    const oceanFalloff = Math.max(0, z - 800.0) * 0.045;
     baseH -= oceanFalloff;
 
     // Near airport: natural ground is kept gentle

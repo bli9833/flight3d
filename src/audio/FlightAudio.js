@@ -268,4 +268,64 @@ export class FlightAudio {
     }
     this.lastRadioAlt = rAlt;
   }
+
+  playExplosion(isWater = false) {
+    if (!this.isInitialized || !this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+
+    // Cut ongoing engine, turbine & wind sounds
+    if (this.engineGain) this.engineGain.gain.setValueAtTime(0, now);
+    if (this.turbineGain) this.turbineGain.gain.setValueAtTime(0, now);
+    if (this.windGain) this.windGain.gain.setValueAtTime(0, now);
+    if (this.warningGain) this.warningGain.gain.setValueAtTime(0, now);
+
+    // 1. Deep Low-Frequency Subwoofer Detonation Thump
+    const bufferSize = Math.floor(this.ctx.sampleRate * 3.5);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.7));
+    }
+
+    const noiseSrc = this.ctx.createBufferSource();
+    noiseSrc.buffer = noiseBuffer;
+
+    const bassFilter = this.ctx.createBiquadFilter();
+    bassFilter.type = 'lowpass';
+    bassFilter.frequency.setValueAtTime(isWater ? 180 : 320, now);
+    bassFilter.frequency.exponentialRampToValueAtTime(32, now + 2.8);
+
+    const bassGain = this.ctx.createGain();
+    bassGain.gain.setValueAtTime(1.4, now);
+    bassGain.gain.exponentialRampToValueAtTime(0.001, now + 3.2);
+
+    noiseSrc.connect(bassFilter);
+    bassFilter.connect(bassGain);
+    bassGain.connect(this.masterGain);
+    noiseSrc.start(now);
+
+    // 2. High-Frequency Metal Crunch / Debris Shatter (or Water Rush)
+    const crunchBuffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 1.5), this.ctx.sampleRate);
+    const cData = crunchBuffer.getChannelData(0);
+    for (let i = 0; i < cData.length; i++) {
+      cData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.3));
+    }
+
+    const crunchSrc = this.ctx.createBufferSource();
+    crunchSrc.buffer = crunchBuffer;
+
+    const crunchFilter = this.ctx.createBiquadFilter();
+    crunchFilter.type = isWater ? 'bandpass' : 'highpass';
+    crunchFilter.frequency.setValueAtTime(isWater ? 600 : 2200, now);
+    crunchFilter.frequency.exponentialRampToValueAtTime(isWater ? 180 : 350, now + 1.2);
+
+    const crunchGain = this.ctx.createGain();
+    crunchGain.gain.setValueAtTime(isWater ? 1.0 : 0.85, now);
+    crunchGain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+
+    crunchSrc.connect(crunchFilter);
+    crunchFilter.connect(crunchGain);
+    crunchGain.connect(this.masterGain);
+    crunchSrc.start(now);
+  }
 }

@@ -585,4 +585,30 @@ export class Boeing737 {
     if (this.fuselageGroup) this.fuselageGroup.visible = !isCockpit;
     if (this.cockpit && this.cockpit.group) this.cockpit.group.visible = isCockpit;
   }
+
+  triggerCrashVisuals(collisionType) {
+    this.isCrashed = true;
+    if (this.lightsGroup) this.lightsGroup.visible = false;
+
+    // Dislocate/damage wing structures upon catastrophic impact
+    if (this.wingGroup && this.wingGroup.children.length >= 2) {
+      this.wingGroup.children[0].rotation.z = -0.22;
+      this.wingGroup.children[0].rotation.x = 0.15;
+      this.wingGroup.children[1].rotation.z = 0.26;
+      this.wingGroup.children[1].rotation.x = -0.18;
+    }
+  }
+
+  resetCrashVisuals() {
+    this.isCrashed = false;
+    if (this.lightsGroup) this.lightsGroup.visible = this.lightsOn;
+
+    // Restore pristine wing geometry
+    if (this.wingGroup && this.wingGroup.children.length >= 2) {
+      this.wingGroup.children[0].rotation.z = 0;
+      this.wingGroup.children[0].rotation.x = 0;
+      this.wingGroup.children[1].rotation.z = 0;
+      this.wingGroup.children[1].rotation.x = 0;
+    }
+  }
 }

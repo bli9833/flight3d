@@ -21,21 +21,21 @@ export class Ships {
     cargoShip.position.set(800, 0, 4200);
     cargoShip.rotation.y = THREE.MathUtils.degToRad(35.0);
     this.group.add(cargoShip);
-    this.vessels.push({ mesh: cargoShip, basePos: cargoShip.position.clone(), length: 220, width: 34 });
+    this.vessels.push({ mesh: cargoShip, basePos: cargoShip.position.clone(), length: 220, width: 34, height: 35 });
 
     // 2. Luxury Cruise Liner (cruising off coastal headland: x=-2400, z=5500)
     const cruiseLiner = this.createCruiseLiner();
     cruiseLiner.position.set(-2400, 0, 5500);
     cruiseLiner.rotation.y = THREE.MathUtils.degToRad(-60.0);
     this.group.add(cruiseLiner);
-    this.vessels.push({ mesh: cruiseLiner, basePos: cruiseLiner.position.clone(), length: 190, width: 30 });
+    this.vessels.push({ mesh: cruiseLiner, basePos: cruiseLiner.position.clone(), length: 190, width: 30, height: 38 });
 
     // 3. Oil Tanker / Bulk Freighter (anchored in deep outer roadstead: x=4500, z=6500)
     const tanker = this.createTanker();
     tanker.position.set(4500, 0, 6500);
     tanker.rotation.y = THREE.MathUtils.degToRad(110.0);
     this.group.add(tanker);
-    this.vessels.push({ mesh: tanker, basePos: tanker.position.clone(), length: 180, width: 28 });
+    this.vessels.push({ mesh: tanker, basePos: tanker.position.clone(), length: 180, width: 28, height: 28 });
 
     // 4. Actively Moving Motor Yachts / Speedboats cruising the bay
     this.createSpeedboat(-500, 3200, 15.0, 1200);

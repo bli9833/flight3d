@@ -217,5 +217,21 @@ export class CameraSystem {
         break;
       }
     }
+
+    // Apply catastrophic impact / explosion camera trauma shake
+    if (this.trauma > 0) {
+      this.trauma = Math.max(0.0, this.trauma - dt * 0.55);
+      const shakePower = Math.pow(this.trauma, 2.0);
+      const shakeOffset = new THREE.Vector3(
+        (Math.random() - 0.5) * 3.2 * shakePower,
+        (Math.random() - 0.5) * 2.5 * shakePower,
+        (Math.random() - 0.5) * 3.2 * shakePower
+      );
+      this.camera.position.add(shakeOffset);
+    }
+  }
+
+  addTrauma(amount = 1.0) {
+    this.trauma = Math.min(1.0, (this.trauma || 0) + amount);
   }
 }

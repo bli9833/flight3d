@@ -74,6 +74,40 @@
     <!-- Stall Warning Alert Banner -->
     <div id="hud-stall" class="stall-banner">⚠️ STALL WARNING - PULL DOWN NOSE ⚠️</div>
 
+    <!-- Catastrophic Crash & Explosion Overlay -->
+    <div id="crash-overlay" class="crash-overlay" style="display: none;">
+      <div class="crash-vignette"></div>
+      <div class="crash-card">
+        <div class="crash-header">
+          <span class="crash-badge">💥 CATASTROPHIC IMPACT</span>
+          <span class="crash-status-tag">HULL LOSS</span>
+        </div>
+        <h1 id="crash-title" class="crash-title">관제탑 충돌 (CONTROL TOWER COLLISION)</h1>
+        <p id="crash-desc" class="crash-desc">공항 관제탑 시설에 기수 부위가 격돌했습니다.</p>
+        
+        <div class="crash-telemetry-grid">
+          <div class="crash-stat">
+            <span class="stat-label">충돌 대기속도</span>
+            <span id="crash-speed" class="stat-val">178 KT</span>
+          </div>
+          <div class="crash-stat">
+            <span class="stat-label">기체 피해 상태</span>
+            <span class="stat-val critical">전파 손실 (DESTROYED)</span>
+          </div>
+          <div class="crash-stat">
+            <span class="stat-label">충돌 대상 분류</span>
+            <span id="crash-type" class="stat-val">AIRPORT TOWER</span>
+          </div>
+        </div>
+
+        <div class="crash-actions">
+          <button id="btn-crash-restart" class="btn btn-crash-restart">
+            <span class="btn-icon">🔄</span> 활주로 09L에서 즉시 재시작 [Space / R]
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast-msg" class="toast">Runway 09L Ready</div>
 

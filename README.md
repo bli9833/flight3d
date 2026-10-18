@@ -3,8 +3,9 @@
 [![Node Version](https://img.shields.io/badge/Node.js-20%2B-brightgreen.svg)](https://nodejs.org)
 [![Three.js](https://img.shields.io/badge/Three.js-r186-black.svg)](https://threejs.org)
 [![Vite](https://img.shields.io/badge/Vite-6.0-purple.svg)](https://vitejs.dev)
-[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-20%2F20%20Pass%20(100%25)-success.svg)](file:///home/stlim/flight3d/tests)
+[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-30%2F30%20Pass%20(100%25)-success.svg)](file:///home/stlim/flight3d/tests)
 [![Flight CDP Tests](https://img.shields.io/badge/Flight%20Agent-5%2F5%20Pass%20(100%25)-blue.svg)](file:///home/stlim/flight3d/scripts/test-flight-agent.js)
+[![Crash CDP Tests](https://img.shields.io/badge/Crash%20Agent-5%2F5%20Pass%20(100%25)-red.svg)](file:///home/stlim/flight3d/scripts/test-crash-scenarios.js)
 
 IL-2 슈투르모빅(IL-2 Sturmovik) 및 정밀 비행 시뮬레이터(MSFS / X-Plane) 수준의 현실적인 6-DOF 항공역학 물리 모델과 실제 보잉 737 실사 사진을 정밀 반영한 글래스 콕핏 계기판, 절차적 굴곡 지형, 햇빛이 반사되는 거스트너 파도 수면, 해상 선박 및 공항 관제탑 시스템을 모두 갖춘 고성능 웹 3D 비행 시뮬레이터입니다.
 
@@ -23,6 +24,10 @@ IL-2 슈투르모빅(IL-2 Sturmovik) 및 정밀 비행 시뮬레이터(MSFS / X-
 | 3NM PAPI 최종 진입 (Final Approach) | 거스트너 파도 & 해상 선단 (Ocean Fleet) |
 | :---: | :---: |
 | ![Demo Approach PAPI](demo_approach_papi_showcase.png) | ![Ocean Ships](ocean_ships_view.png) |
+
+| 관제탑 충돌 폭발 (Tower Crash) | 도심 빌딩 충돌 폭발 (Building Crash) |
+| :---: | :---: |
+| ![Crash Tower](crash_tower_showcase.png) | ![Crash Building](crash_building_showcase.png) |
 
 ---
 
@@ -48,6 +53,21 @@ IL-2 슈투르모빅(IL-2 Sturmovik) 및 정밀 비행 시뮬레이터(MSFS / X-
 
 ### 3. 🌊 절차적 3D 월드, 해양 & 공항 시스템 (`src/environment/`)
 * **거스트너 파도 셰이더 & 해상 선단:** 햇빛 정반사(Sun Glint)와 프레넬 반사, 부력으로 흔들리는 컨테이너선, 대형 유람선, 쾌속 요트.
+* **실시간 4등식 PAPI 조명:** 항공기 상대 고도각을 $120\text{Hz}$로 계산하여 $3.0^\circ$ 활공각 정렬 시 정확히 **2등 백색 / 2등 적색** 유도.
+* **ICAO / FAA 표준 활주로:** 3,200m 09L/27R 활주로, 150m~900m TDZ 마킹, 900m MALSR 진입등(주행 점멸 래빗 및 크로스바), 65m 회전 레이더 관제탑.
+* **지형 및 대기권:** 20km 프랙탈 산맥, 3,500+ 그루의 나무, 500+ 채의 도심 고층 빌딩, 시간대별 대기권 원근 안개(Aerial Perspective Fog).
+
+### 4. 🎬 6단계 자율 시네마틱 데모 비행 디렉터 (`src/director/DemoFlightDirector.js`)
+* 첫 접속 시 활주로 이륙 활주 $\rightarrow$ 로테이션 & 기어 수납 $\rightarrow$ 해안가 선회 $\rightarrow$ 파도/선단 크루즈 $\rightarrow$ 3NM PAPI 접근 $\rightarrow$ 플레어/접지/역추진 제동을 자동으로 시연.
+* 사용자가 언제든지 <kbd>Esc</kbd> 또는 조종키를 누르면 지연 없이 즉각 수동 조종으로 매끄럽게 전환.
+
+### 5. 💥 다중 장애물 충돌 감지 & 시네마틱 폭발 시스템 (`src/physics/CollisionDetector.js`, `src/effects/ExplosionSystem.js`)
+* **8포인트 바운딩 프로브 정밀 검사:** 기수(Radome), 미부(Tail), 수직미익(Fin), 좌/우 주익단(Wingtip), 좌/우 CFM56 엔진, 동체 하단(Belly)을 월드 좌표로 실시간 변환.
+* **전 방위 장애물 충돌 판정:** 20km 굴곡 산맥, 해상 수면, 공항 관제탑(Cylinder), 여객 터미널/격납고(AABB), 550+ 채의 도심 고층 빌딩 및 3,500+ 그루의 수목(Spatial Grid Broadphase), 해상 선박.
+* **활주로 정상 운항 포락선 보호:** 활주로 접지 시 올레오 서스펜션 완충 및 정상 로테이션(피치 -5.5° ~ +14.5°) 시 오발생 없는 안전 비행 보장. 과도한 강하율(-12.5 m/s 이상), 윙팁 지면 스크랩(롤 16.5° 초과), 기어 미전개 동체 접지 시 충돌 판정.
+* **다단계 시네마틱 입자 폭발 시스템:** 동적 섬광 포인트 라이트(15,000 lm), 팽창 화염구 코어, 대량의 부유식 흑연 연기 기둥, 탄도 궤적 파편 스파크, 지면/수면 충격파 링, 해상 비산 물보라 간헐천, 잔해 지속 연기.
+* **Web Audio API 절차적 폭발음:** 초저역(30~80Hz) 충격음 쿵과 메탈 파쇄 노이즈를 절차적으로 합성 재생.
+* **기체 파손 비주얼 & 원터치 재시작:** 날개 구조 변형, 전원 소등, 충돌 텔레메트리 카드 HUD 및 <kbd>Space</kbd> / <kbd>R</kbd> 원터치 즉시 재시작.
 * **실시간 4등식 PAPI 조명:** 항공기 상대 고도각을 $120\text{Hz}$로 계산하여 $3.0^\circ$ 활공각 정렬 시 정확히 **2등 백색 / 2등 적색** 유도.
 * **ICAO / FAA 표준 활주로:** 3,200m 09L/27R 활주로, 150m~900m TDZ 마킹, 900m MALSR 진입등(주행 점멸 래빗 및 크로스바), 65m 회전 레이더 관제탑.
 * **지형 및 대기권:** 20km 프랙탈 산맥, 3,500+ 그루의 나무, 500+ 채의 도심 고층 빌딩, 시간대별 대기권 원근 안개(Aerial Perspective Fog).
@@ -97,6 +117,7 @@ npm run dev
 | **물리 진단창** | <kbd>`</kbd> 또는 <kbd>F3</kbd> | 120Hz 텔레메트리, G-Force/AoA 그래프, 실시간 공력 튜닝 슬라이더 |
 | **사운드 음소거** | <kbd>M</kbd> | 제트엔진 및 GPWS 사운드 켜기/끄기 |
 | **도움말** | <kbd>H</kbd> | 비행 조작 매뉴얼 팝업 토글 |
+| **충돌 후 재시작** | <kbd>Space</kbd> / <kbd>R</kbd> / <kbd>Enter</kbd> | 충돌 폭발 후 기체 완전 복원 및 활주로 09L 즉각 재시작 |
 
 ---
 
@@ -106,8 +127,8 @@ npm run dev
 ```bash
 npm test
 ```
-* **결과:** 20 / 20 통과 (100% Pass)
-* 대기 모델(ISA), 6-DOF 공력 미계수, 터보팬 엔진 스풀 지연, 착륙장치 올레오 서스펜션 수학적 검증.
+* **결과:** 30 / 30 통과 (100% Pass)
+* 대기 모델(ISA), 6-DOF 공력 미계수, 터보팬 엔진 스풀 지연, 착륙장치 올레오 서스펜션, 8포인트 다중 장애물 충돌 감지기 수학적 검증.
 
 ### 2. 자율 비행 CDP 테스트 에이전트 (Autonomous CDP Flight Agent)
 ```bash
@@ -119,6 +140,17 @@ AI 코딩 에이전트 및 개발자가 게임을 수동으로 조작하지 않�
 3. `[PASS]` $3.0^\circ$ 글라이드슬로프 접근, $25\text{ft}$ 플레어, 접지 및 역추진/브레이크 정지 검증
 4. `[PASS]` 프리셋 및 5대 카메라 뷰 스트레스 전환 및 NaN/예외 미발생 검증
 5. `[PASS]` 6단계 자율 데모 비행 상태 전이 및 조종사 즉시 수동 제어권 회복 검증
+
+### 3. 자율 충돌 및 폭발 CDP 테스트 에이전트 (Autonomous CDP Crash Suite)
+```bash
+npm run test:crash
+```
+다양한 지형지물 및 인공 구조물과의 물리 충돌 판정 및 폭발 이펙트를 자동 검증합니다:
+1. `[PASS]` 공항 관제탑(Control Tower) 실린더 정밀 충돌 판정 및 파편 폭발
+2. `[PASS]` 해상 수면(Ocean Water) 고속 다이빙 충돌 및 물보라 간헐천
+3. `[PASS]` 20km 프랙탈 산악 지형(Mountain Ridge) 암벽 격돌
+4. `[PASS]` 도심 고층 빌딩(Skyscraper) 격돌 및 대형 화염구 생성
+5. `[PASS]` 산림 수목(Forest Trees) 접촉 및 <kbd>Space</kbd>/<kbd>R</kbd> 원터치 즉각 재시작 무결성 검증
 
 ---
 
