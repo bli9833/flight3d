@@ -18,14 +18,17 @@ export class SkyAtmosphere {
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
-    this.sunLight.shadow.camera.near = 0.5;
-    this.sunLight.shadow.camera.far = 1500;
-    const sCam = 80;
+    this.sunLight.shadow.camera.near = 1.0;
+    this.sunLight.shadow.camera.far = 2000;
+    this.sunLight.shadow.bias = -0.0003;
+    this.sunLight.shadow.normalBias = 0.02;
+    const sCam = 120;
     this.sunLight.shadow.camera.left = -sCam;
     this.sunLight.shadow.camera.right = sCam;
     this.sunLight.shadow.camera.top = sCam;
     this.sunLight.shadow.camera.bottom = -sCam;
     this.scene.add(this.sunLight);
+    this.scene.add(this.sunLight.target);
 
     this.ambientLight = new THREE.AmbientLight(0xdde8f5, 1.2);
     this.scene.add(this.ambientLight);
@@ -45,12 +48,12 @@ export class SkyAtmosphere {
     this.updateSun();
   }
 
-  setTimeOfDay(hours) {
+  setTimeOfDay(hours, targetPos = null) {
     this.timeOfDay = (hours + 24) % 24;
-    this.updateSun();
+    this.updateSun(targetPos);
   }
 
-  updateSun() {
+  updateSun(targetPos = null) {
     // Map 24h to solar elevation and azimuth
     // 06:00 = Sunrise (elev 0°), 12:00 = Noon (elev 65°), 18:00 = Sunset (elev 0°), 24:00 = Midnight
     const hourRad = ((this.timeOfDay - 6.0) / 24.0) * Math.PI * 2.0;
@@ -63,16 +66,22 @@ export class SkyAtmosphere {
 
     this.sunPosition.setFromSphericalCoords(1, phi, theta);
 
-    // Update Sky Shader uniforms
+    // Update Sky Shader uniforms (smooth continuous Rayleigh transition prevents sky flashing)
+    const rayleighT = Math.max(0.0, Math.min(1.0, (elevation - 4.0) / 12.0));
     const uniforms = this.sky.material.uniforms;
     uniforms['turbidity'].value = 8.0;
-    uniforms['rayleigh'].value = elevation < 12 ? 3.5 : 1.2;
+    uniforms['rayleigh'].value = 3.5 - 2.3 * rayleighT;
     uniforms['mieCoefficient'].value = 0.005;
     uniforms['mieDirectionalG'].value = 0.85;
     uniforms['sunPosition'].value.copy(this.sunPosition);
 
-    // Update Sun Light direction & color
-    this.sunLight.position.copy(this.sunPosition).multiplyScalar(800);
+    // Update Sun Light direction & position following aircraft to eliminate shadow clipping popping
+    if (targetPos) {
+      this.sunLight.target.position.copy(targetPos);
+      this.sunLight.position.copy(targetPos).addScaledVector(this.sunPosition, 600);
+    } else {
+      this.sunLight.position.copy(this.sunPosition).multiplyScalar(800);
+    }
 
     // Update Atmospheric Aerial Perspective Fog Color
     if (!this.scene.fog) {

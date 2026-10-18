@@ -56,17 +56,16 @@ export class Cockpit {
       metalness: 0.05
     });
 
-    // Glass windshield material
-    const glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0x88aabb,
+    // Glass windshield material (clean non-refractive transparent material, eliminating transmission pass buffer flickering)
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x90b8d0,
       transparent: true,
-      opacity: 0.15,
-      roughness: 0.05,
-      metalness: 0.1,
-      transmission: 0.90,
-      ior: 1.52,
-      reflectivity: 0.5
+      opacity: 0.12,
+      roughness: 0.08,
+      metalness: 0.25,
+      depthWrite: false
     });
+
 
     // 1. Cockpit Floor
     const floorGeo = new THREE.BoxGeometry(2.4, 0.08, 2.6);

@@ -39,9 +39,14 @@ class FlightSimulator {
 
     // 1. Scene, Camera, Renderer
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 50000);
+    // near: 0.25m and far: 45,000m combined with logarithmicDepthBuffer completely eliminates Z-fighting & screen flickering
+    this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.25, 45000);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      logarithmicDepthBuffer: true,
+      powerPreference: 'high-performance'
+    });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -583,12 +588,14 @@ class FlightSimulator {
       this.integratePhysics(this.physicsDt);
       this.totalSimTime += this.physicsDt;
     }
+    this.demoDirector.update(simSeconds);
+    const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
+    this.aircraft.setCockpitMode(isCockpit);
     this.aircraft.update(this.physicsDt, this.telemetry);
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry);
-    this.demoDirector.update(simSeconds);
     this.explosionSystem.update(simSeconds);
     this.updateHUD();
     return this.telemetry;
@@ -631,14 +638,18 @@ class FlightSimulator {
     this.water.update(frameDelta);
     this.airport.update(frameDelta, this.position);
     this.ships.update(frameDelta, this.totalSimTime);
+    this.sky.updateSun(this.position);
     this.explosionSystem.update(frameDelta);
 
-    // 4. Update Audio System & Cockpit Visibility
+    // 4. Update Demo Director (Controls flight autopilot & camera view selection per stage)
+    this.demoDirector.update(frameDelta);
+
+    // 5. Update Cockpit Visibility & Audio
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     this.aircraft.setCockpitMode(isCockpit);
     this.audio.update(frameDelta, this.telemetry, isCockpit);
 
-    // 5. Update Camera System & Dynamic FOV (60° in cockpit eliminates fisheye speed distortion)
+    // 6. Update Camera System & Dynamic FOV (60° in cockpit eliminates fisheye speed distortion)
     const targetFov = isCockpit ? 60 : 54;
     if (Math.abs(this.camera.fov - targetFov) > 0.1) {
       this.camera.fov = targetFov;
@@ -646,12 +657,11 @@ class FlightSimulator {
     }
     this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry);
 
-    // 6. Update Demo Director & HTML HUD & Diagnostics Inspector
-    this.demoDirector.update(frameDelta);
+    // 7. Update HTML HUD & Diagnostics Inspector
     this.updateHUD();
     this.diagnostics.update(frameDelta, this.telemetry);
 
-    // 7. Render 3D Scene
+    // 8. Render 3D Scene
     this.renderer.render(this.scene, this.camera);
   }
 

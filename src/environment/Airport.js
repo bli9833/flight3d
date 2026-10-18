@@ -47,17 +47,23 @@ export class Airport {
   }
 
   initAirport() {
-    // Materials
+    // Materials with hardware polygon offset to guarantee zero Z-fighting with terrain
     const asphaltMat = new THREE.MeshStandardMaterial({
       color: 0x1e242b,
       roughness: 0.85,
-      metalness: 0.1
+      metalness: 0.1,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
     });
 
     const concreteMat = new THREE.MeshStandardMaterial({
       color: 0x94a3b8,
       roughness: 0.75,
-      metalness: 0.2
+      metalness: 0.2,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
     });
 
     const towerGlassMat = new THREE.MeshStandardMaterial({
@@ -89,11 +95,17 @@ export class Airport {
     const rwyGeo = new THREE.PlaneGeometry(this.runwayLength, this.runwayWidth);
     rwyGeo.rotateX(-Math.PI * 0.5);
     const rwyMesh = new THREE.Mesh(rwyGeo, asphaltMat);
-    rwyMesh.position.set(0, this.elevation + 0.05, 0);
+    rwyMesh.position.set(0, this.elevation + 0.06, 0);
     this.group.add(rwyMesh);
 
-    // Runway Markings Material
-    const whiteMarkMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    // Runway Markings Material (polygonOffset & depthWrite: false prevents all flickering)
+    const whiteMarkMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+      depthWrite: false
+    });
     const markingsGroup = new THREE.Group();
     markingsGroup.position.set(0, this.elevation + 0.08, 0);
 
@@ -202,7 +214,14 @@ export class Airport {
       c.fillText(text, 128, 128);
 
       const tex = new THREE.CanvasTexture(can);
-      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -3,
+        polygonOffsetUnits: -3,
+        depthWrite: false
+      });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), mat);
       mesh.rotation.set(-Math.PI * 0.5, 0, rotY);
       mesh.position.set(x, 0.01, 0);

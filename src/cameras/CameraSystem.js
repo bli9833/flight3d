@@ -82,8 +82,22 @@ export class CameraSystem {
   snapToTarget(aircraftMesh) {
     const behindLocal = new THREE.Vector3(0, this.chaseHeight, this.chaseDistance);
     this.chasePos.copy(behindLocal.applyMatrix4(aircraftMesh.matrixWorld));
-    this.camera.position.copy(this.chasePos);
-    this.camera.lookAt(aircraftMesh.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+
+    if (this.mode === CameraSystem.MODES.COCKPIT) {
+      const eyeWorld = this.cockpitHeadOffset.clone().applyMatrix4(aircraftMesh.matrixWorld);
+      this.camera.position.copy(eyeWorld);
+      const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraftMesh.quaternion);
+      this.camera.up.copy(upWorld);
+      const forwardLocal = new THREE.Vector3(0, 0, -100);
+      forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.lookPitch);
+      forwardLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.lookYaw);
+      const forwardWorld = forwardLocal.applyQuaternion(aircraftMesh.quaternion);
+      this.camera.lookAt(eyeWorld.clone().add(forwardWorld));
+    } else {
+      this.camera.position.copy(this.chasePos);
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(aircraftMesh.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+    }
   }
 
   cycleMode() {
@@ -146,6 +160,10 @@ export class CameraSystem {
         const eyeWorld = eyeLocal.applyMatrix4(aircraftMesh.matrixWorld);
         this.camera.position.copy(eyeWorld);
 
+        // Up vector tracks aircraft roll (MUST be set BEFORE lookAt)
+        const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
+        this.camera.up.copy(upWorld);
+
         // Compute forward look target with head rotation
         const forwardLocal = new THREE.Vector3(0, 0, -100);
         // Apply pilot pan/tilt
@@ -154,9 +172,6 @@ export class CameraSystem {
         const forwardWorld = forwardLocal.applyQuaternion(planeQuat);
 
         this.camera.lookAt(eyeWorld.clone().add(forwardWorld));
-        // Up vector tracks aircraft roll
-        const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
-        this.camera.up.copy(upWorld);
         break;
       }
 
@@ -170,8 +185,8 @@ export class CameraSystem {
         this.camera.position.copy(this.chasePos);
 
         const lookTarget = planePos.clone().add(new THREE.Vector3(0, 1.5, 0));
-        this.camera.lookAt(lookTarget);
         this.camera.up.set(0, 1, 0);
+        this.camera.lookAt(lookTarget);
         break;
       }
 
@@ -181,12 +196,13 @@ export class CameraSystem {
         const eyeWorld = windowLocal.applyMatrix4(aircraftMesh.matrixWorld);
         this.camera.position.copy(eyeWorld);
 
+        const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
+        this.camera.up.copy(upWorld);
+
         // Look outward towards wingtip and engine
         const lookLocal = new THREE.Vector3(-15.0, -1.2, -4.0);
         const lookWorld = lookLocal.applyMatrix4(aircraftMesh.matrixWorld);
         this.camera.lookAt(lookWorld);
-        const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
-        this.camera.up.copy(upWorld);
         break;
       }
 
