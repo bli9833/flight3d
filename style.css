@@ -750,3 +750,547 @@ kbd {
   box-shadow: 0 6px 22px rgba(239, 68, 68, 0.6);
 }
 
+/* ==========================================================================
+   Mobile & Touchscreen On-Screen Flight Control System
+   ========================================================================== */
+
+.btn-touch-toggle {
+  background: linear-gradient(135deg, #1e293b, #0f172a) !important;
+  border-color: #38bdf8 !important;
+  color: #38bdf8 !important;
+}
+
+.btn-touch-toggle.active {
+  background: linear-gradient(135deg, #0284c7, #0369a1) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(14, 165, 233, 0.65) !important;
+}
+
+.touch-controls-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 16px 20px;
+  box-sizing: border-box;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+}
+
+.touch-quadrant {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* Left Quadrant: Throttle & Engine Controls */
+.touch-left {
+  flex-direction: row;
+}
+
+.touch-throttle-card {
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 12px;
+  padding: 8px 10px;
+  width: 108px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.touch-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 4px;
+}
+
+.touch-label {
+  color: #94a3b8;
+}
+
+.touch-value {
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.touch-throttle-body {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.touch-throttle-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.btn-touch-preset {
+  width: 42px;
+  height: 32px;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  transition: all 0.15s;
+}
+
+.btn-touch-preset:active {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #38bdf8;
+  transform: scale(0.95);
+}
+
+.touch-throttle-track {
+  position: relative;
+  width: 44px;
+  height: 160px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 2px solid rgba(56, 189, 248, 0.45);
+  border-radius: 22px;
+  overflow: hidden;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.touch-throttle-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(to top, rgba(14, 165, 233, 0.25), rgba(56, 189, 248, 0.85));
+  border-radius: 0 0 20px 20px;
+  pointer-events: none;
+  transition: height 0.05s ease-out;
+}
+
+.touch-throttle-thumb {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 44px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, #38bdf8, #0284c7);
+  border: 2px solid #ffffff;
+  border-radius: 13px;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.9);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb-grip {
+  width: 14px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 2px;
+}
+
+.throttle-detent {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+}
+
+.touch-left-actions,
+.touch-right-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.btn-touch-pill {
+  min-width: 58px;
+  height: 44px;
+  padding: 0 10px;
+  border-radius: 22px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #f1f5f9;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  touch-action: none;
+  transition: all 0.15s;
+}
+
+.btn-touch-pill:active,
+.btn-touch-pill.active {
+  background: rgba(16, 185, 129, 0.35);
+  border-color: #10b981;
+  color: #a7f3d0;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.6);
+}
+
+.btn-touch-pill.active-amber {
+  background: rgba(245, 158, 11, 0.35);
+  border-color: #f59e0b;
+  color: #fde68a;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.6);
+}
+
+/* Center Quadrant: Rudder & Brakes */
+.touch-center {
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.btn-touch-brake {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(185, 28, 28, 0.45));
+  border: 2px solid #ef4444;
+  color: #fee2e2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+  box-shadow: 0 4px 18px rgba(239, 68, 68, 0.4);
+  transition: all 0.15s;
+}
+
+.btn-touch-brake .brake-label {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.btn-touch-brake .brake-sub {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.btn-touch-brake:active,
+.btn-touch-brake.active {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 26px #ef4444;
+  transform: scale(0.96);
+}
+
+.touch-rudder-card {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 10px;
+  padding: 6px 10px;
+  width: 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rudder-label-strip {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 800;
+  color: #94a3b8;
+}
+
+.touch-rudder-track {
+  position: relative;
+  width: 100%;
+  height: 32px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.rudder-center-notch {
+  width: 2px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+.touch-rudder-thumb {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #38bdf8, #0284c7);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #38bdf8;
+  pointer-events: none;
+  transform: translateX(0px);
+  transition: transform 0.05s ease-out;
+}
+
+/* Right Quadrant: Virtual Flight Stick Yoke */
+.touch-right {
+  flex-direction: row;
+}
+
+.touch-stick-card {
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 12px;
+  padding: 8px 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.touch-stick-zone {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, rgba(15, 23, 42, 0.95) 75%);
+  border: 2px solid rgba(56, 189, 248, 0.5);
+  cursor: crosshair;
+  touch-action: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stick-crosshair-h {
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  background: rgba(56, 189, 248, 0.25);
+  pointer-events: none;
+}
+
+.stick-crosshair-v {
+  position: absolute;
+  height: 100%;
+  width: 1px;
+  background: rgba(56, 189, 248, 0.25);
+  pointer-events: none;
+}
+
+.stick-boundary {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border: 1px dashed rgba(56, 189, 248, 0.35);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.touch-stick-knob {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #38bdf8 25%, #0284c7 85%);
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.9);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(0px, 0px);
+  transition: transform 0.05s ease-out;
+}
+
+.knob-ring {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+}
+
+.knob-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #ffffff;
+}
+
+.help-col-wide {
+  grid-column: span 2;
+}
+
+/* ==========================================================================
+   Responsive Mobile & Tablet Viewport Adaptations
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .hud-strip {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 6px 10px;
+  }
+  .hud-strip::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+body.touch-mode .action-panel {
+  display: none !important;
+}
+
+@media (max-width: 960px) {
+  .hud-strip {
+    font-size: 11px;
+    gap: 8px;
+    padding: 6px 12px;
+  }
+  .hud-item {
+    min-width: 50px;
+  }
+  .presets-bar {
+    top: 50px;
+    left: 8px;
+    gap: 5px;
+    max-width: calc(100vw - 16px);
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .presets-bar .btn-preset {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+  .action-panel {
+    display: none !important;
+  }
+  .touch-controls-overlay {
+    padding: 8px 12px;
+  }
+  .touch-throttle-card {
+    width: 96px;
+    padding: 6px 8px;
+  }
+  .touch-throttle-track {
+    width: 38px;
+    height: 135px;
+  }
+  .touch-stick-zone {
+    width: 135px;
+    height: 135px;
+  }
+  .touch-stick-knob {
+    width: 48px;
+    height: 48px;
+  }
+  .btn-touch-brake {
+    width: 58px;
+    height: 58px;
+  }
+  .touch-rudder-card {
+    width: 130px;
+  }
+  .help-col-wide {
+    grid-column: span 1;
+  }
+}
+
+@media (max-height: 540px) {
+  /* Mobile Landscape phone mode */
+  .action-panel {
+    display: none !important;
+  }
+  .hud-strip {
+    top: 4px;
+    left: auto;
+    right: 8px;
+    transform: none;
+    padding: 3px 10px;
+    gap: 8px;
+  }
+  .hud-item .hud-label {
+    font-size: 8px;
+  }
+  .hud-item .hud-val {
+    font-size: 11px;
+  }
+  /* On compact landscape mobile, hide items already shown on touch buttons */
+  .hud-item:nth-child(5),
+  .hud-item:nth-child(7),
+  .hud-item:nth-child(8),
+  .hud-item:nth-child(9),
+  .hud-item:nth-child(10) {
+    display: none;
+  }
+  .presets-bar {
+    top: 4px;
+    left: 8px;
+    flex-direction: row;
+    gap: 4px;
+    z-index: 15;
+  }
+  .presets-bar .btn-preset {
+    padding: 3px 6px;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+  .touch-throttle-track {
+    height: 120px;
+  }
+  .touch-stick-zone {
+    width: 125px;
+    height: 125px;
+  }
+  .touch-controls-overlay {
+    padding: 6px 12px;
+  }
+  .demo-banner {
+    top: 40px;
+    padding: 4px 12px;
+  }
+}
+

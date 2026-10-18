@@ -23,6 +23,7 @@ import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
 import { DemoFlightDirector } from './director/DemoFlightDirector.js';
 import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
+import { TouchFlightControls } from './controls/TouchFlightControls.js';
 
 // Expose THREE globally for test harness and browser console debugging
 if (typeof window !== 'undefined') {
@@ -101,6 +102,7 @@ class FlightSimulator {
     // 6. Audio & Controls & Camera & Diagnostics
     this.audio = new FlightAudio();
     this.controls = new FlightControls(this.renderer.domElement);
+    this.touchControls = new TouchFlightControls(this.controls);
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
@@ -597,6 +599,7 @@ class FlightSimulator {
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry);
     this.explosionSystem.update(simSeconds);
+    this.touchControls.updateUI(this.telemetry);
     this.updateHUD();
     return this.telemetry;
   }
@@ -657,8 +660,9 @@ class FlightSimulator {
     }
     this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry);
 
-    // 7. Update HTML HUD & Diagnostics Inspector
+    // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
+    this.touchControls.updateUI(this.telemetry);
     this.diagnostics.update(frameDelta, this.telemetry);
 
     // 8. Render 3D Scene
@@ -725,6 +729,11 @@ class FlightSimulator {
     document.getElementById('btn-time')?.addEventListener('click', () => this.controls.onCycleTimeOfDay(3.0));
     document.getElementById('btn-sound')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-diag')?.addEventListener('click', () => this.diagnostics.toggle());
+    document.getElementById('btn-touch-toggle')?.addEventListener('click', () => {
+      this.touchControls.toggle();
+      const state = this.touchControls.enabled ? 'ON' : 'OFF';
+      this.showToast(`터치 조작 컨트롤: ${state}`);
+    });
     document.getElementById('btn-ap')?.addEventListener('click', () => {
       this.apMaster = !this.apMaster;
       this.showToast(`Autopilot: ${this.apMaster ? 'ENGAGED' : 'DISENGAGED'}`);

@@ -23,6 +23,13 @@ export class FlightControls {
     this.virtualElevator = null;
     this.virtualAileron = null;
     this.virtualRudder = null;
+    this.virtualBrakes = null;
+
+    // Mobile / Touchscreen on-screen inputs
+    this.touchElevator = 0.0;
+    this.touchAileron = 0.0;
+    this.touchRudder = 0.0;
+    this.touchBrakes = 0.0;
 
     // Keys pressed state
     this.keys = {};
@@ -124,9 +131,9 @@ export class FlightControls {
       this.throttle = Math.max(0.0, this.throttle - dt * 0.35);
     }
 
-    // 2. Pitch Control (W/S or Down/Up Arrow)
-    // Positive elevator = pitch UP (pulling stick back / KeyS / ArrowDown)
-    let targetElevator = this.virtualElevator !== null ? this.virtualElevator : 0.0;
+    // 2. Pitch Control (W/S or Down/Up Arrow or Touch)
+    // Positive elevator = pitch UP (pulling stick back / KeyS / ArrowDown / Touch Drag Down)
+    let targetElevator = this.virtualElevator !== null ? this.virtualElevator : this.touchElevator;
     if (this.keys['KeyS'] || this.keys['ArrowDown']) {
       targetElevator += 1.0; // Pitch UP
     }
@@ -134,8 +141,8 @@ export class FlightControls {
       targetElevator -= 1.0; // Pitch DOWN
     }
 
-    // 3. Roll Control (A/D or Left/Right Arrow)
-    let targetAileron = this.virtualAileron !== null ? this.virtualAileron : 0.0;
+    // 3. Roll Control (A/D or Left/Right Arrow or Touch)
+    let targetAileron = this.virtualAileron !== null ? this.virtualAileron : this.touchAileron;
     if (this.keys['KeyD'] || this.keys['ArrowRight']) {
       targetAileron += 1.0; // Bank RIGHT
     }
@@ -149,8 +156,8 @@ export class FlightControls {
       targetAileron = Math.max(-1.0, Math.min(1.0, this.mouseX * 1.5));
     }
 
-    // 4. Yaw Rudder Control (Q/E)
-    let targetRudder = this.virtualRudder !== null ? this.virtualRudder : 0.0;
+    // 4. Yaw Rudder Control (Q/E or Touch)
+    let targetRudder = this.virtualRudder !== null ? this.virtualRudder : this.touchRudder;
     if (this.keys['KeyE']) {
       targetRudder += 1.0; // Yaw RIGHT
     }
@@ -191,14 +198,33 @@ export class FlightControls {
     }
     this.pitchTrim = Math.max(-4.0, Math.min(12.0, this.pitchTrim));
 
-    // 6. Wheel Brakes (Spacebar)
+    // 6. Wheel Brakes (Spacebar or Virtual/Touch Brakes)
     if (this.keys['Space']) {
       this.brakes = 1.0;
     } else if (this.virtualBrakes !== null && this.virtualBrakes !== undefined) {
       this.brakes = this.virtualBrakes;
+    } else if (this.touchBrakes > 0) {
+      this.brakes = this.touchBrakes;
     } else {
       this.brakes = 0.0;
     }
+  }
+
+  setTouchStick(pitch, roll) {
+    this.touchElevator = Math.max(-1.0, Math.min(1.0, pitch));
+    this.touchAileron = Math.max(-1.0, Math.min(1.0, roll));
+  }
+
+  setTouchThrottle(val) {
+    this.throttle = Math.max(0.0, Math.min(1.0, val));
+  }
+
+  setTouchRudder(rudder) {
+    this.touchRudder = Math.max(-1.0, Math.min(1.0, rudder));
+  }
+
+  setTouchBrakes(brakes) {
+    this.touchBrakes = Math.max(0.0, Math.min(1.0, brakes));
   }
 
   setVirtualInput(axis, val) {
