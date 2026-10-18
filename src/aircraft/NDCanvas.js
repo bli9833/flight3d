@@ -1,0 +1,291 @@
+import * as THREE from 'three';
+
+/**
+ * Boeing Navigation Display (ND)
+ * Shows compass rose arc, runway centerline, airport fix waypoints, range rings, wind vector, GS/TAS.
+ */
+export class NDCanvas {
+  constructor(width = 512, height = 512) {
+    this.width = width;
+    this.height = height;
+
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = width;
+    this.canvas.height = height;
+    this.ctx = this.canvas.getContext('2d');
+
+    this.texture = new THREE.CanvasTexture(this.canvas);
+    this.texture.generateMipmaps = true;
+    this.texture.minFilter = THREE.LinearMipmapLinearFilter;
+    this.texture.magFilter = THREE.LinearFilter;
+
+    this.heading = 0;
+    this.track = 0;
+    this.groundSpeed = 0;
+    this.tas = 0;
+    this.windDir = 270;
+    this.windSpeed = 10;
+    this.planePos = new THREE.Vector2(0, 0); // World X, Z in meters
+
+    // Range setting in Nautical Miles (10 NM = 18,520m)
+    this.rangeNm = 10;
+  }
+
+  updateData(state) {
+    this.heading = (state.headingDeg || 0 + 360) % 360;
+    this.track = (state.trackDeg || this.heading + 360) % 360;
+    this.groundSpeed = state.groundSpeedKnots || 0;
+    this.tas = state.tasKnots || 0;
+    this.planePos.set(state.x || 0, state.z || 0);
+  }
+
+  render() {
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+
+    // Background
+    ctx.fillStyle = '#0a0d12';
+    ctx.fillRect(0, 0, w, h);
+
+    const cx = w * 0.5;
+    const cy = h * 0.78; // Aircraft symbol at bottom-center in ARC mode
+    const arcRadius = h * 0.62;
+
+    // Top status readouts: GS, TAS, Wind
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`GS ${Math.round(this.groundSpeed)}`, 24, 28);
+    ctx.fillText(`TAS ${Math.round(this.tas)}`, 24, 46);
+
+    ctx.textAlign = 'right';
+    ctx.fillText(`${Math.round(this.windDir)}° / ${Math.round(this.windSpeed)} KT`, w - 24, 28);
+
+    // Range rings
+    ctx.strokeStyle = '#283548';
+    ctx.lineWidth = 1.5;
+    const rings = [0.25, 0.5, 0.75, 1.0];
+    rings.forEach((ratio, idx) => {
+      const r = arcRadius * ratio;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, -Math.PI * 0.82, -Math.PI * 0.18);
+      ctx.stroke();
+
+      // Range text
+      ctx.fillStyle = '#4a5d78';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'right';
+      const nmLabel = Math.round(this.rangeNm * ratio);
+      ctx.fillText(`${nmLabel}`, cx - 6, cy - r + 4);
+    });
+
+    // Outer compass arc
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, arcRadius, -Math.PI * 0.80, -Math.PI * 0.20);
+    ctx.stroke();
+
+    // Compass tick marks
+    const pxPerNm = arcRadius / this.rangeNm;
+    const hdgRad = THREE.MathUtils.degToRad(this.heading);
+
+    for (let deg = -60; deg <= 60; deg += 5) {
+      const markHdg = (Math.round(this.heading) + deg + 360) % 360;
+      const angle = THREE.MathUtils.degToRad(deg - 90);
+      const isMajor = markHdg % 10 === 0;
+      const len = isMajor ? 12 : 6;
+
+      const x1 = cx + Math.cos(angle) * (arcRadius - len);
+      const y1 = cy + Math.sin(angle) * (arcRadius - len);
+      const x2 = cx + Math.cos(angle) * arcRadius;
+      const y2 = cy + Math.sin(angle) * arcRadius;
+
+      ctx.lineWidth = isMajor ? 2 : 1;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      if (isMajor) {
+        let label = (markHdg / 10).toString().padStart(2, '0');
+        if (markHdg === 0) label = 'N';
+        if (markHdg === 90) label = 'E';
+        if (markHdg === 180) label = 'S';
+        if (markHdg === 270) label = 'W';
+
+        const tx = cx + Math.cos(angle) * (arcRadius - 22);
+        const ty = cy + Math.sin(angle) * (arcRadius - 22);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, tx, ty);
+      }
+    }
+
+    // Top heading track triangle & box
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - arcRadius - 4);
+    ctx.lineTo(cx - 7, cy - arcRadius - 14);
+    ctx.lineTo(cx + 7, cy - arcRadius - 14);
+    ctx.closePath();
+    ctx.fill();
+
+    const boxW = 50;
+    const boxH = 22;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(cx - boxW * 0.5, cy - arcRadius - 38, boxW, boxH);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cx - boxW * 0.5, cy - arcRadius - 38, boxW, boxH);
+
+    ctx.fillStyle = '#00ff44';
+    ctx.font = 'bold 15px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(Math.round(this.heading).toString().padStart(3, '0'), cx, cy - arcRadius - 27);
+
+    // Track line (Current course track)
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx, cy - arcRadius * 0.95);
+    ctx.stroke();
+
+    // Draw Runway & Waypoints relative to aircraft
+    // 1 Nautical Mile = 1852 meters
+    const metersToNm = 1.0 / 1852.0;
+
+    // Helper to project world (X, Z) into ND screen space
+    const projectToScreen = (worldX, worldZ) => {
+      // Delta from aircraft
+      const dxMeters = worldX - this.planePos.x;
+      const dzMeters = worldZ - this.planePos.y; // world Z corresponds to planePos.y
+
+      const dxNm = dxMeters * metersToNm;
+      const dzNm = dzMeters * metersToNm; // South is +Z, North is -Z
+
+      // Rotate by aircraft heading so aircraft heading points UP (-Y on screen)
+      // North is -Z, East is +X
+      const angleRot = -hdgRad;
+      const rotX = dxNm * Math.cos(angleRot) - (-dzNm) * Math.sin(angleRot);
+      const rotY = dxNm * Math.sin(angleRot) + (-dzNm) * Math.cos(angleRot);
+
+      return {
+        x: cx + rotX * pxPerNm,
+        y: cy - rotY * pxPerNm
+      };
+    };
+
+    // Runway 09L/27R: Center at world (0, 0), length 3000m, orientation East-West (heading 090°)
+    const rwyStart = projectToScreen(-1500, 0);
+    const rwyEnd = projectToScreen(1500, 0);
+
+    // Extended Runway Centerline (dashed line extending 5 NM with 1 NM cross ticks)
+    const extStart = projectToScreen(-10000, 0);
+    const extEnd = projectToScreen(8000, 0);
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath();
+    ctx.moveTo(extStart.x, extStart.y);
+    ctx.lineTo(extEnd.x, extEnd.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 1 NM tick marks along final approach course
+    for (let nm = 1; nm <= 5; nm++) {
+      const tickPos = projectToScreen(-1350 - nm * 1852, 0);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(tickPos.x, tickPos.y - 6);
+      ctx.lineTo(tickPos.x, tickPos.y + 6);
+      ctx.stroke();
+    }
+
+    // Active Flight Plan Route (Vivid Magenta Line connecting fixes)
+    const fixes = [
+      { name: 'MERIT', x: -12000, z: 2500 },
+      { name: 'APPR1', x: -6500, z: 0 },
+      { name: 'RW09L', x: -1350, z: 0 },
+      { name: 'COAST', x: 3500, z: 4500 },
+      { name: 'BAY', x: -2000, z: 8000 }
+    ];
+
+    ctx.strokeStyle = '#f72585';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    fixes.forEach((f, idx) => {
+      const p = projectToScreen(f.x, f.z);
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+
+    // Runway symbol (solid white outline rectangle on threshold)
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(rwyStart.x, rwyStart.y);
+    ctx.lineTo(rwyEnd.x, rwyEnd.y);
+    ctx.stroke();
+
+    // Waypoint symbols (Cyan stars / triangles with white labels)
+    fixes.forEach(fix => {
+      const p = projectToScreen(fix.x, fix.z);
+      ctx.fillStyle = '#00d2ff';
+      ctx.beginPath();
+      // Triangle waypoint
+      ctx.moveTo(p.x, p.y - 5);
+      ctx.lineTo(p.x - 5, p.y + 4);
+      ctx.lineTo(p.x + 5, p.y + 4);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(fix.name, p.x + 8, p.y + 4);
+    });
+
+    // Top Right Active Waypoint Block
+    ctx.fillStyle = '#f72585';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('RW09L', w - 24, 46);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 12px monospace';
+    const distToThreshold = Math.max(0.1, (Math.abs(this.planePos.x - (-1350)) / 1852.0));
+    ctx.fillText(`${distToThreshold.toFixed(1)} NM`, w - 24, 62);
+
+    // Bottom Left & Right VOR Frequency Data
+    ctx.fillStyle = '#10b981';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('VOR 1  109.50', 24, h - 24);
+    ctx.textAlign = 'right';
+    ctx.fillText('VOR 2  113.80', w - 24, h - 24);
+
+    // Aircraft symbol at bottom-center (Authentic Boeing white aircraft glyph)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 14); // Nose
+    ctx.lineTo(cx - 12, cy + 6); // Left wingtip
+    ctx.lineTo(cx - 3, cy + 4);
+    ctx.lineTo(cx - 5, cy + 12); // Left stab
+    ctx.lineTo(cx, cy + 10);
+    ctx.lineTo(cx + 5, cy + 12); // Right stab
+    ctx.lineTo(cx + 3, cy + 4);
+    ctx.lineTo(cx + 12, cy + 6); // Right wingtip
+    ctx.closePath();
+    ctx.fill();
+
+    this.texture.needsUpdate = true;
+  }
+}
