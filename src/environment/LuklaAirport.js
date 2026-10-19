@@ -208,15 +208,19 @@ export class LuklaAirport {
       const markTex = new THREE.CanvasTexture(markCanvas);
       markTex.anisotropy = 4;
 
-      const markMat = new THREE.MeshBasicMaterial({
+      const markMat = new THREE.MeshStandardMaterial({
         map: markTex,
         transparent: true,
         polygonOffset: true,
         polygonOffsetFactor: -4,
-        polygonOffsetUnits: -4
+        polygonOffsetUnits: -4,
+        depthWrite: false,
+        roughness: 0.85,
+        metalness: 0.1
       });
 
       const markMesh = new THREE.Mesh(rwyGeom, markMat);
+      markMesh.receiveShadow = true;
       rwyGroup.add(markMesh);
     }
 
@@ -277,6 +281,7 @@ export class LuklaAirport {
       ringGeom.rotateX(-Math.PI * 0.5);
       const ringMesh = new THREE.Mesh(ringGeom, ringMat);
       ringMesh.position.set(hx, 0.05, hz);
+      ringMesh.receiveShadow = true;
       apronGroup.add(ringMesh);
 
       // White "H" marking
@@ -287,10 +292,13 @@ export class LuklaAirport {
 
       const hLeft = new THREE.Mesh(barGeom1, heliMat);
       hLeft.position.set(hx - 1.3, 0.06, hz);
+      hLeft.receiveShadow = true;
       const hRight = new THREE.Mesh(barGeom1, heliMat);
       hRight.position.set(hx + 1.3, 0.06, hz);
+      hRight.receiveShadow = true;
       const hMid = new THREE.Mesh(barGeom2, heliMat);
       hMid.position.set(hx, 0.06, hz);
+      hMid.receiveShadow = true;
 
       apronGroup.add(hLeft, hRight, hMid);
     }
