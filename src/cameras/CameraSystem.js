@@ -114,8 +114,10 @@ export class CameraSystem {
     });
   }
 
-  resetDroneOrbit(angle = 1.8) {
+  resetDroneOrbit(angle = 1.8, distance = 38.0, height = 11.5) {
     this.droneOrbitAngle = angle;
+    this.droneDistance = distance;
+    this.droneHeight = height;
     this.droneInitialized = false;
   }
 
@@ -174,6 +176,9 @@ export class CameraSystem {
       if (this.savedMode !== null && this.savedMode !== undefined) {
         this.mode = this.savedMode;
         this.savedMode = null;
+        if (this.mode === CameraSystem.MODES.DRONE) {
+          this.droneInitialized = false;
+        }
       }
       this.onTemporaryViewComplete = null;
     }
@@ -224,6 +229,9 @@ export class CameraSystem {
         if (this.savedMode !== null && this.savedMode !== undefined) {
           this.mode = this.savedMode;
           this.savedMode = null;
+          if (this.mode === CameraSystem.MODES.DRONE) {
+            this.droneInitialized = false;
+          }
           if (this.onTemporaryViewComplete) {
             const cb = this.onTemporaryViewComplete;
             this.onTemporaryViewComplete = null;

@@ -134,7 +134,7 @@ export class DemoFlightDirector {
         // Setup runway preset parked
         this.sim.setPreset('runway', true);
         this.sim.cameraSystem.setMode(CameraSystem.MODES.DRONE);
-        this.sim.cameraSystem.resetDroneOrbit(1.8);
+        this.sim.cameraSystem.resetDroneOrbit(1.8, 38.0, 11.5);
         this.sim.sky.setTimeOfDay(7.2); // Golden morning
         this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
 
@@ -222,6 +222,7 @@ export class DemoFlightDirector {
           '활주로 정지 완료 • 스포일러/역추진 격납 • 보잉 737 기체 전경 드론 조망 [Esc: 직접 조종]'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.DRONE);
+        this.sim.cameraSystem.resetDroneOrbit(this.sim.cameraSystem.droneOrbitAngle, 38.0, 11.5);
         this.sim.controls.setVirtualInput('brakes', 1.0);
         this.sim.gear.setBrakes(1.0);
         this.sim.controls.setVirtualInput('throttle', 0.0);

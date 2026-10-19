@@ -95,6 +95,56 @@ describe('Drone Orbit View & Demo Pre/Post-Flight Integration', () => {
       const dist = camera.position.distanceTo(aircraft.position);
       assert.ok(dist > 30.0 && dist < 50.0, 'Camera distance upon snap should be close to drone radius');
     });
+
+    it('should reset framing (distance, height) and initialization flag in resetDroneOrbit', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const mockDom = { addEventListener: () => {} };
+      const camSystem = new CameraSystem(camera, mockDom);
+
+      camSystem.setMode(CameraSystem.MODES.DRONE);
+      // Simulate user custom zoom and elevation
+      camSystem.droneDistance = 20.0;
+      camSystem.droneHeight = 5.0;
+      camSystem.droneOrbitAngle = 4.2;
+
+      // Calling resetDroneOrbit should restore standard framing
+      camSystem.resetDroneOrbit(1.8, 38.0, 11.5);
+      assert.strictEqual(camSystem.droneOrbitAngle, 1.8);
+      assert.strictEqual(camSystem.droneDistance, 38.0);
+      assert.strictEqual(camSystem.droneHeight, 11.5);
+      assert.strictEqual(camSystem.droneInitialized, false);
+    });
+
+    it('should reset droneInitialized when temporary view restores DRONE mode to snap instantly without lerp lag', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const mockDom = { addEventListener: () => {} };
+      const camSystem = new CameraSystem(camera, mockDom);
+
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(0, 14.15, 0);
+      aircraft.updateMatrixWorld(true);
+
+      // Start in DRONE mode and update once
+      camSystem.setMode(CameraSystem.MODES.DRONE);
+      camSystem.update(0.016, aircraft, { onGround: true });
+      assert.strictEqual(camSystem.droneInitialized, true);
+
+      // Trigger temporary GEAR view (e.g. liftoff or gear transit)
+      camSystem.showTemporaryView(CameraSystem.MODES.GEAR, 3.0);
+      assert.strictEqual(camSystem.mode, CameraSystem.MODES.GEAR);
+
+      // Move aircraft far ahead (simulating takeoff roll / flight during 3.0 seconds)
+      aircraft.position.set(500, 150, 0);
+      aircraft.updateMatrixWorld(true);
+
+      // Expire temporary view
+      camSystem.update(3.1, aircraft, { onGround: false });
+      assert.strictEqual(camSystem.mode, CameraSystem.MODES.DRONE);
+
+      // Camera should immediately snap near the aircraft (500, 150, 0), NOT dragging from origin
+      const distToAircraft = camera.position.distanceTo(aircraft.position);
+      assert.ok(distToAircraft < 50.0, `Camera should be close to aircraft (${distToAircraft}m), not lagging at origin`);
+    });
   });
 
   describe('DemoFlightDirector (Pre-flight & Post-flight Drone Orbit)', () => {
