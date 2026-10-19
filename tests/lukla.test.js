@@ -292,7 +292,45 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
     }
 
     assert.ok(closestDistSq < 1.0, 'Must have a fine-tessellation vertex right at s=200, w=0');
-    assert.ok(Math.abs(closestH - analyticalH200) < 0.1, `Fine vertex height ${closestH} must match analytical height ${analyticalH200}`);
+    assert.ok(Math.abs(closestH - (analyticalH200 - 0.5)) < 0.01,
+      'Rendered terrace must sit below the unchanged physical runway height');
+  });
+
+  it('keeps terrain triangles below the asphalt across both thresholds and edges after DEM reload', () => {
+    const terrain = new LuklaTerrain(22000, 128);
+    const airport = new LuklaAirport();
+    const runway = airport.group.children.find(g => g.children.some(m => m.geometry?.type === 'PlaneGeometry'));
+    const asphalt = runway.children.find(m => m.geometry?.type === 'PlaneGeometry');
+    const foundation = runway.children.find(m => m.geometry?.type === 'BoxGeometry');
+    assert.ok(foundation.position.y + foundation.geometry.parameters.height * 0.5 <= -0.5,
+      'Foundation top must stay below the asphalt plane');
+    airport.group.updateMatrixWorld(true);
+    terrain.mesh.updateMatrixWorld(true);
+    const sin = Math.sin(terrain.runwayHeadingRad);
+    const cos = Math.cos(terrain.runwayHeadingRad);
+    const ray = new THREE.Raycaster();
+    const checkClearance = () => {
+      for (const s of [-261, -250, -10, 0, 10, 250, 261]) {
+        for (const w of [-14.9, -10, 0, 10, 14.9]) {
+          const x = s * sin + w * cos;
+          const z = -s * cos + w * sin;
+          ray.set(new THREE.Vector3(x, 4000, z), new THREE.Vector3(0, -1, 0));
+          const surface = ray.intersectObject(asphalt)[0];
+          const ground = ray.intersectObject(terrain.mesh, true)[0];
+          assert.ok(surface && ground, `Both surfaces must exist at s=${s}, w=${w}`);
+          assert.ok(surface.point.y - ground.point.y > 0.25,
+            `Terrain must clear asphalt at s=${s}, w=${w}`);
+          assert.ok(Math.abs(terrain.getHeight(x, z) - surface.point.y) < 0.001,
+            'Physical runway height must remain aligned with asphalt');
+        }
+      }
+    };
+    checkClearance();
+    const buf = fs.readFileSync(path.resolve('public/terrain/lukla_dem_256.bin'));
+    terrain.elevations = new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4);
+    terrain.isLoaded = true;
+    terrain.updateGeometryElevations();
+    checkClearance();
   });
 });
 

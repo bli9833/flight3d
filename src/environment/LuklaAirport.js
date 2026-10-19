@@ -136,7 +136,8 @@ export class LuklaAirport {
       metalness: 0.05
     });
     const skirtMesh = new THREE.Mesh(skirtGeom, skirtMat);
-    skirtMesh.position.y = -12.0;
+    // Keep the foundation top below the asphalt instead of sharing its plane.
+    skirtMesh.position.y = -12.5;
     skirtMesh.receiveShadow = true;
 
     // Transform: yaw heading 058°, pitch 11.7% (6.71° uphill towards NE)
