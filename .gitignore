@@ -46,3 +46,6 @@ lukla_*.png
 
 # Local Cloudflare state
 .wrangler/
+
+# Raw large 3D source assets (optimized Draco versions are committed)
+public/models/b737-cockpit.glb

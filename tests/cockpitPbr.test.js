@@ -169,4 +169,48 @@ describe('Cockpit PBR & Real-Photo Texture Enhancement System', () => {
       assert.ok(stats.size < 2 * 1024 * 1024, `${file} must be under 2MB for browser efficiency`);
     }
   });
+
+  it('should support 3D GLTF cockpit hierarchy, live dynamic displays, and fallback', () => {
+    const pfd = new PFDCanvas(256, 256);
+    const nd = new NDCanvas(256, 256);
+    const eicas = new EICASCanvas(256, 256);
+    const mcp = new MCPCanvas(512, 64);
+    const isfd = new ISFDCanvas(128, 128);
+    const cdu = new CDUCanvas(256, 256);
+    const cockpit = new Cockpit(pfd, nd, eicas, mcp, isfd, cdu);
+
+    assert.ok(cockpit.gltfCockpitGroup instanceof THREE.Group, 'GLTF cockpit group must exist');
+    assert.ok(cockpit.proceduralCockpitGroup instanceof THREE.Group, 'Procedural cockpit group must exist');
+    assert.ok(cockpit.group.children.includes(cockpit.gltfCockpitGroup), 'GLTF group must be attached to root');
+    assert.ok(cockpit.group.children.includes(cockpit.proceduralCockpitGroup), 'Procedural group must be attached to root');
+
+    // Mount GLTF displays and verify dynamic canvas mappings
+    cockpit.setupGltfFlightDisplays();
+    assert.ok(cockpit.gltfDisplays instanceof THREE.Group, 'GLTF displays group must exist');
+    assert.ok(cockpit.gltfCaptainPfd instanceof THREE.Mesh, 'Captain PFD must be a Mesh');
+    assert.strictEqual(cockpit.gltfCaptainPfd.material.map, cockpit.pfdCanvas.texture, 'PFD must map to live pfdCanvas texture');
+    assert.strictEqual(cockpit.gltfCaptainNd.material.map, cockpit.ndCanvas.texture, 'ND must map to live ndCanvas texture');
+    assert.strictEqual(cockpit.gltfUpperEicas.material.map, cockpit.eicasCanvas.texture, 'EICAS must map to live eicasCanvas texture');
+    assert.strictEqual(cockpit.gltfIsfd.material.map, cockpit.isfdCanvas.texture, 'ISFD must map to live isfdCanvas texture');
+    assert.strictEqual(cockpit.gltfMcp.material.map, cockpit.mcpCanvas.texture, 'MCP must map to live mcpCanvas texture');
+    assert.strictEqual(cockpit.gltfCaptainCdu.material.map, cockpit.cduCanvas.texture, 'CDU must map to live cduCanvas texture');
+
+    // Verify depth / polygonOffset to eliminate Z-fighting
+    assert.strictEqual(cockpit.gltfCaptainPfd.material.polygonOffset, true);
+    assert.strictEqual(cockpit.gltfCaptainPfd.material.polygonOffsetFactor, -1);
+  });
+
+  it('should verify optimized 3D GLB model and Draco decoder assets exist in public/', () => {
+    const glbPath = path.resolve(process.cwd(), 'public/models/b737-cockpit-draco.glb');
+    assert.ok(fs.existsSync(glbPath), 'Optimized Draco GLB model must exist in public/models/');
+    const glbStats = fs.statSync(glbPath);
+    assert.ok(glbStats.size > 1024 * 1024, 'Draco GLB model must be at least 1MB');
+    assert.ok(glbStats.size < 5 * 1024 * 1024, 'Draco GLB model must be under 5MB for fast loading');
+
+    const dracoFiles = ['draco_decoder.wasm', 'draco_decoder.js', 'draco_wasm_wrapper.js'];
+    for (const df of dracoFiles) {
+      const dfPath = path.resolve(process.cwd(), 'public/draco/gltf', df);
+      assert.ok(fs.existsSync(dfPath), `Draco decoder file ${df} must exist in public/draco/gltf/`);
+    }
+  });
 });
