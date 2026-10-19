@@ -10,12 +10,13 @@
     "test:flight": "node scripts/test-flight-agent.js",
     "test:crash": "node scripts/test-crash-scenarios.js",
     "test:mobile": "node scripts/test-mobile-touch.js",
-    "test:demo": "node scripts/test-demo-stepping.js"
+    "test:demo": "node scripts/test-demo-stepping.js",
+    "check": "node scripts/check-syntax.mjs && node scripts/check-workflow-actions.mjs"
   },
   "dependencies": {
     "three": "^0.186.0"
   },
   "devDependencies": {
-    "vite": "^6.0.0"
+    "vite": "^8.3.4"
   }
 }
