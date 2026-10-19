@@ -5,24 +5,28 @@ import { CameraSystem } from '../cameras/CameraSystem.js';
  * Autonomous Cinematic Demo Flight Director
  * 
  * Orchestrates a comprehensive showcase demonstration of the simulator:
- * 1. Runway 09L Takeoff Roll (Cockpit View, TOGA 100%, Vr rotation)
- * 2. Liftoff & Climb (Chase Exterior View, Gear Retraction, Mountains & City)
- * 3. Scenic Coastal Banking Turn (Wing View, 20° Bank over Bay & Hills)
- * 4. Ocean Fleet & Waves Cruise (Cinematic Flyby View, Gerstner Waves & Ships)
- * 5. 3NM Final Approach on 3° Glideslope (Cockpit View, PAPI 2 White 2 Red Guidance)
- * 6. Flare, Touchdown, Spoilers & Reverse Thrust Rollout (Chase/Tower View, Safe Stop)
- * 7. Seamless Handover to User Manual Flight
+ * 1. Pre-Flight Drone Orbit Inspection (Elevated 360° Drone View, Flaps 5, Golden Morning)
+ * 2. Runway 09L Takeoff Roll (Cockpit View, TOGA 100%, Vr rotation)
+ * 3. Liftoff & Climb (Chase Exterior View, Gear Retraction, Mountains & City)
+ * 4. Scenic Coastal Banking Turn (Wing View, 20° Bank over Bay & Hills)
+ * 5. Ocean Fleet & Waves Cruise (Cinematic Flyby View, Gerstner Waves & Ships)
+ * 6. 3NM Final Approach on 3° Glideslope (Cockpit View, PAPI 2 White 2 Red Guidance)
+ * 7. Flare, Touchdown, Spoilers & Reverse Thrust Rollout (Chase/Gear View, Safe Stop)
+ * 8. Post-Landing Drone Orbit Showcase (Elevated 360° Drone View, Safe Stop Inspection)
+ * 9. Seamless Handover to User Manual Flight
  */
 export class DemoFlightDirector {
   static STAGES = {
     IDLE: -1,
-    TAKEOFF_ROLL: 0,
-    ROTATION_CLIMB: 1,
-    COASTAL_BANK: 2,
-    OCEAN_CRUISE: 3,
-    FINAL_APPROACH: 4,
-    TOUCHDOWN_ROLLOUT: 5,
-    COMPLETED: 6
+    PREFLIGHT_ORBIT: 0,
+    TAKEOFF_ROLL: 1,
+    ROTATION_CLIMB: 2,
+    COASTAL_BANK: 3,
+    OCEAN_CRUISE: 4,
+    FINAL_APPROACH: 5,
+    TOUCHDOWN_ROLLOUT: 6,
+    POSTFLIGHT_ORBIT: 7,
+    COMPLETED: 8
   };
 
   constructor(simulator) {
@@ -97,7 +101,7 @@ export class DemoFlightDirector {
       this.audioInitiated = true;
     }
 
-    this.setStage(DemoFlightDirector.STAGES.TAKEOFF_ROLL);
+    this.setStage(DemoFlightDirector.STAGES.PREFLIGHT_ORBIT);
   }
 
   stop(message = null) {
@@ -122,30 +126,51 @@ export class DemoFlightDirector {
     this.stageTimer = 0;
 
     switch (newStage) {
+      case DemoFlightDirector.STAGES.PREFLIGHT_ORBIT:
+        this.updateBanner(
+          '🚁 [1/8] 비행 전 드론 서클 점검 (Pre-Flight Drone Inspection)',
+          '활주로 09L 대기 • 보잉 737 기체 외형 360° 공중 점검 • 플랩 5° 및 엔진 가동 준비'
+        );
+        // Setup runway preset parked
+        this.sim.setPreset('runway', true);
+        this.sim.cameraSystem.setMode(CameraSystem.MODES.DRONE);
+        this.sim.cameraSystem.resetDroneOrbit(1.8, 38.0, 11.5);
+        this.sim.sky.setTimeOfDay(7.2); // Golden morning
+        this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
+
+        // Keep parked on runway with brakes applied & idle thrust
+        this.sim.controls.setVirtualInput('throttle', 0.0);
+        this.sim.engines.setThrottle(0.0);
+        this.sim.controls.setVirtualInput('elevator', 0.0);
+        this.sim.controls.setVirtualInput('aileron', 0.0);
+        this.sim.controls.setVirtualInput('rudder', 0.0);
+        this.sim.controls.setVirtualInput('brakes', 1.0);
+        this.sim.gear.setBrakes(1.0);
+        this.sim.aero.setFlapPosition(2); // Flaps 5 for takeoff
+        break;
+
       case DemoFlightDirector.STAGES.TAKEOFF_ROLL:
         this.updateBanner(
-          '🛫 [1/6] 활주로 이륙 활주 (Runway 09L Takeoff Roll)',
+          '🛫 [2/8] 활주로 이륙 활주 (Runway 09L Takeoff Roll)',
           'TOGA 100% 추력 가속 • 보잉 글래스 콕핏(MCP, PFD, ND, ISFD) 계기 감상'
         );
-        // Setup runway preset
-        this.sim.setPreset('runway', true);
         this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
         this.sim.sky.setTimeOfDay(7.2); // Golden morning
         this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
 
-        // Full TOGA thrust
+        // Full TOGA thrust, release brakes
+        this.sim.controls.setVirtualInput('brakes', 0.0);
+        this.sim.gear.setBrakes(0.0);
         this.sim.controls.setVirtualInput('throttle', 1.0);
         this.sim.engines.setThrottle(1.0);
         this.sim.controls.setVirtualInput('elevator', 0.0);
         this.sim.controls.setVirtualInput('aileron', 0.0);
         this.sim.controls.setVirtualInput('rudder', 0.0);
-        this.sim.controls.setVirtualInput('brakes', 0.0);
-        this.sim.gear.setBrakes(0.0);
         break;
 
       case DemoFlightDirector.STAGES.ROTATION_CLIMB:
         this.updateBanner(
-          '✈️ [2/6] V_r 로테이션 & 이륙 상승 (Rotation & Initial Climb)',
+          '✈️ [3/8] V_r 로테이션 & 이륙 상승 (Rotation & Initial Climb)',
           '133 KT 부드러운 기수 인상(2.2°/s) • 랜딩 기어 접기 • 기체 외형 및 도심 전경'
         );
         // Rotate smoothly at 2.2°/s
@@ -154,7 +179,7 @@ export class DemoFlightDirector {
 
       case DemoFlightDirector.STAGES.COASTAL_BANK:
         this.updateBanner(
-          '⛰️ [3/6] 해안가 선회 비행 (Scenic Coastal Banking Turn)',
+          '⛰️ [4/8] 해안가 선회 비행 (Scenic Coastal Banking Turn)',
           '우측 20° 선회 • 굴곡 산맥 지형, 3,500+ 그루 식생 및 500+ 채 도심 빌딩 조망'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.WING);
@@ -163,7 +188,7 @@ export class DemoFlightDirector {
 
       case DemoFlightDirector.STAGES.OCEAN_CRUISE:
         this.updateBanner(
-          '🚢 [4/6] 해상 선박 & 거스트너 파도 수면 순항 (Ocean Waves & Fleet Cruise)',
+          '🚢 [5/8] 해상 선박 & 거스트너 파도 수면 순항 (Ocean Waves & Fleet Cruise)',
           '햇빛 반사 수면 • 컨테이너 화물선, 대형 유람선 및 쾌속 모터보트 웨이크 감상'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.FLYBY);
@@ -171,7 +196,7 @@ export class DemoFlightDirector {
 
       case DemoFlightDirector.STAGES.FINAL_APPROACH:
         this.updateBanner(
-          '🛬 [5/6] 3NM 최종 착륙 접근 (Runway 09L Final Approach)',
+          '🛬 [6/8] 3NM 최종 착륙 접근 (Runway 09L Final Approach)',
           'PAPI 4등식 3.0° 활공각 유도(2 White 2 Red) • ALS 진입 스트로브 • 플랩 30 전개'
         );
         // Switch to approach preset
@@ -185,10 +210,23 @@ export class DemoFlightDirector {
 
       case DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT:
         this.updateBanner(
-          '🛑 [6/6] 활주로 접지 & 역추진 제동 (Touchdown & Reverser Rollout)',
+          '🛑 [7/8] 활주로 접지 & 역추진 제동 (Touchdown & Reverser Rollout)',
           '랜딩 기어 뷰: 올레오 서스펜션 완충 접지 • 타이어 연기 • 스포일러 & 역추진 제동'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
+        break;
+
+      case DemoFlightDirector.STAGES.POSTFLIGHT_ORBIT:
+        this.updateBanner(
+          '🚁 [8/8] 안전 착륙 완료 & 드론 서클 쇼케이스 (Touchdown Complete • Drone Orbit View)',
+          '활주로 정지 완료 • 스포일러/역추진 격납 • 보잉 737 기체 전경 드론 조망 [Esc: 직접 조종]'
+        );
+        this.sim.cameraSystem.setMode(CameraSystem.MODES.DRONE);
+        this.sim.cameraSystem.resetDroneOrbit(this.sim.cameraSystem.droneOrbitAngle, 38.0, 11.5);
+        this.sim.controls.setVirtualInput('brakes', 1.0);
+        this.sim.gear.setBrakes(1.0);
+        this.sim.controls.setVirtualInput('throttle', 0.0);
+        this.sim.engines.setThrottle(0.0);
         break;
 
       case DemoFlightDirector.STAGES.COMPLETED:
@@ -210,7 +248,26 @@ export class DemoFlightDirector {
 
     switch (this.currentStage) {
       // -------------------------------------------------------------
-      // STAGE 0: Takeoff Roll
+      // STAGE 0: Pre-Flight Drone Orbit Inspection
+      // -------------------------------------------------------------
+      case DemoFlightDirector.STAGES.PREFLIGHT_ORBIT: {
+        // Hold parked position on runway for 6.0 seconds while drone orbits around aircraft
+        this.sim.controls.setVirtualInput('brakes', 1.0);
+        this.sim.gear.setBrakes(1.0);
+        this.sim.controls.setVirtualInput('throttle', 0.0);
+        this.sim.engines.setThrottle(0.0);
+        this.sim.controls.setVirtualInput('elevator', 0.0);
+        this.sim.controls.setVirtualInput('aileron', 0.0);
+        this.sim.controls.setVirtualInput('rudder', 0.0);
+
+        if (this.stageTimer >= 6.0) {
+          this.setStage(DemoFlightDirector.STAGES.TAKEOFF_ROLL);
+        }
+        break;
+      }
+
+      // -------------------------------------------------------------
+      // STAGE 1: Runway Takeoff Roll
       // -------------------------------------------------------------
       case DemoFlightDirector.STAGES.TAKEOFF_ROLL: {
         // Accelerate until Vr (133 KT)
@@ -221,7 +278,7 @@ export class DemoFlightDirector {
       }
 
       // -------------------------------------------------------------
-      // STAGE 1: Rotation & Climb
+      // STAGE 2: Rotation & Climb
       // -------------------------------------------------------------
       case DemoFlightDirector.STAGES.ROTATION_CLIMB: {
         // Wings-level stabilization during climb with roll-rate damping
@@ -254,7 +311,7 @@ export class DemoFlightDirector {
       }
 
       // -------------------------------------------------------------
-      // STAGE 2: Coastal Banking Turn
+      // STAGE 3: Coastal Banking Turn
       // -------------------------------------------------------------
       case DemoFlightDirector.STAGES.COASTAL_BANK: {
         // Coordinated 20° bank turn towards South-East (Heading ~155°)
@@ -288,7 +345,7 @@ export class DemoFlightDirector {
       }
 
       // -------------------------------------------------------------
-      // STAGE 3: Ocean Waves & Shipping Fleet Cruise
+      // STAGE 4: Ocean Waves & Shipping Fleet Cruise
       // -------------------------------------------------------------
       case DemoFlightDirector.STAGES.OCEAN_CRUISE: {
         // Fly level over bay at 1,200ft, speed 205 knots
@@ -321,7 +378,7 @@ export class DemoFlightDirector {
       }
 
       // -------------------------------------------------------------
-      // STAGE 4: 3NM Final Approach with PAPI
+      // STAGE 5: 3NM Final Approach with PAPI
       // -------------------------------------------------------------
       case DemoFlightDirector.STAGES.FINAL_APPROACH: {
         // Track 3° glideslope down to Runway 09L threshold (x = -1350m, alt = 47ft / 14m)
@@ -366,7 +423,7 @@ export class DemoFlightDirector {
       }
 
       // -------------------------------------------------------------
-      // STAGE 5: Touchdown & Reverser Rollout
+      // STAGE 6: Touchdown & Reverser Rollout
       // -------------------------------------------------------------
       case DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT: {
         // Deploy full spoilers, reverse thrust, and maximum brakes
@@ -378,20 +435,35 @@ export class DemoFlightDirector {
         this.sim.gear.setBrakes(1.0);
         this.sim.controls.setVirtualInput('throttle', 0.0);
         this.sim.engines.setThrottle(0.0);
-        // Switch to exterior chase camera at 4.5s after showcasing touchdown impact and tire smoke
-        if (this.stageTimer > 4.5 && this.sim.cameraSystem.mode === CameraSystem.MODES.GEAR) {
-          this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
-        }
 
         // Switch to exterior chase camera at 4.5s after showcasing touchdown impact and tire smoke
         if (this.stageTimer > 4.5 && this.sim.cameraSystem.mode === CameraSystem.MODES.GEAR) {
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
-        // Aircraft brought to complete safe stop
+        // Aircraft brought to complete safe stop -> transition to post-flight drone orbit view
         if (tel.iasKnots < 5.0 || this.stageTimer > 12.0) {
           this.sim.engines.setReverser(false, true);
           this.sim.aero.spoilers = 0.0;
+          this.setStage(DemoFlightDirector.STAGES.POSTFLIGHT_ORBIT);
+        }
+        break;
+      }
+
+      // -------------------------------------------------------------
+      // STAGE 7: Post-Landing Drone Orbit Showcase
+      // -------------------------------------------------------------
+      case DemoFlightDirector.STAGES.POSTFLIGHT_ORBIT: {
+        // Hold safe parked position on runway for 7.0 seconds while drone orbits around aircraft
+        this.sim.controls.setVirtualInput('brakes', 1.0);
+        this.sim.gear.setBrakes(1.0);
+        this.sim.controls.setVirtualInput('throttle', 0.0);
+        this.sim.engines.setThrottle(0.0);
+        this.sim.controls.setVirtualInput('elevator', 0.0);
+        this.sim.controls.setVirtualInput('aileron', 0.0);
+        this.sim.controls.setVirtualInput('rudder', 0.0);
+
+        if (this.stageTimer >= 7.0) {
           this.setStage(DemoFlightDirector.STAGES.COMPLETED);
         }
         break;
