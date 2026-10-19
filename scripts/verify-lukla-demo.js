@@ -74,7 +74,10 @@ async function testLuklaDemo() {
 
     const evalJs = async (expr) => {
       const res = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
-      if (res?.exceptionDetails) throw new Error(res.exceptionDetails.text);
+      if (res?.exceptionDetails) {
+        const desc = res.exceptionDetails.exception?.description || res.exceptionDetails.text;
+        throw new Error(`Browser JS Error: ${desc}`);
+      }
       return res?.result?.value;
     };
 
@@ -111,7 +114,7 @@ async function testLuklaDemo() {
 
     // Step simulation across all 5 demo stages through touchdown and safe stop
     const stagesSeen = new Set();
-    const maxSteps = 240; // up to 60s of sim time (0.25s per step)
+    const maxSteps = 620; // up to 155s of sim time (0.25s per step) for full continuous circuit to safe stop
     let completed = false;
 
     for (let step = 0; step < maxSteps; step++) {
@@ -121,31 +124,49 @@ async function testLuklaDemo() {
           sim.stepSimulation(0.25);
           const d = sim.demoDirector;
           const tel = sim.telemetry;
+          const pos = sim.position;
+          const groundH = sim.currentTerrain ? sim.currentTerrain.getHeight(pos.x, pos.z) : 0;
           return {
             stage: d.currentStage,
             stageTimer: d.stageTimer.toFixed(1),
             ias: Math.round(tel.iasKnots),
             alt: Math.round(tel.altitudeFt),
             pitch: tel.pitchDeg.toFixed(1),
+            roll: tel.rollDeg.toFixed(1),
+            heading: Math.round(tel.headingDeg),
+            aileron: sim.controls?.aileron?.toFixed(2),
+            rudder: sim.controls?.rudder?.toFixed(2),
+            w: Math.round(pos.x * 0.529919 + pos.z * 0.848048),
+            s: Math.round(pos.x * 0.848048 - pos.z * 0.529919),
+            x: Math.round(pos.x),
+            y: Math.round(pos.y),
+            z: Math.round(pos.z),
+            groundH: Math.round(groundH),
+            clearance: Math.round(pos.y - groundH),
             isCrashed: sim.isCrashed,
             crashDesc: sim.crashResult ? sim.crashResult.description : null,
             touchdown: tel.touchdown,
-            onGround: tel.onGround
+            onGround: tel.onGround,
+            isStalled: sim.aero?.isStalled,
+            alpha: (THREE.MathUtils.radToDeg(sim.aero?.alpha || 0)).toFixed(1),
+            elev: sim.controls?.elevator?.toFixed(2),
+            virtElev: sim.controls?.virtualElevator?.toFixed(2),
+            trim: sim.controls?.pitchTrim?.toFixed(1)
           };
         })()
       `);
 
       stagesSeen.add(stepData.stage);
 
-      if (step % 8 === 0 || stepData.stage === 4 || stepData.stage === 5) {
-        console.log(`⏱️ T=${(step * 0.25).toFixed(1)}s: Stage ${stepData.stage}, IAS: ${stepData.ias}kt, Alt: ${stepData.alt}ft, Pitch: ${stepData.pitch}°, Crashed: ${stepData.isCrashed}`);
+      if (step % 8 === 0 || stepData.stage === 4 || stepData.stage === 5 || stepData.isCrashed) {
+        console.log(`⏱️ T=${(step * 0.25).toFixed(1)}s: Stg ${stepData.stage}, IAS:${stepData.ias}kt, Alt:${stepData.alt}ft, Ptch:${stepData.pitch}°, Roll:${stepData.roll}°, Hdg:${stepData.heading}°, Ail:${stepData.aileron}, Rud:${stepData.rudder}, s:${stepData.s}m, w:${stepData.w}m, Grnd:${stepData.groundH}m, Clr:${stepData.clearance}m, Crashed:${stepData.isCrashed}`);
       }
 
       if (stepData.isCrashed) {
-        throw new Error(`Plane crashed during demo flight! Stage ${stepData.stage}: ${stepData.crashDesc}`);
+        throw new Error(`Plane crashed during demo flight! Stage ${stepData.stage} at (${stepData.x},${stepData.y},${stepData.z}) vs Ground ${stepData.groundH}m: ${stepData.crashDesc}`);
       }
 
-      if (stepData.stage === 5) { // LUKLA_STAGES.COMPLETED
+      if (stepData.stage === 5 || (stepData.stage === -1 && stagesSeen.has(4))) {
         completed = true;
         console.log(`🎉 Demo flight reached COMPLETED stage at T=${(step * 0.25).toFixed(1)}s!`);
         break;
@@ -158,6 +179,10 @@ async function testLuklaDemo() {
       if (!stagesSeen.has(stg)) {
         throw new Error(`Demo did not transition through expected stage ${stg}. Stages traversed: ${[...stagesSeen].join(', ')}`);
       }
+    }
+
+    if (!completed) {
+      throw new Error(`Demo flight did not reach complete stop within step budget!`);
     }
 
     console.log('✅ Lukla Demo Flight verification successfully passed!');

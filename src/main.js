@@ -376,7 +376,7 @@ class FlightSimulator {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(2); // Flaps 5
+        this.aero.setFlapPosition(3); // Flaps 15 (mountain short-field takeoff)
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 5.5;
         this.controls.pitchTrim = 5.5;
