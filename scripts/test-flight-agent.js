@@ -439,8 +439,8 @@ class FlightTestAgent {
         `);
       }
 
-      // Detect touchdown (radioAlt on ground is ~7 ft due to CG height)
-      if (!touchdownConfirmed && (state.onGround || state.touchdown || (flareInitiated && state.radioAltFt <= 8.5))) {
+      // Detect touchdown (radioAlt on ground is ~11 ft due to CG height)
+      if (!touchdownConfirmed && (state.onGround || state.touchdown || (flareInitiated && state.radioAltFt <= 12.5))) {
         touchdownConfirmed = true;
         this.log(`TOUCHDOWN CONFIRMED! Radio Alt: ${Math.round(state.radioAltFt)} FT, G-Load: ${state.gForce.toFixed(2)} G`, '🎯');
         this.log(`Deploying Spoilers, Maximum Brakes, and Reverse Thrust...`, '🛑');
@@ -477,7 +477,7 @@ class FlightTestAgent {
       metrics: {
         touchdownConfirmed,
         stoppedOnRunway,
-        maxTouchdownG: Math.max(...history.filter(s => s.onGround || s.radioAltFt <= 8.5).map(s => s.gForce)).toFixed(2),
+        maxTouchdownG: Math.max(...history.filter(s => s.onGround || s.radioAltFt <= 12.5).map(s => s.gForce)).toFixed(2),
         finalStopSpeedKt: Math.round(history[history.length - 1].iasKnots)
       }
     };

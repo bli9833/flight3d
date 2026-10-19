@@ -51,6 +51,8 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     // Procedural mode: exit cockpit (chase view)
     aircraft.setCockpitMode(false);
     assert.strictEqual(aircraft.fuselageGroup.visible, true, 'Procedural fuselage must be visible in exterior view');
+    assert.strictEqual(aircraft.tailGroup.visible, true, 'Procedural tail must be visible in exterior view');
+    assert.strictEqual(aircraft.empennageGroup.visible, true, 'empennageGroup must match tailGroup visibility');
     assert.strictEqual(aircraft.cockpit.group.visible, false, 'Cockpit interior must be hidden in exterior view');
 
     // Simulate GLTF loaded state
@@ -62,6 +64,27 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     aircraft.setCockpitMode(false);
     assert.strictEqual(aircraft.gltfGroup.visible, true, 'GLTF model must be visible in exterior view');
     assert.strictEqual(aircraft.cockpit.group.visible, false, 'Cockpit must be hidden in exterior view');
+  });
+
+  it('should hide procedural tail and empennage when GLTF model is active', () => {
+    const pfd = new PFDCanvas(256, 256);
+    const nd = new NDCanvas(256, 256);
+    const eicas = new EICASCanvas(256, 256);
+    const aircraft = new Boeing737(pfd, nd, eicas);
+
+    assert.ok(aircraft.tailGroup, 'Procedural tailGroup must exist');
+    assert.strictEqual(aircraft.tailGroup, aircraft.empennageGroup, 'empennageGroup must alias tailGroup');
+    assert.strictEqual(aircraft.tailGroup.visible, true, 'Default procedural tail must be visible');
+
+    // Simulate GLTF loaded callback logic
+    if (aircraft.fuselageGroup) aircraft.fuselageGroup.visible = false;
+    if (aircraft.wingGroup) aircraft.wingGroup.visible = false;
+    if (aircraft.tailGroup) aircraft.tailGroup.visible = false;
+    if (aircraft.empennageGroup) aircraft.empennageGroup.visible = false;
+    if (aircraft.enginesGroup) aircraft.enginesGroup.visible = false;
+
+    assert.strictEqual(aircraft.tailGroup.visible, false, 'tailGroup must be hidden when GLTF loads');
+    assert.strictEqual(aircraft.empennageGroup.visible, false, 'empennageGroup must be hidden when GLTF loads');
   });
 
   it('should articulate crash visuals and restore pristine state', () => {

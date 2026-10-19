@@ -57,9 +57,9 @@ describe('LandingGear (Tricycle Oleo-Pneumatic Suspension & Steering)', () => {
   it('should generate upward suspension forces when contacting ground', () => {
     const gear = new LandingGear();
     const aircraft = new THREE.Object3D();
-    // Aircraft at y = 14m, ground height is 12m
-    // Main gear is at y = -2.2m from CG, so tire contact is at 14 - 2.2 = 11.8m (penetrating ground by 0.2m)
-    aircraft.position.set(0, 14.0, 0);
+    // Aircraft at y = 15.0m, ground height is 12m
+    // Main gear contact is at y = -3.30m from CG, penetrating ground to compress suspension
+    aircraft.position.set(0, 15.0, 0);
     aircraft.quaternion.set(0, 0, 0, 1);
     aircraft.updateMatrixWorld(true);
 
