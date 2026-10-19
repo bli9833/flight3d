@@ -64,6 +64,18 @@ describe('Cockpit PBR & Real-Photo Texture Enhancement System', () => {
     assert.ok(cockpit.foYoke.root instanceof THREE.Group);
   });
 
+  it('can hide yokes for instrument inspection without stopping their animation', () => {
+    const cockpit = new Cockpit(new PFDCanvas(), new NDCanvas(), new EICASCanvas());
+    cockpit.gltfYokes = [new THREE.Group(), new THREE.Group()];
+    assert.equal(cockpit.toggleYokes(), false);
+    assert.equal(cockpit.captainYoke.root.visible, false);
+    assert.ok(cockpit.gltfYokes.every(yoke => !yoke.visible));
+    cockpit.updateControls({ aileron: 1, elevator: 1 });
+    assert.equal(cockpit.toggleYokes(), true);
+    assert.ok(cockpit.gltfYokes.every(yoke => yoke.visible && yoke.rotation.z > 1));
+    assert.equal(cockpit.captainYoke.root.visible, true);
+  });
+
   it('should construct throttle quadrant with molded levers, flap lever, spoiler, and trim wheels', () => {
     const pfd = new PFDCanvas(256, 256);
     const nd = new NDCanvas(256, 256);

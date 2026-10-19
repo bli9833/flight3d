@@ -157,7 +157,7 @@ describe('CockpitPhotoOverlay & Photorealistic 2D Cockpit System', () => {
     const aircraftMesh = new THREE.Mesh();
     camSys.update(0.016, aircraftMesh, { onGround: true, pitchDeg: 0, rollDeg: 0 });
 
-    assert.ok(camera.position.x < -0.4, 'Eye position should be Captain seat (negative X)');
+    assert.ok(camera.position.x < -0.3, 'Eye position should be Captain seat (negative X)');
     assert.ok(camera.position.y > 0.8, 'Eye height should be Captain eye level');
   });
 });

@@ -28,11 +28,11 @@ export class CameraSystem {
 
     // Cockpit Head Dynamics & Look-Around
     this.photoCockpit = false; // Default to high-fidelity 3D Virtual Cockpit with GLTF asset
-    this.cockpitHeadOffset = new THREE.Vector3(-0.48, 0.85, -12.44); // Captain eye
+    this.cockpitHeadOffset = new THREE.Vector3(-0.39, 0.85, -12.35); // Captain eye
     this.headGForceOffset = new THREE.Vector3();
     this.touchJoltOffset = 0;
     this.lookYaw = 0;
-    this.lookPitch = -0.18; // Natural pilot head tilt showing MCP, instruments & runway horizon
+    this.lookPitch = -0.25; // Natural pilot head tilt showing MCP, instruments & runway horizon
 
     // Landing Gear Belly View Parameters (Oblique angle looking at nose and main gear under fuselage)
     this.gearCamOffset = new THREE.Vector3(2.2, -2.6, 6.2);
@@ -284,7 +284,7 @@ export class CameraSystem {
 
   resetLook() {
     this.lookYaw = 0;
-    this.lookPitch = -0.18;
+    this.lookPitch = -0.25;
     this.chaseYaw = 0;
     this.chasePitch = 0;
     this.chaseDistance = 55.0;
@@ -310,7 +310,7 @@ export class CameraSystem {
 
   isLookingAwayFromCenter() {
     if (this.mode !== CameraSystem.MODES.COCKPIT) return false;
-    return Math.abs(this.lookYaw) > 0.38 || Math.abs(this.lookPitch - (-0.18)) > 0.42;
+    return Math.abs(this.lookYaw) > 0.38 || Math.abs(this.lookPitch - (-0.25)) > 0.42;
   }
 
   resetDroneOrbit(angle = 1.8, distance = 38.0, height = 11.5) {
