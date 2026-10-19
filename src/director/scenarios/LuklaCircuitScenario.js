@@ -36,8 +36,8 @@ export class LuklaCircuitScenario {
     switch (stage) {
       case LuklaCircuitScenario.STAGES.CLIFF_TAKEOFF:
         this.director.updateBanner(
-          '🛫 [1/5] 루클라 24번 활주로 절벽 가속 이륙 (Runway 24 Cliff Dive Takeoff)',
-          '11.7% 내리막 활주 • TOGA 100% 가속 • 600m 낭떠러지 협곡 다이브 진입 [Esc: 직접 조종]'
+          '🛫 [1/5] 루클라 24번 활주로 내리막 이륙 (Runway 24 Takeoff)',
+          '11.7% 내리막 활주 • TOGA 100% 가속 • 계곡 방향 이륙 [Esc: 직접 조종]'
         );
         if (this.sim.setPreset) {
           this.sim.setPreset('cliff', true);
@@ -61,7 +61,7 @@ export class LuklaCircuitScenario {
       case LuklaCircuitScenario.STAGES.CANYON_CLIMB:
         this.director.updateBanner(
           '🏔️ [2/5] 두드코시 협곡 하류 질주 & 고도 상승 (Dudh Kosi Canyon Outbound & Climb)',
-          'V자 협곡 능선 추종 • 랜딩 기어 수납 • 30m DEM 실제 지형 및 울창한 수목 조망'
+          '계곡 방향 상승 • 랜딩 기어 수납 • Copernicus 기반 주변 지형 조망'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         this.sim.controls.setVirtualInput('throttle', 0.90);
@@ -100,7 +100,7 @@ export class LuklaCircuitScenario {
 
       case LuklaCircuitScenario.STAGES.UPHILL_TOUCHDOWN:
         this.director.updateBanner(
-          '🛑 [5/5] 11.7% 오르막 활주로 접지 & 암벽 앞 감속 (Uphill Touchdown & Rollout)',
+          '🛑 [5/5] 11.7% 오르막 활주로 접지 & 감속 (Uphill Touchdown & Rollout)',
           '11.7% 오르막 자연 감속 • 올레오 완충 접지 • 스포일러, 역추진 및 브레이크 제동'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
@@ -162,7 +162,7 @@ export class LuklaCircuitScenario {
           }
           this.sim.controls.setVirtualInput('elevator', Math.max(0.12, Math.min(0.50, elevatorCmd)));
 
-          // Retract gear once safely airborne over the 600m gorge
+          // Retract gear once safely airborne over the valley
           if (!tel.onGround && tel.radioAltFt > 15.0 && tel.gearState > 0.1 && !tel.isTransit) {
             this.sim.gear.setGearTarget(false);
           }
