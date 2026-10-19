@@ -162,4 +162,44 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     assert.ok(content.includes('Poly Haven'), 'Must credit Poly Haven HDRI');
     assert.ok(content.includes('CC0'), 'Must document CC0 license');
   });
+
+  it('should align procedural fallback turbofan mounts and pylons with collision probes and wing', () => {
+    const pfd = new PFDCanvas(256, 256);
+    const nd = new NDCanvas(256, 256);
+    const eicas = new EICASCanvas(256, 256);
+    const aircraft = new Boeing737(pfd, nd, eicas);
+
+    assert.ok(aircraft.enginesGroup, 'enginesGroup must exist');
+    assert.strictEqual(aircraft.enginesGroup.children.length, 2, 'Must have left and right engines');
+
+    const [leftEng, rightEng] = aircraft.enginesGroup.children;
+    // Probe coordinates in CollisionDetector: (±5.06, -1.95, -5.22)
+    assert.strictEqual(leftEng.position.x, -5.06, 'Left engine mount X must match CFM56 collision probe');
+    assert.strictEqual(leftEng.position.y, -1.95, 'Left engine mount Y must match CFM56 collision probe');
+    assert.strictEqual(leftEng.position.z, -5.22, 'Left engine mount Z must match CFM56 collision probe');
+
+    assert.strictEqual(rightEng.position.x, 5.06, 'Right engine mount X must match CFM56 collision probe');
+    assert.strictEqual(rightEng.position.y, -1.95, 'Right engine mount Y must match CFM56 collision probe');
+    assert.strictEqual(rightEng.position.z, -5.22, 'Right engine mount Z must match CFM56 collision probe');
+
+    // Pylon geometry & span
+    const pylon = leftEng.children[0];
+    assert.ok(pylon, 'Engine pylon mesh must exist');
+    const pylonGeo = pylon.geometry;
+    const depth = pylonGeo.parameters.depth; // length along Z
+    const height = pylonGeo.parameters.height; // height along Y
+
+    // Aircraft local coordinates of pylon rear and top
+    const rearZ = leftEng.position.z + pylon.position.z + depth / 2;
+    const frontZ = leftEng.position.z + pylon.position.z - depth / 2;
+    const topY = leftEng.position.y + pylon.position.y + height / 2;
+    const bottomY = leftEng.position.y + pylon.position.y - height / 2;
+
+    // Wing leading edge at x=5.06 is at z ≈ -2.71, cowl top is at y = -0.90
+    assert.ok(frontZ <= -5.8, `Pylon front (${frontZ}) must rest forward over engine cowl`);
+    assert.ok(rearZ >= -2.0, `Pylon rear (${rearZ}) must connect securely into wing leading edge without a gap`);
+    assert.ok(topY >= 0.0, `Pylon top (${topY}) must penetrate into wing chord`);
+    assert.ok(bottomY <= -1.2, `Pylon bottom (${bottomY}) must seat firmly in nacelle core`);
+  });
 });
+

@@ -12,10 +12,10 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const PORT = 5173;
-const CDP_PORT = 9446;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5173;
+const CDP_PORT = process.env.CDP_PORT ? parseInt(process.env.CDP_PORT, 10) : 9446;
 const SIM_URL = `http://localhost:${PORT}/`;
-const ARTIFACT_DIR = process.env.ARTIFACT_DIR || '/home/stlim/.gemini/antigravity-cli/brain/ad33c4b1-3b1c-4752-ad5e-b09f9794851b';
+const ARTIFACT_DIR = process.env.ARTIFACT_DIR || process.cwd();
 
 class FlightTestAgent {
   constructor() {
