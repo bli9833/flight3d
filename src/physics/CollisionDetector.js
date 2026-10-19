@@ -409,7 +409,7 @@ export class CollisionDetector {
     // 1. Runway operations (Takeoff roll, rotation, flare, touchdown, and braking)
     if (isAirportRunway) {
       // Hard landing: only checked when wheels actually contact ground (y <= groundH + 3.55m)
-      if (aircraftPos.y <= groundH + 3.55 && speedMs > 25.0) {
+      if (isGearDeployed && aircraftPos.y <= groundH + 3.55 && speedMs > 25.0) {
         // Gear collapse / belly impact onto runway concrete
         if (aircraftPos.y < groundH + 2.1) {
           return {
@@ -450,11 +450,18 @@ export class CollisionDetector {
             description: `과도한 기수 상승각(${pitchDeg.toFixed(1)}°)으로 후방 동체가 활주로에 격돌했습니다.`
           };
         }
-        // Gear-up belly landing at high speed (> 30 knots)
-        if (gearState < 0.25) {
+      }
+      // With gear retracted, use body contact rather than the deployed wheel height.
+      // Engine probes are centers; their radii locate the nacelle bottoms.
+      if (gearState < 0.25 && speedMs > 25.0) {
+        const bodyContact = worldProbes.find(probe => {
+          const bottomY = probe.pos.y - (probe.id === 'engineL' || probe.id === 'engineR' ? probe.radius : 0);
+          return bottomY < this.terrain.getHeight(probe.pos.x, probe.pos.z) + 0.1;
+        });
+        if (bodyContact) {
           return {
             name: '동체 착륙 폭발 (GEAR-UP BELLY CRASH)',
-            point: aircraftPos.clone(),
+            point: bodyContact.pos.clone(),
             description: `랜딩기어 미전개 상태에서 고속(${(speedMs * 1.94384).toFixed(0)} KT)으로 동체가 활주로와 충돌했습니다.`
           };
         }
