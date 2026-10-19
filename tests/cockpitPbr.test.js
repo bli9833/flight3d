@@ -200,12 +200,15 @@ describe('Cockpit PBR & Real-Photo Texture Enhancement System', () => {
     assert.strictEqual(cockpit.gltfCaptainPfd.material.polygonOffsetFactor, -1);
   });
 
-  it('should verify optimized 3D GLB model and Draco decoder assets exist in public/', () => {
-    const glbPath = path.resolve(process.cwd(), 'public/models/b737-cockpit-draco.glb');
-    assert.ok(fs.existsSync(glbPath), 'Optimized Draco GLB model must exist in public/models/');
-    const glbStats = fs.statSync(glbPath);
-    assert.ok(glbStats.size > 1024 * 1024, 'Draco GLB model must be at least 1MB');
-    assert.ok(glbStats.size < 5 * 1024 * 1024, 'Draco GLB model must be under 5MB for fast loading');
+  it('should verify optimized 3D GLB models (balanced & lite) and Draco decoder assets exist in public/', () => {
+    const dracoPath = path.resolve(process.cwd(), 'public/models/b737-cockpit-draco.glb');
+    const mediumPath = path.resolve(process.cwd(), 'public/models/b737-cockpit-medium.glb');
+    assert.ok(fs.existsSync(dracoPath), 'Optimized Draco lite GLB model must exist in public/models/');
+    assert.ok(fs.existsSync(mediumPath), 'Balanced medium GLB model must exist in public/models/');
+    const dracoStats = fs.statSync(dracoPath);
+    const mediumStats = fs.statSync(mediumPath);
+    assert.ok(dracoStats.size > 1024 * 1024 && dracoStats.size < 5 * 1024 * 1024);
+    assert.ok(mediumStats.size > 1024 * 1024 && mediumStats.size < 6 * 1024 * 1024);
 
     const dracoFiles = ['draco_decoder.wasm', 'draco_decoder.js', 'draco_wasm_wrapper.js'];
     for (const df of dracoFiles) {
