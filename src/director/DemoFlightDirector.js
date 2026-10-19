@@ -53,7 +53,7 @@ export class DemoFlightDirector {
   constructor(simulator) {
     this.sim = simulator;
     this.isActive = false;
-    this.activeDemoAirport = this.sim?.activeAirport || 'lukla';
+    this.activeDemoAirport = this.sim?.activeAirport || 'coastal';
     this.currentStage = DemoFlightDirector.STAGES.IDLE;
     this.stageTimer = 0;
     this.totalTimer = 0;
@@ -608,7 +608,7 @@ export class DemoFlightDirector {
       case DemoFlightDirector.STAGES.ROTATION_CLIMB:
         this.updateBanner(
           '✈️ [3/8] V_r 로테이션 & 이륙 상승 (Rotation & Initial Climb)',
-          '133 KT 부드러운 기수 인상(2.2°/s) • 랜딩 기어 접기 • 기체 외형 및 도심 전경'
+          '133 KT 부드러운 기수 인상(2.2°/s) • 앞/뒷바퀴 이륙 & 랜딩 기어 접기 • 기체 외형 및 도심 전경'
         );
         this.sim.controls.setVirtualInput('elevator', 0.65);
         break;
@@ -646,7 +646,7 @@ export class DemoFlightDirector {
       case DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT:
         this.updateBanner(
           '🛑 [7/8] 활주로 접지 & 역추진 제동 (Touchdown & Reverser Rollout)',
-          '랜딩 기어 뷰: 올레오 서스펜션 완충 접지 • 타이어 연기 • 스포일러 & 역추진 제동'
+          '랜딩 기어 뷰: 뒷바퀴/앞바퀴 순차 완충 접지 • 타이어 연기 • 스포일러 & 역추진 제동'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
         break;

@@ -24,7 +24,9 @@ export class Boeing737 {
     this.group.add(this.gltfGroup);
     this.gltfFans = [];
     this.useGltf = false;
+    this.loadingGltf = false;
     this.modelLoaded = false;
+    this.isCockpit = false;
 
     // Control surfaces references
     this.aileronL = null;
@@ -40,6 +42,13 @@ export class Boeing737 {
     // Engines
     this.fanL = null;
     this.fanR = null;
+
+    this.fuselageGroup = null;
+    this.wingGroup = null;
+    this.tailGroup = null;
+    this.empennageGroup = null;
+    this.enginesGroup = null;
+    this.gearGroup = null;
 
     // Landing Gear meshes
     this.noseGearGroup = null;
@@ -282,6 +291,7 @@ export class Boeing737 {
 
   buildEmpennage(whiteMat, blueMat, greyMat) {
     this.tailGroup = new THREE.Group();
+    this.empennageGroup = this.tailGroup;
     this.tailGroup.position.set(0, 0.8, 14.2);
 
     // 1. Vertical Stabilizer (Fin)
@@ -420,26 +430,26 @@ export class Boeing737 {
       return wheel;
     };
 
-    // 1. Nose Gear Assembly (Center forward: x=0, y=-2.1m, z=-12.5m)
+    // 1. Nose Gear Assembly (Center forward: x=0, y=-0.85m, z=-12.5m)
     this.noseGearGroup = new THREE.Group();
     this.noseGearGroup.position.set(0, -0.85, -12.5);
 
     // Outer stationary strut housing cylinder
-    const nStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.2, 12), strutMat);
-    nStrut.position.y = -0.6;
+    const nStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.5, 12), strutMat);
+    nStrut.position.y = -0.75;
     this.noseGearGroup.add(nStrut);
 
     // Movable Nose Truck (Sliding oleo chrome piston + dual wheels)
     this.noseTruck = new THREE.Group();
-    const nPiston = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 1.1, 12), chromePistonMat);
-    nPiston.position.y = -1.15;
+    const nPiston = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 1.5, 12), chromePistonMat);
+    nPiston.position.y = -1.65;
     this.noseTruck.add(nPiston);
 
     // Dual Nose Wheels
     const nWheelL = makeWheel(0.38, 0.22);
-    nWheelL.position.set(-0.24, -1.65, 0);
+    nWheelL.position.set(-0.24, -2.42, 0);
     const nWheelR = makeWheel(0.38, 0.22);
-    nWheelR.position.set(0.24, -1.65, 0);
+    nWheelR.position.set(0.24, -2.42, 0);
     this.noseTruck.add(nWheelL, nWheelR);
 
     this.noseGearGroup.add(this.noseTruck);
@@ -450,20 +460,20 @@ export class Boeing737 {
       mainGear.position.set(xPos, -0.9, 1.8);
 
       // Outer stationary strut housing cylinder
-      const mStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.3, 12), strutMat);
-      mStrut.position.y = -0.65;
+      const mStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.5, 12), strutMat);
+      mStrut.position.y = -0.75;
       mainGear.add(mStrut);
 
       // Movable Main Truck (Sliding oleo chrome piston + 2-wheel bogie)
       const truck = new THREE.Group();
-      const mPiston = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 1.25, 12), chromePistonMat);
-      mPiston.position.y = -1.2;
+      const mPiston = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 1.5, 12), chromePistonMat);
+      mPiston.position.y = -1.65;
       truck.add(mPiston);
 
       const wL = makeWheel(0.48, 0.32);
-      wL.position.set(-0.35, -1.75, 0);
+      wL.position.set(-0.35, -2.40, 0);
       const wR = makeWheel(0.48, 0.32);
-      wR.position.set(0.35, -1.75, 0);
+      wR.position.set(0.35, -2.40, 0);
       truck.add(wL, wR);
 
       mainGear.add(truck);
@@ -603,13 +613,13 @@ export class Boeing737 {
 
     // Dynamic Oleo Strut Suspension Squat ("털썩" 하중 압축)
     if (gearState > 0.8 && flightState.compressions) {
-      const compNose = Math.min(0.5, Math.max(0, flightState.compressions.nose || 0));
-      const compL = Math.min(0.55, Math.max(0, flightState.compressions.mainLeft || 0));
-      const compR = Math.min(0.55, Math.max(0, flightState.compressions.mainRight || 0));
+      const compNose = Math.min(0.9, Math.max(0, flightState.compressions.nose || 0));
+      const compL = Math.min(0.9, Math.max(0, flightState.compressions.mainLeft || 0));
+      const compR = Math.min(0.9, Math.max(0, flightState.compressions.mainRight || 0));
 
-      if (this.noseTruck) this.noseTruck.position.y = compNose * 0.75;
-      if (this.mainTruckL) this.mainTruckL.position.y = compL * 0.72;
-      if (this.mainTruckR) this.mainTruckR.position.y = compR * 0.72;
+      if (this.noseTruck) this.noseTruck.position.y = compNose;
+      if (this.mainTruckL) this.mainTruckL.position.y = compL;
+      if (this.mainTruckR) this.mainTruckR.position.y = compR;
     } else {
       if (this.noseTruck) this.noseTruck.position.y = 0;
       if (this.mainTruckL) this.mainTruckL.position.y = 0;
@@ -646,11 +656,21 @@ export class Boeing737 {
 
   loadGltfModel(url) {
     if (typeof window === 'undefined') return;
+    this.loadingGltf = true;
+
+    // Suppress procedural exterior while primary GLTF asset is loading to prevent flash of old model
+    if (this.fuselageGroup) this.fuselageGroup.visible = false;
+    if (this.wingGroup) this.wingGroup.visible = false;
+    if (this.tailGroup) this.tailGroup.visible = false;
+    if (this.empennageGroup) this.empennageGroup.visible = false;
+    if (this.enginesGroup) this.enginesGroup.visible = false;
+
     try {
       const loader = new GLTFLoader();
       loader.load(
         url,
         (gltf) => {
+          this.loadingGltf = false;
           this.gltfModel = gltf.scene;
           // Rotate 90° clockwise around Y so nose (-X in raw asset) faces -Z (simulator flight direction)
           this.gltfModel.rotation.y = Math.PI * 0.5;
@@ -678,13 +698,14 @@ export class Boeing737 {
           if (fan2) this.gltfFans.push(fan2);
 
           this.gltfGroup.add(this.gltfModel);
-          this.gltfGroup.visible = true;
+          this.gltfGroup.visible = !this.isCockpit;
           this.modelLoaded = true;
           this.useGltf = true;
 
-          // Switch exterior visibility: hide procedural fuselage and wings, keep landing gear & lights
+          // Switch exterior visibility: hide procedural fuselage, wings and tail, keep landing gear & lights
           if (this.fuselageGroup) this.fuselageGroup.visible = false;
           if (this.wingGroup) this.wingGroup.visible = false;
+          if (this.tailGroup) this.tailGroup.visible = false;
           if (this.empennageGroup) this.empennageGroup.visible = false;
           if (this.enginesGroup) this.enginesGroup.visible = false;
         },
@@ -692,20 +713,34 @@ export class Boeing737 {
         (err) => {
           // Graceful fallback to procedural model
           console.warn('GLTF B737 model failed to load, falling back to procedural:', err);
+          this.loadingGltf = false;
           this.useGltf = false;
+          if (this.fuselageGroup) this.fuselageGroup.visible = !this.isCockpit;
+          if (this.wingGroup) this.wingGroup.visible = !this.isCockpit;
+          if (this.tailGroup) this.tailGroup.visible = !this.isCockpit;
+          if (this.empennageGroup) this.empennageGroup.visible = !this.isCockpit;
+          if (this.enginesGroup) this.enginesGroup.visible = !this.isCockpit;
         }
       );
     } catch (e) {
+      this.loadingGltf = false;
       this.useGltf = false;
+      if (this.fuselageGroup) this.fuselageGroup.visible = !this.isCockpit;
+      if (this.wingGroup) this.wingGroup.visible = !this.isCockpit;
+      if (this.tailGroup) this.tailGroup.visible = !this.isCockpit;
+      if (this.empennageGroup) this.empennageGroup.visible = !this.isCockpit;
+      if (this.enginesGroup) this.enginesGroup.visible = !this.isCockpit;
     }
   }
 
   setCockpitMode(isCockpit, showInterior = true) {
+    this.isCockpit = isCockpit;
     if (this.useGltf && this.gltfGroup) {
       this.gltfGroup.visible = !isCockpit;
-    } else {
+    } else if (!this.loadingGltf) {
       if (this.fuselageGroup) this.fuselageGroup.visible = !isCockpit;
       if (this.wingGroup) this.wingGroup.visible = !isCockpit;
+      if (this.tailGroup) this.tailGroup.visible = !isCockpit;
       if (this.empennageGroup) this.empennageGroup.visible = !isCockpit;
       if (this.enginesGroup) this.enginesGroup.visible = !isCockpit;
     }

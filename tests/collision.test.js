@@ -60,6 +60,18 @@ test('CollisionDetector (Multi-Obstacle & Crash Detection System)', async (t) =>
     assert.equal(result, null, 'Safe runway roll should not trigger collision');
   });
 
+  await t.test('gear-up approach stays airborne until the engine nacelle reaches the runway', () => {
+    const quat = new THREE.Quaternion();
+    const velocity = new THREE.Vector3(70, -2, 0);
+    for (const clearance of [4, 3.5, 3.1]) {
+      assert.equal(detector.checkCollision(new THREE.Vector3(-1000, 12 + clearance, 0),
+        quat, velocity, 0, 0, 0), null, `Gear-up aircraft is clear at ${clearance}m CG height`);
+    }
+    const impact = detector.checkCollision(new THREE.Vector3(-1000, 14.9, 0), quat, velocity, 0, 0, 0);
+    assert.ok(impact, 'Nacelle ground contact must trigger a crash');
+    assert.match(impact.name, /GEAR-UP/);
+  });
+
   await t.test('should detect control tower collision', () => {
     // Flying directly into control tower cab at (120, 50, 280)
     const pos = new THREE.Vector3(120, 50, 280);

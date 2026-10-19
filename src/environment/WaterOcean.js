@@ -6,8 +6,10 @@ import * as THREE from 'three';
  * deep oceanic color absorption, and wave height query for floating ships.
  */
 export class WaterOcean {
-  constructor(size = 36000) {
+  constructor(size = 36000, segments = 180) {
     this.size = size;
+    this.segments = segments;
+    this.snapStep = this.size / this.segments;
     this.waterLevel = 0.0;
     this.sunDirection = new THREE.Vector3(0.5, 0.6, 0.4).normalize();
 
@@ -16,7 +18,7 @@ export class WaterOcean {
 
   initWater() {
     // High-resolution plane geometry for wave displacement
-    const geom = new THREE.PlaneGeometry(this.size, this.size, 180, 180);
+    const geom = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
     geom.rotateX(-Math.PI * 0.5);
 
     // Custom Water Shader Material with Gerstner Waves & Sunlight Specular Glint
@@ -31,13 +33,16 @@ export class WaterOcean {
         uFogColor: { value: new THREE.Color(0xc8def4) },
         uFogDensity: { value: 0.00020 },
         uFogHeightFalloff: { value: 0.00068 },
-        uBaseFogDensity: { value: 0.00020 }
+        uBaseFogDensity: { value: 0.00020 },
+        uEdgeFadeStart: { value: this.size * 0.5 * 0.70 },
+        uEdgeFadeEnd: { value: this.size * 0.5 * 0.95 }
       },
       vertexShader: `
         uniform float uTime;
         varying vec3 vWorldPos;
         varying vec3 vNormal;
         varying float vWaveHeight;
+        varying vec2 vLocalPos;
 
         // Gerstner Wave function
         vec3 gerstnerWave(vec2 dir, float steepness, float wavelength, float speed, vec2 pos, float time) {
@@ -55,25 +60,38 @@ export class WaterOcean {
 
         void main() {
           vec3 pos = position;
+          vLocalPos = pos.xz;
+
+          // Evaluate Gerstner waves in global world coordinates so wave phase is invariant to mesh translation
+          vec4 baseWorldPos = modelMatrix * vec4(pos, 1.0);
+          vec2 worldXZ = baseWorldPos.xz;
 
           // 3 Octaves of Gerstner Waves
-          vec3 w1 = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.18, 48.0, 1.0, pos.xz, uTime);
-          vec3 w2 = gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.14, 26.0, 1.2, pos.xz, uTime);
-          vec3 w3 = gerstnerWave(normalize(vec2(0.2, -1.0)), 0.10, 12.0, 1.5, pos.xz, uTime);
+          vec3 w1 = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.18, 48.0, 1.0, worldXZ, uTime);
+          vec3 w2 = gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.14, 26.0, 1.2, worldXZ, uTime);
+          vec3 w3 = gerstnerWave(normalize(vec2(0.2, -1.0)), 0.10, 12.0, 1.5, worldXZ, uTime);
 
-          vec3 displaced = pos + w1 + w2 + w3;
-          vWaveHeight = displaced.y;
+          vec3 totalDisplacement = w1 + w2 + w3;
+          vec3 displacedWorld = baseWorldPos.xyz + totalDisplacement;
+          vWaveHeight = totalDisplacement.y;
 
-          // Compute analytical normal from wave gradients
+          // Compute analytical normal from wave gradients in world coordinates
           float eps = 0.8;
-          vec3 pX = pos + vec3(eps, 0.0, 0.0) + gerstnerWave(normalize(vec2(1.0, 0.4)), 0.18, 48.0, 1.0, pos.xz + vec2(eps, 0.0), uTime);
-          vec3 pZ = pos + vec3(0.0, 0.0, eps) + gerstnerWave(normalize(vec2(1.0, 0.4)), 0.18, 48.0, 1.0, pos.xz + vec2(0.0, eps), uTime);
-          vec3 n = normalize(cross(pZ - displaced, pX - displaced));
+          vec2 pXCoord = worldXZ + vec2(eps, 0.0);
+          vec2 pZCoord = worldXZ + vec2(0.0, eps);
+          vec3 pXDisp = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.18, 48.0, 1.0, pXCoord, uTime)
+                      + gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.14, 26.0, 1.2, pXCoord, uTime)
+                      + gerstnerWave(normalize(vec2(0.2, -1.0)), 0.10, 12.0, 1.5, pXCoord, uTime);
+          vec3 pZDisp = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.18, 48.0, 1.0, pZCoord, uTime)
+                      + gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.14, 26.0, 1.2, pZCoord, uTime)
+                      + gerstnerWave(normalize(vec2(0.2, -1.0)), 0.10, 12.0, 1.5, pZCoord, uTime);
+          vec3 pX = baseWorldPos.xyz + vec3(eps, 0.0, 0.0) + pXDisp;
+          vec3 pZ = baseWorldPos.xyz + vec3(0.0, 0.0, eps) + pZDisp;
+          vec3 n = normalize(cross(pZ - displacedWorld, pX - displacedWorld));
           vNormal = n;
 
-          vec4 worldPos = modelMatrix * vec4(displaced, 1.0);
-          vWorldPos = worldPos.xyz;
-          gl_Position = projectionMatrix * viewMatrix * worldPos;
+          vWorldPos = displacedWorld;
+          gl_Position = projectionMatrix * viewMatrix * vec4(displacedWorld, 1.0);
         }
       `,
       fragmentShader: `
@@ -87,10 +105,13 @@ export class WaterOcean {
         uniform float uFogHeightFalloff;
         uniform float uBaseFogDensity;
         uniform float uTime;
+        uniform float uEdgeFadeStart;
+        uniform float uEdgeFadeEnd;
 
         varying vec3 vWorldPos;
         varying vec3 vNormal;
         varying float vWaveHeight;
+        varying vec2 vLocalPos;
 
         void main() {
           vec3 viewDir = normalize(cameraPosition - vWorldPos);
@@ -146,8 +167,9 @@ export class WaterOcean {
           float fogFactor = clamp(1.0 - exp(-fogExp * fogExp), 0.0, 1.0);
 
           // Far edge blending: ensure ocean water completely melts into horizon sky fog before boundary
-          float edgeDist = max(abs(vWorldPos.x), abs(vWorldPos.z));
-          float edgeFade = smoothstep(12500.0, 17500.0, edgeDist);
+          // Uses local mesh coordinates so the fade stays anchored to the far outer rim regardless of camera position
+          float edgeDist = max(abs(vLocalPos.x), abs(vLocalPos.y));
+          float edgeFade = smoothstep(uEdgeFadeStart, uEdgeFadeEnd, edgeDist);
           fogFactor = max(fogFactor, edgeFade);
 
           finalColor = mix(finalColor, uFogColor, fogFactor);
@@ -200,7 +222,13 @@ export class WaterOcean {
     }
   }
 
-  update(dt) {
+  update(dt, focusPos = null) {
     this.material.uniforms.uTime.value += dt;
+    if (focusPos) {
+      const snappedX = Math.round(focusPos.x / this.snapStep) * this.snapStep;
+      const snappedZ = Math.round(focusPos.z / this.snapStep) * this.snapStep;
+      this.mesh.position.x = snappedX;
+      this.mesh.position.z = snappedZ;
+    }
   }
 }

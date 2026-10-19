@@ -27,8 +27,8 @@ export class CollisionDetector {
       { id: 'fin', pos: new THREE.Vector3(0, 9.2, 16.0), radius: 0.8, desc: '수직 꼬리날개 (Vertical Fin)' },
       { id: 'wingL', pos: new THREE.Vector3(-17.2, 0.6, 2.8), radius: 1.0, desc: '좌측 주익단 (Left Wingtip)' },
       { id: 'wingR', pos: new THREE.Vector3(17.2, 0.6, 2.8), radius: 1.0, desc: '우측 주익단 (Right Wingtip)' },
-      { id: 'engineL', pos: new THREE.Vector3(-5.2, -1.4, -1.5), radius: 1.4, desc: '좌측 엔진 (Left Engine)' },
-      { id: 'engineR', pos: new THREE.Vector3(5.2, -1.4, -1.5), radius: 1.4, desc: '우측 엔진 (Right Engine)' },
+      { id: 'engineL', pos: new THREE.Vector3(-5.06, -1.95, -5.22), radius: 1.0, desc: '좌측 엔진 (Left Engine)' },
+      { id: 'engineR', pos: new THREE.Vector3(5.06, -1.95, -5.22), radius: 1.0, desc: '우측 엔진 (Right Engine)' },
       { id: 'belly', pos: new THREE.Vector3(0, -1.75, 0.0), radius: 1.8, desc: '동체 하단 (Belly Fuselage)' }
     ];
 
@@ -483,7 +483,7 @@ export class CollisionDetector {
         const normalImpactSpeed = linearVelocity ? -linearVelocity.dot(normal) : -vsiMs;
 
         // Gear collapse / belly impact onto runway concrete
-        if (aircraftPos.y < groundH + 1.35) {
+        if (aircraftPos.y < groundH + 2.1) {
           return {
             name: '하드 랜딩 기체 파손 (HARD LANDING CRASH)',
             point: aircraftPos.clone(),
@@ -516,18 +516,25 @@ export class CollisionDetector {
           };
         }
         // Severe tail strike beyond rotation envelope (> 14.5 deg at low altitude)
-        if (pitchDeg > 14.5 && aircraftPos.y < groundH + 1.85) {
+        if (pitchDeg > 14.5 && aircraftPos.y < groundH + 3.1) {
           return {
             name: '테일 스트라이크 (TAIL STRIKE CRASH)',
             point: aircraftPos.clone(),
             description: `과도한 기수 상승각(${pitchDeg.toFixed(1)}°)으로 후방 동체가 활주로에 격돌했습니다.`
           };
         }
-        // Gear-up belly landing at high speed (> 30 knots)
-        if (gearState < 0.25) {
+      }
+      // With gear retracted, use body contact rather than the deployed wheel height.
+      // Engine probes are centers; their radii locate the nacelle bottoms.
+      if (gearState < 0.25 && speedMs > 25.0) {
+        const bodyContact = worldProbes.find(probe => {
+          const bottomY = probe.pos.y - (probe.id === 'engineL' || probe.id === 'engineR' ? probe.radius : 0);
+          return bottomY < this.terrain.getHeight(probe.pos.x, probe.pos.z) + 0.1;
+        });
+        if (bodyContact) {
           return {
             name: '동체 착륙 폭발 (GEAR-UP BELLY CRASH)',
-            point: aircraftPos.clone(),
+            point: bodyContact.pos.clone(),
             description: `랜딩기어 미전개 상태에서 고속(${(speedMs * 1.94384).toFixed(0)} KT)으로 동체가 활주로와 충돌했습니다.`
           };
         }

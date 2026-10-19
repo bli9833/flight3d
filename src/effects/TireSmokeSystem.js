@@ -59,24 +59,30 @@ export class TireSmokeSystem {
   spawnTouchdownSmoke(contacts, linearVelocity) {
     if (!contacts || contacts.length === 0) return;
 
-    for (const c of contacts) {
+    // Only main landing gear bogies produce high-energy touchdown spin-up rubber smoke (nose gear never smokes)
+    const validContacts = contacts.filter(c => c.id !== 'nose');
+    if (validContacts.length === 0) return;
+
+    for (const c of validContacts) {
       const pos = c.worldPos;
       const groundSpeed = c.groundSpeed || 70.0;
-      const sinkRate = Math.max(0.8, c.sinkRate || 1.5);
+      if (groundSpeed < 20.0) continue; // Minimum speed threshold for tire spin-up rubber smoke
 
-      // Number of initial particles proportional to impact energy
-      const count = Math.min(45, Math.max(16, Math.round(sinkRate * 12 + (groundSpeed / 30.0) * 6)));
+      const sinkRate = Math.max(0.5, c.sinkRate || 1.5);
+
+      // Authentic, crisp touchdown puff: 8 to 14 particles per main bogie (instantaneous burst)
+      const count = Math.min(14, Math.max(8, Math.round(sinkRate * 4 + (groundSpeed / 35.0) * 4)));
 
       this.emitSmokeBurst(pos, linearVelocity, groundSpeed, count);
 
-      // Start a short tire spin-up emitter (tires scrub for ~0.25 - 0.35s)
+      // Brief spin-up trailing scrub (~0.12s)
       this.activeSpinUpEmitters.push({
         worldPos: pos.clone(),
         linearVelocity: linearVelocity.clone(),
         groundSpeed,
-        duration: 0.28,
+        duration: 0.12,
         elapsed: 0.0,
-        interval: 0.035,
+        interval: 0.04,
         timer: 0.0
       });
     }
@@ -102,15 +108,15 @@ export class TireSmokeSystem {
       const spriteMat = new THREE.SpriteMaterial({
         map: this.smokeTexture,
         transparent: true,
-        opacity: 0.85 + Math.random() * 0.15,
+        opacity: 0.60 + Math.random() * 0.15,
         depthWrite: false
       });
 
       const sprite = new THREE.Sprite(spriteMat);
 
       // Spawn at contact point with lateral tire spread
-      const lateralSpread = (Math.random() - 0.5) * 1.4;
-      const longitudinalSpread = (Math.random() - 0.5) * 1.0;
+      const lateralSpread = (Math.random() - 0.5) * 1.2;
+      const longitudinalSpread = (Math.random() - 0.5) * 0.8;
       const latVec = new THREE.Vector3(-velNorm.z, 0, velNorm.x);
 
       sprite.position.copy(origin).addScaledVector(latVec, lateralSpread).addScaledVector(velNorm, longitudinalSpread);
@@ -120,12 +126,12 @@ export class TireSmokeSystem {
       // High-speed backward throw from runway friction into slipstream
       const slipstreamFactor = 0.25 + Math.random() * 0.35;
       const vel = new THREE.Vector3(
-        -velNorm.x * groundSpeed * slipstreamFactor + (Math.random() - 0.5) * 3.5,
-        1.2 + Math.random() * 3.2, // Upward buoyant billow
-        -velNorm.z * groundSpeed * slipstreamFactor + (Math.random() - 0.5) * 3.5
+        -velNorm.x * groundSpeed * slipstreamFactor + (Math.random() - 0.5) * 3.0,
+        1.0 + Math.random() * 2.5, // Upward buoyant billow
+        -velNorm.z * groundSpeed * slipstreamFactor + (Math.random() - 0.5) * 3.0
       );
 
-      const baseScale = 1.0 + Math.random() * 1.4;
+      const baseScale = 0.9 + Math.random() * 0.5;
       sprite.scale.set(baseScale, baseScale, 1.0);
 
       this.group.add(sprite);
@@ -133,10 +139,10 @@ export class TireSmokeSystem {
         sprite,
         vel,
         scale: baseScale,
-        growth: 4.0 + Math.random() * 4.5,
+        growth: 2.2 + Math.random() * 2.0,
         life: 0.0,
-        maxLife: 1.6 + Math.random() * 0.9,
-        baseOpacity: 0.85
+        maxLife: 1.1 + Math.random() * 0.3,
+        baseOpacity: 0.65
       });
     }
   }
@@ -146,11 +152,13 @@ export class TireSmokeSystem {
    */
   spawnBrakingSmoke(contacts, linearVelocity, brakeIntensity) {
     if (!contacts || brakeIntensity < 0.6) return;
+    const groundSpeed = Math.hypot(linearVelocity.x, linearVelocity.z);
+    if (groundSpeed < 5.0) return; // Parked wheels cannot produce braking smoke.
     if (Math.random() > 0.4) return; // Stagger braking emission
 
     for (const c of contacts) {
-      if (c.id === 'nose') continue; // Main brakes do the heavy stopping
-      this.emitSmokeBurst(c.worldPos, linearVelocity, c.groundSpeed || 40.0, 3);
+      if (c.id === 'nose' || !c.isGrounded) continue; // Only loaded main wheels can brake.
+      this.emitSmokeBurst(c.worldPos, linearVelocity, groundSpeed, 3);
     }
   }
 
