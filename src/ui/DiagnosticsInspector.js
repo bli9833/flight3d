@@ -52,6 +52,13 @@ export class DiagnosticsInspector {
           <button id="btn-toggle-terrain-quality" class="btn btn-demo-skip" style="margin-top:6px; width:100%;">지형 품질 전환 [High ⇄ Low]</button>
         </div>
 
+        <!-- Aircraft 3D Model & IBL Reflection Metrics -->
+        <div class="diag-section">
+          <div class="diag-subheading">✈️ 기체 PBR 모델 & IBL 환경 반사 (Aircraft)</div>
+          <div class="diag-row"><span class="k">모델 포맷 (Model Format)</span><span id="m-aircraft-model" class="v cyan">GLTF PBR (237 KB)</span></div>
+          <div class="diag-row"><span class="k">환경 반사 (IBL Sky Map)</span><span id="m-aircraft-ibl" class="v green">ACTIVE (1K HDR)</span></div>
+        </div>
+
         <!-- Live Forces & Aerodynamic Vectors -->
         <div class="diag-section">
           <div class="diag-subheading">✈️ 실시간 공력 & 힘 벡터 (Forces)</div>
@@ -268,6 +275,21 @@ export class DiagnosticsInspector {
       if (hEl && telemetry) {
         const gh = this.sim.terrain.getHeight(telemetry.x || 0, telemetry.z || 0);
         hEl.textContent = `${gh.toFixed(1)} m`;
+      }
+    }
+
+    // Aircraft PBR & IBL status
+    if (this.sim.aircraft) {
+      const elModel = document.getElementById('m-aircraft-model');
+      if (elModel) {
+        elModel.textContent = this.sim.aircraft.useGltf ? 'GLTF PBR (237 KB)' : 'Procedural Mesh (Fallback)';
+        elModel.className = this.sim.aircraft.useGltf ? 'v cyan' : 'v amber';
+      }
+      const elIbl = document.getElementById('m-aircraft-ibl');
+      if (elIbl) {
+        const hasIbl = Boolean(this.sim.scene && this.sim.scene.environment);
+        elIbl.textContent = hasIbl ? 'ACTIVE (1K HDR)' : 'STANDARD';
+        elIbl.className = hasIbl ? 'v green' : 'v';
       }
     }
 
