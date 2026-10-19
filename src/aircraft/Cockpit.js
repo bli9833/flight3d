@@ -1011,25 +1011,30 @@ export class Cockpit {
             if (child.isMesh) {
               child.castShadow = true;
               child.receiveShadow = true;
+              // Configure authentic Boeing cockpit materials for the native frame & fuselage meshes
+              if (child.name === 'Body020_Material008_0') {
+                child.visible = true;
+                child.material = boeingFrameMat;
+                return;
+              }
+              if (child.name.startsWith('Body006') || child.name.startsWith('Body002')) {
+                child.visible = true;
+                child.material = boeingLiningMat;
+                return;
+              }
+              if (child.name.startsWith('Body')) {
+                // Hide exterior nose fuselage skin (Body018)
+                child.visible = false;
+                return;
+              }
               if (child.material) {
-                // Keep FrontSide on body, shell, and frame to prevent inverted backface clutter and clipping
-                if (child.name.includes('Body') || child.name.includes('Cube567') || child.name.includes('Cube106')) {
+                if (child.name.includes('Cube567') || child.name.includes('Cube106')) {
                   child.material.side = THREE.FrontSide;
                 } else {
                   child.material.side = THREE.DoubleSide;
                 }
 
-                if (child.name.includes('Body020') || child.name.includes('Body.020')) {
-                  // Windshield Center Post, A-Pillars, Lower Sill, and Top Brow
-                  child.material = boeingFrameMat;
-                } else if (
-                  child.name.includes('Body002_Material014') || child.name.includes('Body.002_Material.014') ||
-                  child.name.includes('Body018_Material014') || child.name.includes('Body.018_Material.014') ||
-                  child.name.includes('Body006_Material014') || child.name.includes('Body.006_Material.014')
-                ) {
-                  // Fuselage cockpit shell interior walls
-                  child.material = boeingLiningMat;
-                } else if (child.name.includes('Cube1061') || child.name.includes('Cube1060')) {
+                if (child.name.includes('Cube1061') || child.name.includes('Cube1060')) {
                   // Captain and FO side consoles
                   child.material.color.setHex(0x424b57);
                   child.material.roughness = 0.85;
@@ -1193,87 +1198,100 @@ export class Cockpit {
   }
 
   /**
-   * Constructs authentic Boeing 737 cockpit window glass panels,
-   * ceiling eyebrow header trim, and center post compass bracket
-   * to enclose the 3D model seamlessly and eliminate sky leaks.
+   * Constructs authentic Boeing 737 cockpit window framing, solid A-pillars,
+   * center mullion post with magnetic compass, side sliding window frames,
+   * interior sidewall liners, and seamless ceiling eyebrow enclosures.
    */
   setupGltfCockpitFraming() {
     this.gltfCockpitFraming = new THREE.Group();
     this.gltfCockpitFraming.name = 'GLTF_Cockpit_Framing';
 
-    const boeingGreyMat = new THREE.MeshStandardMaterial({
-      color: 0x323a46,
-      roughness: 0.82,
-      metalness: 0.18,
-      side: THREE.FrontSide
+    const boeingCharcoal = new THREE.MeshStandardMaterial({
+      color: 0x22262e, // Authentic Boeing Cockpit Grey / Charcoal
+      roughness: 0.85,
+      metalness: 0.15,
+      side: THREE.DoubleSide
     });
 
-    const boeingWallMat = new THREE.MeshStandardMaterial({
-      color: 0x586270,
-      roughness: 0.90,
+    const boeingLiningSlate = new THREE.MeshStandardMaterial({
+      color: 0x303640, // Boeing flight deck interior lining slate
+      roughness: 0.88,
       metalness: 0.10,
-      side: THREE.FrontSide
+      side: THREE.DoubleSide
     });
 
-    // 1. Complete Enclosure Ceiling Header & Eyebrow Structure
-    // Center ceiling fairing connecting windshield header to overhead panel
-    const centerRoof = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.14, 0.45), boeingGreyMat);
-    centerRoof.name = 'GLTF_Center_Ceiling_Trim';
-    centerRoof.position.set(0, 1.22, -12.58);
-    centerRoof.rotation.x = 0.28;
-
-    // Left eyebrow roof trim (above captain front and side window)
-    const leftRoof = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.14, 0.55), boeingWallMat);
-    leftRoof.name = 'GLTF_Left_Eyebrow_Trim';
-    leftRoof.position.set(-0.62, 1.25, -12.50);
-    leftRoof.rotation.set(0.24, 0.15, -0.12);
-
-    // Right eyebrow roof trim (above FO front and side window)
-    const rightRoof = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.14, 0.55), boeingWallMat);
-    rightRoof.name = 'GLTF_Right_Eyebrow_Trim';
-    rightRoof.position.set(0.62, 1.25, -12.50);
-    rightRoof.rotation.set(0.24, -0.15, 0.12);
-
-    // Center Post Compass Fairing & Bracket (securely mounting compass to center post)
-    this.gltfCompassBracket = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.26, 0.18), boeingGreyMat);
+    // 1. Standby Magnetic Compass mounted flush on center post under the ceiling header
+    this.gltfCompassBracket = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.08, 0.035), boeingCharcoal);
     this.gltfCompassBracket.name = 'GLTF_Center_Post_Compass_Bracket';
-    this.gltfCompassBracket.position.set(-0.015, 1.06, -12.67);
+    this.gltfCompassBracket.position.set(-0.01, 1.05, -12.68);
     this.gltfCompassBracket.rotation.x = -0.36;
+
+    const compassGroup = new THREE.Group();
+    compassGroup.name = 'GLTF_Compass_Group';
+    compassGroup.position.set(-0.01, 1.05, -12.66);
+    compassGroup.rotation.x = -0.36;
+    const compassBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.022, 0.034, 16),
+      new THREE.MeshStandardMaterial({ color: 0x181c22, roughness: 0.5, metalness: 0.3 })
+    );
+    compassBody.rotation.x = Math.PI * 0.5;
+    const compassFace = new THREE.Mesh(
+      new THREE.CircleGeometry(0.018, 16),
+      new THREE.MeshBasicMaterial({ color: 0x080d14 })
+    );
+    compassFace.position.z = 0.018;
+    compassGroup.add(compassBody, compassFace);
+
+    this.gltfCenterPost = null;
+    this.gltfAPillars = [];
+    this.gltfSideFrames = [];
+    this.gltfCockpitFraming.add(this.gltfCompassBracket, compassGroup);
+
+    // 2. Seamless Ceiling Enclosure Fairings (bridges between Body006 and overhead panel)
+    const roofFairing = new THREE.Mesh(new THREE.BoxGeometry(1.68, 0.04, 0.55), boeingLiningSlate);
+    roofFairing.name = 'GLTF_Roof_Fairing';
+    roofFairing.position.set(0, 1.25, -12.52);
+    roofFairing.rotation.x = 0.22;
+
+    const centerRoofFairing = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.05, 0.40), boeingCharcoal);
+    centerRoofFairing.name = 'GLTF_Center_Roof_Fairing';
+    centerRoofFairing.position.set(0, 1.22, -12.65);
+    centerRoofFairing.rotation.x = 0.12;
 
     this.gltfCeilingTrim = new THREE.Group();
     this.gltfCeilingTrim.name = 'GLTF_Ceiling_Trim';
-    this.gltfCeilingTrim.add(centerRoof, leftRoof, rightRoof);
-    this.gltfCockpitFraming.add(this.gltfCeilingTrim, this.gltfCompassBracket);
+    this.gltfCeilingTrim.add(roofFairing, centerRoofFairing);
+    this.gltfCockpitFraming.add(this.gltfCeilingTrim);
 
-    // 2. Subtle Tinted Windshield Glass
+    // 3. Subtle Tinted Aviation Windshield Glass Panels
     const glassMat = new THREE.MeshStandardMaterial({
       color: 0x88b0cc,
       transparent: true,
-      opacity: 0.08,
-      roughness: 0.05,
-      metalness: 0.35,
+      opacity: 0.05,
+      roughness: 0.06,
+      metalness: 0.30,
       depthWrite: false
     });
 
-    const glass1L = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.48), glassMat);
+    const glass1L = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.44), glassMat);
     glass1L.name = 'GLTF_Glass_1L';
-    glass1L.position.set(-0.35, 0.90, -12.79);
-    glass1L.rotation.set(-0.37, 0.18, -0.06);
+    glass1L.position.set(-0.25, 0.83, -12.92);
+    glass1L.rotation.set(-0.47, 0.22, -0.06);
 
-    const glass1R = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.48), glassMat);
+    const glass1R = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.44), glassMat);
     glass1R.name = 'GLTF_Glass_1R';
-    glass1R.position.set(0.35, 0.90, -12.79);
-    glass1R.rotation.set(-0.37, -0.18, 0.06);
+    glass1R.position.set(0.25, 0.83, -12.92);
+    glass1R.rotation.set(-0.47, -0.22, 0.06);
 
-    const glass2L = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 0.45), glassMat);
+    const glass2L = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.44), glassMat);
     glass2L.name = 'GLTF_Glass_2L';
-    glass2L.position.set(-0.83, 0.91, -12.52);
-    glass2L.rotation.set(-0.15, 0.98, 0);
+    glass2L.position.set(-0.85, 0.95, -12.45);
+    glass2L.rotation.set(-0.12, 1.10, 0);
 
-    const glass2R = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 0.45), glassMat);
+    const glass2R = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.44), glassMat);
     glass2R.name = 'GLTF_Glass_2R';
-    glass2R.position.set(0.83, 0.91, -12.52);
-    glass2R.rotation.set(-0.15, -0.98, 0);
+    glass2R.position.set(0.85, 0.95, -12.45);
+    glass2R.rotation.set(-0.12, -1.10, 0);
 
     this.gltfGlassPanels = [glass1L, glass1R, glass2L, glass2R];
     this.gltfCockpitFraming.add(...this.gltfGlassPanels);
