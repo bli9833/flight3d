@@ -27,8 +27,8 @@ export class CameraSystem {
     this.onTemporaryViewComplete = null;
 
     // Cockpit Head Dynamics & Look-Around
-    this.photoCockpit = true; // Default to 100% photorealistic Boeing 737 photo panel overlay
-    this.cockpitHeadOffset = new THREE.Vector3(-0.48, 0.82, -12.02); // Captain eye
+    this.photoCockpit = false; // Default to high-fidelity 3D Virtual Cockpit with GLTF asset
+    this.cockpitHeadOffset = new THREE.Vector3(-0.48, 0.85, -12.44); // Captain eye
     this.headGForceOffset = new THREE.Vector3();
     this.touchJoltOffset = 0;
     this.lookYaw = 0;

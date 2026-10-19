@@ -141,17 +141,17 @@ describe('CockpitPhotoOverlay & Photorealistic 2D Cockpit System', () => {
     const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
     const camSys = new CameraSystem(camera, null);
 
-    assert.strictEqual(camSys.photoCockpit, true, 'CameraSystem must default to photoCockpit=true');
+    assert.strictEqual(camSys.photoCockpit, false, 'CameraSystem must default to photoCockpit=false (3D Virtual Cockpit)');
     assert.strictEqual(camSys.getModeName(), 'COCKPIT (CAPTAIN)');
-    assert.strictEqual(camSys.getCockpitSubmodeName(), 'PHOTO 2D');
-
-    camSys.toggleCockpitPhoto();
-    assert.strictEqual(camSys.photoCockpit, false);
     assert.strictEqual(camSys.getCockpitSubmodeName(), '3D VIRTUAL');
 
     camSys.toggleCockpitPhoto();
     assert.strictEqual(camSys.photoCockpit, true);
     assert.strictEqual(camSys.getCockpitSubmodeName(), 'PHOTO 2D');
+
+    camSys.toggleCockpitPhoto();
+    assert.strictEqual(camSys.photoCockpit, false);
+    assert.strictEqual(camSys.getCockpitSubmodeName(), '3D VIRTUAL');
 
     // Verify camera update alignment in photoCockpit mode
     const aircraftMesh = new THREE.Mesh();
