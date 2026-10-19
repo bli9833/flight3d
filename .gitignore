@@ -35,6 +35,7 @@ crash_*.png
 cockpit_view_swift.png
 demo_*.png
 fixed_demo_*.png
+fog_*.png
 # Temporary test and worktree directories
 .worktrees/
 .chrome-profile/
