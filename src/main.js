@@ -900,6 +900,7 @@ class FlightSimulator {
       this.integratePhysics(this.physicsDt);
       this.totalSimTime += this.physicsDt;
     }
+    this.updateFlightDisplays();
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
@@ -920,8 +921,20 @@ class FlightSimulator {
     this.explosionSystem.update(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
     this.touchControls.updateUI(this.telemetry);
+    this.diagnostics.update(simSeconds, this.telemetry);
     this.updateHUD();
     return this.telemetry;
+  }
+
+  updateFlightDisplays() {
+    for (const display of [this.pfdCanvas, this.ndCanvas, this.eicasCanvas]) {
+      display.updateData(this.telemetry);
+      display.render();
+    }
+    // These instruments render as part of updateData.
+    for (const display of [this.mcpCanvas, this.isfdCanvas, this.cduCanvas]) {
+      display.updateData(this.telemetry);
+    }
   }
 
   /**
@@ -950,18 +963,7 @@ class FlightSimulator {
     this.aircraft.group.updateMatrixWorld(true);
 
     // 2. Update Flight Instrument Canvas Displays
-    this.pfdCanvas.updateData(this.telemetry);
-    this.pfdCanvas.render();
-
-    this.ndCanvas.updateData(this.telemetry);
-    this.ndCanvas.render();
-
-    this.eicasCanvas.updateData(this.telemetry);
-    this.eicasCanvas.render();
-
-    this.mcpCanvas.updateData(this.telemetry);
-    this.isfdCanvas.updateData(this.telemetry);
-    this.cduCanvas.updateData(this.telemetry);
+    this.updateFlightDisplays();
 
     // 3. Update Environment Animations & Explosion Particles
     if (this.activeAirport !== 'lukla') {
@@ -1139,6 +1141,21 @@ class FlightSimulator {
     // Crash Restart Button & Keyboard Shortcuts [Space / R / Enter]
     document.getElementById('btn-crash-restart')?.addEventListener('click', () => {
       this.resetCrash();
+    });
+
+    const toggleYokes = () => {
+      const visible = this.aircraft.cockpit.toggleYokes();
+      const button = document.getElementById('btn-yokes');
+      if (button) {
+        button.textContent = visible ? '조종간 숨김 [J]' : '조종간 표시 [J]';
+        button.setAttribute('aria-pressed', String(!visible));
+      }
+    };
+    document.getElementById('btn-yokes')?.addEventListener('click', toggleYokes);
+    window.addEventListener('keydown', e => {
+      if (e.code === 'KeyJ' && !e.repeat && !e.target?.closest?.('input, textarea, select, [contenteditable]')) {
+        toggleYokes();
+      }
     });
 
     // Toggle Cockpit Photo Mode by clicking HUD Camera item

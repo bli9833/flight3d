@@ -105,11 +105,11 @@ export class DemoFlightDirector {
       });
     }
 
-    // Keyboard shortcut for cancelling demo (ESC) or restarting demo (D)
+    // Keyboard shortcut for cancelling demo (ESC) or restarting demo (P)
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.isActive) {
         this.stop('직접 조종 모드로 전환되었습니다.');
-      } else if ((e.key === 'd' || e.key === 'D') && !this.isActive && !e.target.matches('input, textarea')) {
+      } else if ((e.key === 'p' || e.key === 'P') && !this.isActive && !e.target.matches('input, textarea')) {
         this.start();
       }
     });

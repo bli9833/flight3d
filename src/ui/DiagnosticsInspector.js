@@ -224,6 +224,10 @@ export class DiagnosticsInspector {
   }
 
   update(dt, telemetry) {
+    // Keep recording while closed so opening the inspector shows flight history.
+    this.gHistory[this.historyIndex] = telemetry.gForce ?? 1.0;
+    this.aoaHistory[this.historyIndex] = this.sim.aero.alpha * 180 / Math.PI;
+    this.historyIndex = (this.historyIndex + 1) % this.historyLength;
     if (!this.visible) return;
 
     // Track FPS
@@ -308,11 +312,6 @@ export class DiagnosticsInspector {
         elStall.className = 'v status-green';
       }
     }
-
-    // Record graph data
-    this.gHistory[this.historyIndex] = telemetry.gForce || 1.0;
-    this.aoaHistory[this.historyIndex] = aero.alpha * 57.2958;
-    this.historyIndex = (this.historyIndex + 1) % this.historyLength;
 
     // Draw Sparkline Graph
     this.drawSparkline();

@@ -17,7 +17,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     assert.strictEqual(camSys.chasePitch, 0);
     assert.strictEqual(camSys.chaseDistance, 55.0);
     assert.strictEqual(camSys.lookYaw, 0);
-    assert.strictEqual(camSys.lookPitch, -0.18);
+    assert.strictEqual(camSys.lookPitch, -0.25);
     assert.strictEqual(camSys.wingLookYaw, 0);
     assert.strictEqual(camSys.wingLookPitch, 0);
     assert.strictEqual(camSys.isDragging, false);
@@ -170,7 +170,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     assert.strictEqual(camSys.chasePitch, 0);
     assert.strictEqual(camSys.chaseDistance, 55.0);
     assert.strictEqual(camSys.lookYaw, 0);
-    assert.strictEqual(camSys.lookPitch, -0.18);
+    assert.strictEqual(camSys.lookPitch, -0.25);
     assert.strictEqual(camSys.wingLookYaw, 0);
     assert.strictEqual(camSys.wingLookPitch, 0);
     assert.strictEqual(camSys.gearLookYaw, 0);

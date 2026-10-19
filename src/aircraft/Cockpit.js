@@ -1,3 +1,4 @@
+import { bindGltfYokes, updateGltfYokes } from './GltfCockpitControls.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
@@ -44,6 +45,7 @@ export class Cockpit {
     this.gltfCockpitModel = null;
     this.gltfCockpitLoaded = false;
     this.gltfDisplays = null;
+    this.yokesVisible = true;
 
     this.proceduralCockpitGroup = new THREE.Group();
     this.proceduralCockpitGroup.name = 'Procedural_Cockpit';
@@ -238,7 +240,7 @@ export class Cockpit {
     this.group.add(this.cockpitLight);
 
     // 7. Asynchronous High-Detail 3D GLTF Cockpit Asset Loading with Live Instruments
-    this.loadCockpitModel('/models/b737-cockpit-draco.glb');
+    this.loadCockpitModel();
   }
 
   buildWindshield(glassMat, frameMat, metalMat) {
@@ -869,10 +871,19 @@ export class Cockpit {
     this.proceduralCockpitGroup.add(overhead);
   }
 
-  /**
-   * Animate cockpit controls dynamically based on physical flight inputs
-   */
+  /** Temporarily clear the instrument sightline without changing control input. */
+  toggleYokes() {
+    this.yokesVisible = !this.yokesVisible;
+    for (const yoke of this.gltfYokes ?? []) yoke.visible = this.yokesVisible;
+    for (const yoke of [this.captainYoke, this.foYoke]) {
+      if (yoke?.root) yoke.root.visible = this.yokesVisible;
+    }
+    return this.yokesVisible;
+  }
+
+  /** Animate cockpit controls from the applied flight inputs. */
   updateControls(flightState) {
+    updateGltfYokes(this.gltfYokes, flightState);
     // 1. Dual Control Yokes
     const pitchDeflect = (flightState.elevator || 0) * 0.18;
     if (this.captainYoke && this.captainYoke.pitchGroup) {
@@ -985,6 +996,8 @@ export class Cockpit {
             }
           });
 
+          this.gltfYokes = bindGltfYokes(model);
+          for (const yoke of this.gltfYokes) yoke.visible = this.yokesVisible;
           this.gltfCockpitGroup.add(model);
 
           // Mount live 60 FPS flight displays onto the GLTF MIP & Pedestal
@@ -1027,6 +1040,7 @@ export class Cockpit {
     // Display materials referencing CanvasTextures with depth/polygonOffset to avoid Z-fighting
     const createDisplayMat = (canvas) => new THREE.MeshBasicMaterial({
       map: canvas.texture,
+      toneMapped: false,
       polygonOffset: true,
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1
@@ -1039,71 +1053,93 @@ export class Cockpit {
     const mcpMat = createDisplayMat(this.mcpCanvas);
     const cduMat = createDisplayMat(this.cduCanvas);
 
-    // Standard B737-800 CDS LCD Display Unit: 0.145m x 0.145m
-    const duGeo = new THREE.PlaneGeometry(0.145, 0.145);
-    const mipZ = -12.960;
-    const mipY = 0.365;
+    // Measured LCD apertures in the shipped cockpit GLBs.
+    const duGeo = new THREE.PlaneGeometry(0.101, 0.100);
+    const mipZ = -12.882;
+    const mipY = 0.569;
 
     // 1. Captain Outboard Primary Flight Display (PFD)
     this.gltfCaptainPfd = new THREE.Mesh(duGeo, pfdMat);
     this.gltfCaptainPfd.name = 'GLTF_Captain_PFD';
-    this.gltfCaptainPfd.position.set(-0.33, mipY, mipZ);
+    this.gltfCaptainPfd.position.set(-0.322, mipY, mipZ);
     this.gltfDisplays.add(this.gltfCaptainPfd);
 
     // 2. Captain Inboard Navigation Display (ND)
     this.gltfCaptainNd = new THREE.Mesh(duGeo, ndMat);
     this.gltfCaptainNd.name = 'GLTF_Captain_ND';
-    this.gltfCaptainNd.position.set(-0.18, mipY, mipZ);
+    this.gltfCaptainNd.position.set(-0.199, mipY, mipZ);
     this.gltfDisplays.add(this.gltfCaptainNd);
 
     // 3. Integrated Standby Flight Display (ISFD)
-    const isfdGeo = new THREE.PlaneGeometry(0.08, 0.08);
+    const isfdGeo = new THREE.PlaneGeometry(0.044, 0.044);
     this.gltfIsfd = new THREE.Mesh(isfdGeo, isfdMat);
     this.gltfIsfd.name = 'GLTF_Standby_ISFD';
-    this.gltfIsfd.position.set(-0.075, mipY, mipZ);
+    this.gltfIsfd.position.set(-0.103, 0.5946, mipZ);
     this.gltfDisplays.add(this.gltfIsfd);
 
     // 4. Center Upper EICAS (Engine Indications & Crew Alerting System)
     this.gltfUpperEicas = new THREE.Mesh(duGeo, eicasMat);
     this.gltfUpperEicas.name = 'GLTF_Upper_EICAS';
-    this.gltfUpperEicas.position.set(0.00, mipY, mipZ);
+    this.gltfUpperEicas.position.set(-0.006, mipY, mipZ);
     this.gltfDisplays.add(this.gltfUpperEicas);
 
     // 5. First Officer Inboard Navigation Display (ND)
     this.gltfFoNd = new THREE.Mesh(duGeo, ndMat);
     this.gltfFoNd.name = 'GLTF_FO_ND';
-    this.gltfFoNd.position.set(0.18, mipY, mipZ);
+    this.gltfFoNd.position.set(0.155, mipY, mipZ);
     this.gltfDisplays.add(this.gltfFoNd);
 
     // 6. First Officer Outboard Primary Flight Display (PFD)
     this.gltfFoPfd = new THREE.Mesh(duGeo, pfdMat);
     this.gltfFoPfd.name = 'GLTF_FO_PFD';
-    this.gltfFoPfd.position.set(0.33, mipY, mipZ);
+    this.gltfFoPfd.position.set(0.280, mipY, mipZ);
     this.gltfDisplays.add(this.gltfFoPfd);
 
-    // 7. Mode Control Panel (MCP / Autopilot & Flight Director)
-    const mcpGeo = new THREE.PlaneGeometry(0.72, 0.08);
-    this.gltfMcp = new THREE.Mesh(mcpGeo, mcpMat);
-    this.gltfMcp.name = 'GLTF_MCP';
-    this.gltfMcp.position.set(0.00, 0.64, -12.855);
-    this.gltfMcp.rotation.x = -0.12;
-    this.gltfDisplays.add(this.gltfMcp);
+    // Crop canvas UVs to the LCD content; retain the GLB's physical knobs/keys.
+    const crop = (geometry, canvas, x, y, width, height) => {
+      const uv = geometry.getAttribute('uv');
+      for (let i = 0; i < uv.count; i++) {
+        uv.setXY(i, (x + uv.getX(i) * width) / canvas.width,
+          1 - (y + (1 - uv.getY(i)) * height) / canvas.height);
+      }
+      return geometry;
+    };
 
-    // 8. Dual FMC / CDU screens on center console
-    const cduGeo = new THREE.PlaneGeometry(0.10, 0.10);
+    // 7. Six digital MCP windows on the original 3D panel.
+    // [asset X, aperture width, canvas X, canvas width], captain to FO.
+    const windows = [
+      [0.12388, 0.02057, 160, 68],
+      [0.07227, 0.02324, 296, 82],
+      [0.03099, 0.02074, 464, 82],
+      [-0.00907, 0.02325, 600, 94],
+      [-0.03829, 0.02325, 716, 86],
+      [-0.10533, 0.02074, 960, 64]
+    ];
+    this.gltfMcpWindows = windows.map(([x, width, canvasX, canvasWidth], i) => {
+      const geometry = crop(new THREE.PlaneGeometry(width, 0.00781),
+        this.mcpCanvas, canvasX, 26, canvasWidth, 36);
+      const mesh = new THREE.Mesh(geometry, mcpMat);
+      mesh.name = `GLTF_MCP_Window_${i}`;
+      mesh.position.set(-x, 0.75298, -12.8595);
+      this.gltfDisplays.add(mesh);
+      return mesh;
+    });
+    this.gltfMcp = this.gltfMcpWindows[0];
 
-    // Captain CDU (Left)
+    // 8. FMC screen apertures. The canvas also draws a keypad, but the GLB
+    // already supplies 3D keys, so only map its LCD region here.
+    const cduGeo = crop(new THREE.PlaneGeometry(0.0684, 0.0508),
+      this.cduCanvas, 32, 24, this.cduCanvas.width - 64, 216);
     this.gltfCaptainCdu = new THREE.Mesh(cduGeo, cduMat);
     this.gltfCaptainCdu.name = 'GLTF_Captain_CDU';
-    this.gltfCaptainCdu.position.set(-0.10, 0.28, -12.415);
-    this.gltfCaptainCdu.rotation.x = -0.78;
+    this.gltfCaptainCdu.position.set(-0.1159, 0.4941, -12.8600);
+    this.gltfCaptainCdu.rotation.x = -1.12;
     this.gltfDisplays.add(this.gltfCaptainCdu);
 
-    // First Officer CDU (Right)
     this.gltfFoCdu = new THREE.Mesh(cduGeo, cduMat);
     this.gltfFoCdu.name = 'GLTF_FO_CDU';
-    this.gltfFoCdu.position.set(0.10, 0.28, -12.415);
-    this.gltfFoCdu.rotation.x = -0.78;
+    this.gltfFoCdu.position.set(0.09735, 0.4941, -12.8600);
+    this.gltfFoCdu.rotation.x = -1.12;
     this.gltfDisplays.add(this.gltfFoCdu);
 
     this.gltfCockpitGroup.add(this.gltfDisplays);
