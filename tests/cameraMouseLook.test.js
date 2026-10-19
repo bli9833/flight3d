@@ -23,12 +23,14 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     assert.strictEqual(camSys.isDragging, false);
     assert.strictEqual(camSys.pointerLocked, false);
     assert.strictEqual(camSys.enableCursorTrack, true);
+    assert.strictEqual(camera.near, 0.08, 'Default cockpit mode should configure near clipping plane to 0.08m');
   });
 
   it('should update chase orbit angles and clamp pitch on mouse delta in CHASE mode', () => {
     const camera = new THREE.PerspectiveCamera();
     const camSys = new CameraSystem(camera, mockDom);
     camSys.setMode(CameraSystem.MODES.CHASE);
+    assert.strictEqual(camera.near, 0.25, 'CHASE mode should configure near clipping plane to 0.25m');
 
     // Initial angles are zero
     assert.strictEqual(camSys.chaseYaw, 0);
