@@ -12,10 +12,10 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const PORT = 5173;
-const CDP_PORT = 9446;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5173;
+const CDP_PORT = process.env.CDP_PORT ? parseInt(process.env.CDP_PORT, 10) : 9446;
 const SIM_URL = `http://localhost:${PORT}/`;
-const ARTIFACT_DIR = process.env.ARTIFACT_DIR || '/home/stlim/.gemini/antigravity-cli/brain/ad33c4b1-3b1c-4752-ad5e-b09f9794851b';
+const ARTIFACT_DIR = process.env.ARTIFACT_DIR || process.cwd();
 
 class FlightTestAgent {
   constructor() {
@@ -289,8 +289,8 @@ class FlightTestAgent {
         await this.eval(`window.simulator.controls.setVirtualInput('elevator', 0.65);`);
       }
 
-      // Detect liftoff
-      if (rotated && !liftoffDetected && (!state.onGround || state.radioAltFt > 10.5)) {
+      // Detect liftoff (require actual wheel separation from runway)
+      if (rotated && !liftoffDetected && !state.onGround && state.radioAltFt > 14.0) {
         liftoffDetected = true;
         this.log(`Positive Rate of Climb confirmed! Radio Alt: ${Math.round(state.radioAltFt)} FT, VSI: +${Math.round(state.vsiFpm)} FPM`, '✈️');
         // Retract gear and stabilize climb attitude
