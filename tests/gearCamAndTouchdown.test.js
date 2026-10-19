@@ -170,6 +170,26 @@ describe('Landing Gear View & Touchdown Effects', () => {
   });
 
   describe('Boeing737 3D Model (Suspension Oleo Articulation)', () => {
+    it('keeps visible wheel hubs aligned with physics throughout compression and release', () => {
+      const canvas = { getContext: () => null, canvas: {} };
+      const aircraft = new Boeing737(canvas, canvas, canvas);
+      const gear = new LandingGear();
+      const trucks = [aircraft.noseTruck, aircraft.mainTruckL, aircraft.mainTruckR];
+      for (const compression of [0, 0.25, 0.7, 0.9, 0.3, 0]) {
+        aircraft.update(1 / 120, { gearState: 1, compressions: {
+          nose: compression, mainLeft: compression, mainRight: compression
+        } });
+        aircraft.group.updateMatrixWorld(true);
+        trucks.forEach((truck, index) => {
+          const wheel = truck.children.find(child => child.isGroup);
+          assert.ok(wheel, 'Wheel assembly must exist');
+          const hub = wheel.getWorldPosition(new THREE.Vector3());
+          assert.ok(Math.abs(hub.y - (gear.contacts[index].localPos.y + compression)) < 1e-9,
+            `Visible ${gear.contacts[index].id} hub must follow physics at ${compression}m compression`);
+        });
+      }
+    });
+
     it('should articulate chrome oleo pistons and trucks upward during touchdown compression', () => {
       const mockCanvas = { getContext: () => null, canvas: {} };
       const aircraft = new Boeing737(mockCanvas, mockCanvas, mockCanvas, mockCanvas, mockCanvas, mockCanvas);

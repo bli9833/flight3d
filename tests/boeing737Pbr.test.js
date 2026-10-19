@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 if (typeof document === 'undefined') {
   const noop = () => {};
@@ -66,25 +67,32 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     assert.strictEqual(aircraft.cockpit.group.visible, false, 'Cockpit must be hidden in exterior view');
   });
 
-  it('should hide procedural tail and empennage when GLTF model is active', () => {
-    const pfd = new PFDCanvas(256, 256);
-    const nd = new NDCanvas(256, 256);
-    const eicas = new EICASCanvas(256, 256);
-    const aircraft = new Boeing737(pfd, nd, eicas);
+  it('should hide the procedural tail when the asynchronous model loads in cockpit view', (t) => {
+    const aircraft = new Boeing737(new PFDCanvas(256, 256), new NDCanvas(256, 256), new EICASCanvas(256, 256));
+    assert.strictEqual(aircraft.tailGroup, aircraft.empennageGroup);
+    assert.strictEqual(aircraft.tailGroup.visible, true);
 
-    assert.ok(aircraft.tailGroup, 'Procedural tailGroup must exist');
-    assert.strictEqual(aircraft.tailGroup, aircraft.empennageGroup, 'empennageGroup must alias tailGroup');
-    assert.strictEqual(aircraft.tailGroup.visible, true, 'Default procedural tail must be visible');
-
-    // Simulate GLTF loaded callback logic
-    if (aircraft.fuselageGroup) aircraft.fuselageGroup.visible = false;
-    if (aircraft.wingGroup) aircraft.wingGroup.visible = false;
-    if (aircraft.tailGroup) aircraft.tailGroup.visible = false;
-    if (aircraft.empennageGroup) aircraft.empennageGroup.visible = false;
-    if (aircraft.enginesGroup) aircraft.enginesGroup.visible = false;
-
-    assert.strictEqual(aircraft.tailGroup.visible, false, 'tailGroup must be hidden when GLTF loads');
-    assert.strictEqual(aircraft.empennageGroup.visible, false, 'empennageGroup must be hidden when GLTF loads');
+    let completeLoad;
+    t.mock.method(GLTFLoader.prototype, 'load', (_url, onLoad) => { completeLoad = onLoad; });
+    const previousWindow = globalThis.window;
+    globalThis.window = {};
+    try {
+      aircraft.loadGltfModel('/test.glb');
+      aircraft.setCockpitMode(true);
+      completeLoad({ scene: new THREE.Group() });
+      assert.strictEqual(aircraft.modelLoaded, true);
+      assert.strictEqual(aircraft.gltfGroup.visible, false, 'Late model load must preserve cockpit view');
+      assert.strictEqual(aircraft.tailGroup.visible, false);
+      aircraft.setCockpitMode(false);
+      assert.strictEqual(aircraft.gltfGroup.visible, true);
+      assert.strictEqual(aircraft.tailGroup.visible, false, 'Exterior transitions must not restore the procedural tail');
+      aircraft.setCockpitMode(true);
+      assert.strictEqual(aircraft.gltfGroup.visible, false);
+      assert.strictEqual(aircraft.tailGroup.visible, false);
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    }
   });
 
   it('should articulate crash visuals and restore pristine state', () => {

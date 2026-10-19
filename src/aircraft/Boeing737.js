@@ -25,6 +25,7 @@ export class Boeing737 {
     this.gltfFans = [];
     this.useGltf = false;
     this.modelLoaded = false;
+    this.isCockpit = false;
 
     // Control surfaces references
     this.aileronL = null;
@@ -611,9 +612,9 @@ export class Boeing737 {
 
     // Dynamic Oleo Strut Suspension Squat ("털썩" 하중 압축)
     if (gearState > 0.8 && flightState.compressions) {
-      const compNose = Math.min(0.5, Math.max(0, flightState.compressions.nose || 0));
-      const compL = Math.min(0.55, Math.max(0, flightState.compressions.mainLeft || 0));
-      const compR = Math.min(0.55, Math.max(0, flightState.compressions.mainRight || 0));
+      const compNose = Math.min(0.9, Math.max(0, flightState.compressions.nose || 0));
+      const compL = Math.min(0.9, Math.max(0, flightState.compressions.mainLeft || 0));
+      const compR = Math.min(0.9, Math.max(0, flightState.compressions.mainRight || 0));
 
       if (this.noseTruck) this.noseTruck.position.y = compNose;
       if (this.mainTruckL) this.mainTruckL.position.y = compL;
@@ -686,7 +687,7 @@ export class Boeing737 {
           if (fan2) this.gltfFans.push(fan2);
 
           this.gltfGroup.add(this.gltfModel);
-          this.gltfGroup.visible = true;
+          this.gltfGroup.visible = !this.isCockpit;
           this.modelLoaded = true;
           this.useGltf = true;
 
@@ -710,6 +711,7 @@ export class Boeing737 {
   }
 
   setCockpitMode(isCockpit) {
+    this.isCockpit = isCockpit;
     if (this.useGltf && this.gltfGroup) {
       this.gltfGroup.visible = !isCockpit;
     } else {
