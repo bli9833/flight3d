@@ -82,6 +82,12 @@ export class CameraSystem {
     this.pointerLocked = false;
     this.prevMouse = { x: 0, y: 0 };
 
+    // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
+    this.enableEdgePan = true;
+    this.edgePanMargin = 30; // Threshold distance in pixels from screen boundary
+    this.edgePanSpeedX = 280; // Virtual px/s equivalent for horizontal pan (~0.98 rad/s in cockpit, ~1.4 rad/s in chase)
+    this.edgePanSpeedY = 220; // Virtual px/s equivalent for vertical tilt (~0.77 rad/s)
+
     this.initMouseLook();
   }
 
@@ -150,6 +156,16 @@ export class CameraSystem {
           this.prevMouse.y = e.clientY;
 
           this.applyMouseDelta(dx, dy);
+        } else {
+          this.prevMouse.x = e.clientX;
+          this.prevMouse.y = e.clientY;
+        }
+      });
+
+      window.addEventListener('blur', () => {
+        this.isDragging = false;
+        if (this.domElement && this.domElement.style && !this.pointerLocked) {
+          this.domElement.style.cursor = 'grab';
         }
       });
 
@@ -210,6 +226,51 @@ export class CameraSystem {
         this.gearLookYaw = Math.max(-0.8, Math.min(0.8, this.gearLookYaw));
         break;
       }
+    }
+  }
+
+  /**
+   * Continuous Edge Pan (화면 끝 도달 시 적당한 속도로 시선 지속 회전)
+   * When looking around with mouse drag, if the mouse reaches the screen edge,
+   * continuously rotate/tilt the view at a smooth, comfortable speed.
+   */
+  updateEdgePan(dt, width = (typeof window !== 'undefined' ? window.innerWidth : 1920), height = (typeof window !== 'undefined' ? window.innerHeight : 1080)) {
+    if (!this.enableEdgePan || !this.isDragging || this.pointerLocked || dt <= 0) {
+      return;
+    }
+
+    if (!width || !height) return;
+
+    const margin = this.edgePanMargin;
+    const x = this.prevMouse.x;
+    const y = this.prevMouse.y;
+
+    let dirX = 0;
+    let dirY = 0;
+
+    // Horizontal screen edges (left: negative dx, right: positive dx)
+    if (x <= margin) {
+      const factor = Math.min(1.0, Math.max(0.3, (margin - x) / margin));
+      dirX = -factor;
+    } else if (x >= width - margin) {
+      const factor = Math.min(1.0, Math.max(0.3, (x - (width - margin)) / margin));
+      dirX = factor;
+    }
+
+    // Vertical screen edges (top: negative dy, bottom: positive dy)
+    if (y <= margin) {
+      const factor = Math.min(1.0, Math.max(0.3, (margin - y) / margin));
+      dirY = -factor;
+    } else if (y >= height - margin) {
+      const factor = Math.min(1.0, Math.max(0.3, (y - (height - margin)) / margin));
+      dirY = factor;
+    }
+
+    if (dirX !== 0 || dirY !== 0) {
+      const safeDt = Math.min(0.1, dt);
+      const virtualDx = dirX * this.edgePanSpeedX * safeDt;
+      const virtualDy = dirY * this.edgePanSpeedY * safeDt;
+      this.applyMouseDelta(virtualDx, virtualDy);
     }
   }
 
@@ -453,6 +514,9 @@ export class CameraSystem {
     // Smoothly interpolate cursor tracking offsets (마우스 움직임에 따른 실시간 시선 부드러운 추종)
     this.cursorNormX += (this.targetCursorNormX - this.cursorNormX) * Math.min(1.0, dt * 7.0);
     this.cursorNormY += (this.targetCursorNormY - this.cursorNormY) * Math.min(1.0, dt * 7.0);
+
+    // Continuous Edge Pan (마우스 드래그 중 화면 끝 도달 시 적당한 속도로 시선 지속 회전)
+    this.updateEdgePan(dt);
 
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: {
