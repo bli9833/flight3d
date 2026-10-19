@@ -227,6 +227,8 @@ export class LuklaTerrain {
     const pos = this.geometry.attributes.position;
     const uvs = this.geometry.attributes.uv;
     const count = pos.count;
+    // A rotated coarse cell can extend this far along either runway axis.
+    const coarseMargin = (this.size / this.segments) * (sin58 + cos58);
 
     for (let i = 0; i < count; i++) {
       const x = pos.getX(i);
@@ -240,6 +242,10 @@ export class LuklaTerrain {
       const w = x * cos58 + z * sin58;
       if (Math.abs(s) <= 360.0 && Math.abs(w) <= 130.0) {
         h -= 10.0;
+      }
+      if (Math.abs(s) <= this.runwayLength * 0.5 + coarseMargin &&
+          Math.abs(w) <= this.runwayWidth * 0.5 + coarseMargin) {
+        h = Math.min(h, this.midElevation + s * this.runwayGradient - 10.0);
       }
 
       pos.setY(i, h);
@@ -265,7 +271,17 @@ export class LuklaTerrain {
       for (let i = 0; i < lCount; i++) {
         const x = lPos.getX(i);
         const z = lPos.getZ(i);
-        const h = this.getHeight(x, z);
+        let h = this.getHeight(x, z);
+        const s = x * sin58 - z * cos58;
+        const w = x * cos58 + z * sin58;
+        // Recess only the rendered terrain beneath the asphalt. Include one
+        // terrace cell beyond each edge so interpolated boundary triangles
+        // cannot cross the runway plane, especially at the uphill threshold.
+        // Keep getHeight() unchanged for landing gear and collision queries.
+        if (Math.abs(s) <= this.runwayLength * 0.5 + 10.0 &&
+            Math.abs(w) <= this.runwayWidth * 0.5 + 10.0) {
+          h = Math.min(h, this.midElevation + s * this.runwayGradient - 0.5);
+        }
         lPos.setY(i, h);
 
         if (lUvs) {
