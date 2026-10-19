@@ -100,10 +100,22 @@ export class LuklaAirport {
     const rwyMesh = new THREE.Mesh(rwyGeom, rwyMat);
     rwyMesh.receiveShadow = true;
 
+    // Solid stone/rock embankment foundation beneath sloped runway to seal any cliff/canyon gaps
+    const skirtGeom = new THREE.BoxGeometry(this.runwayWidth, 24, this.runwayLength);
+    const skirtMat = new THREE.MeshStandardMaterial({
+      color: 0x2e3338,
+      roughness: 0.95,
+      metalness: 0.05
+    });
+    const skirtMesh = new THREE.Mesh(skirtGeom, skirtMat);
+    skirtMesh.position.y = -12.0;
+    skirtMesh.receiveShadow = true;
+
     // Transform: yaw heading 058°, pitch 11.7% (6.71° uphill towards NE)
     // Local forward (-Z) points along 058° (+X, -Z in world), rising to 2,867m at Threshold 24
     const euler = new THREE.Euler(this.pitchRad, -this.headingRad, 0, 'YXZ');
     rwyGroup.quaternion.setFromEuler(euler);
+    rwyGroup.add(skirtMesh);
     rwyGroup.add(rwyMesh);
 
     // Markings canvas texture (when running in browser DOM)
@@ -206,9 +218,21 @@ export class LuklaAirport {
     const apronMesh = new THREE.Mesh(apronGeom, apronMat);
     apronMesh.receiveShadow = true;
 
+    // Solid stone terrace foundation beneath apron to prevent gaps over hillside
+    const apronSkirtGeom = new THREE.BoxGeometry(36, 16, 80);
+    const apronSkirtMat = new THREE.MeshStandardMaterial({
+      color: 0x3a4048,
+      roughness: 0.95,
+      metalness: 0.05
+    });
+    const apronSkirtMesh = new THREE.Mesh(apronSkirtGeom, apronSkirtMat);
+    apronSkirtMesh.position.y = -8.0;
+    apronSkirtMesh.receiveShadow = true;
+
     // Aligned with runway heading and uphill slope
     apronGroup.rotation.y = -this.headingRad;
     apronGroup.rotation.x = this.pitchRad;
+    apronGroup.add(apronSkirtMesh);
     apronGroup.add(apronMesh);
 
     // Helipads on the southwest side of the apron (local +Z)

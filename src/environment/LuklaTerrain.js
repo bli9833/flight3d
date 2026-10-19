@@ -53,7 +53,8 @@ export class LuklaTerrain {
       color: 0x5a6358,
       roughness: 0.92,
       metalness: 0.05,
-      flatShading: false
+      flatShading: false,
+      side: THREE.DoubleSide
     });
 
     this.mesh = new THREE.Mesh(this.geometry, defaultColorMat);
@@ -71,6 +72,7 @@ export class LuklaTerrain {
   initProceduralFallback() {
     const sin58 = 0.848048;
     const cos58 = 0.529919;
+    const halfLength = this.runwayLength * 0.5;
 
     for (let gy = 0; gy < this.gridSize; gy++) {
       for (let gx = 0; gx < this.gridSize; gx++) {
@@ -83,23 +85,22 @@ export class LuklaTerrain {
         const s = worldX * sin58 - worldZ * cos58;
         const w = worldX * cos58 + worldZ * sin58;
 
-        // Along the approach path (s < -263.5, w ≈ 0), Dudh Kosi canyon drops down to ~2,000m-2,400m
-        // Behind runway 24 (s > +263.5), terrain rises into high mountain peaks
+        // Base canyon floor along Dudh Kosi gorge
         let canyonFloor = 2836.0;
-        if (s < -263.5) {
-          // Drops into Dudh Kosi river gorge (elevation down to ~2,000m at s = -5000m)
-          const distSW = -s - 263.5;
+        if (s < -halfLength) {
+          // Drops into Dudh Kosi river gorge (elevation down to ~1,950m at s = -5000m)
+          const distSW = -s - halfLength;
           canyonFloor = Math.max(1950.0, 2805.0 - distSW * 0.22);
-        } else if (s > 263.5) {
+        } else if (s > halfLength) {
           // Rises into mountain wall
-          const distNE = s - 263.5;
+          const distNE = s - halfLength;
           canyonFloor = 2867.0 + distNE * 0.35;
         } else {
           // On runway: slope from 2805m to 2867m
           canyonFloor = 2836.0 + s * 0.1176;
         }
 
-        // Canyon walls rise steeply on both lateral sides (|w| > 100m)
+        // Natural mountain ridges rise on both lateral sides (|w| > 100m)
         const absW = Math.abs(w);
         let ridgeH = 0.0;
         if (absW > 100.0) {
@@ -107,7 +108,43 @@ export class LuklaTerrain {
           ridgeH = Math.min(2800.0, Math.pow(latDist / 400.0, 1.6) * 450.0);
         }
 
-        const baseH = canyonFloor + ridgeH;
+        let baseH = canyonFloor + ridgeH;
+
+        // Flatten airport terrace and runway envelope
+        if (s >= -halfLength && s <= halfLength) {
+          const rwyH = 2836.0 + s * 0.1176;
+          let targetH = rwyH;
+          let flatWMin = -45.0;
+          let flatWMax = 45.0;
+          let blendW = 55.0;
+
+          if (s >= -15.0 && s <= 135.0) {
+            flatWMax = 85.0;
+            blendW = 50.0;
+            if (w > 15.0) {
+              targetH = Math.max(rwyH, 2844.0);
+            }
+          }
+
+          if (w >= flatWMin && w <= flatWMax) {
+            baseH = Math.min(baseH, targetH);
+          } else if (w < flatWMin) {
+            const dist = flatWMin - w;
+            if (dist < blendW) {
+              const t = dist / blendW;
+              const weight = 0.5 * (1.0 + Math.cos(t * Math.PI));
+              baseH = Math.min(baseH, targetH) * weight + baseH * (1.0 - weight);
+            }
+          } else if (w > flatWMax) {
+            const dist = w - flatWMax;
+            if (dist < blendW) {
+              const t = dist / blendW;
+              const weight = 0.5 * (1.0 + Math.cos(t * Math.PI));
+              baseH = Math.min(baseH, targetH) * weight + baseH * (1.0 - weight);
+            }
+          }
+        }
+
         this.elevations[gy * this.gridSize + gx] = baseH;
       }
     }
@@ -141,7 +178,8 @@ export class LuklaTerrain {
             map: tex,
             roughness: 0.88,
             metalness: 0.05,
-            flatShading: false
+            flatShading: false,
+            side: THREE.DoubleSide
           });
           this.mesh.material.needsUpdate = true;
         });
@@ -218,48 +256,79 @@ export class LuklaTerrain {
 
     const halfLength = this.runwayLength * 0.5; // 263.5m
     const halfWidth = this.runwayWidth * 0.5;   // 15.0m
-    const lateralBlend = 32.0; // Margin to blend into hillside
+    const absW = Math.abs(w);
 
-    // If within runway longitudinal envelope
+    // 2. Lukla Airport Carved Terrace & Sloped Runway Trench
     if (s >= -halfLength && s <= halfLength) {
       // Sloped runway elevation (11.76% uphill grade: 2805m at threshold 06 to 2867m at threshold 24)
       const rwyH = this.midElevation + s * this.runwayGradient;
 
-      const absW = Math.abs(w);
       if (absW <= halfWidth) {
-        // Flat on tarmac surface
+        // Flat on runway tarmac surface
         return rwyH;
-      } else if (absW < halfWidth + lateralBlend) {
-        // Smooth Hermite blend between runway edge and natural mountainside
-        const t = (absW - halfWidth) / lateralBlend;
-        const weight = 0.5 * (1.0 + Math.cos(t * Math.PI));
-        return rwyH * weight + naturalH * (1.0 - weight);
       }
-    } else if (s > halfLength && s < halfLength + 120.0) {
+
+      // Apron tarmac and helipads terrace surface
+      if (s >= -15.0 && s <= 135.0 && w > halfWidth && w <= 52.0) {
+        return Math.max(rwyH, 2844.0);
+      }
+
+      let targetH = rwyH;
+      let flatWMin = -45.0; // Flat shoulder on canyon side
+      let flatWMax = 45.0;  // Flat shoulder on mountain side
+      let blendW = 55.0;
+
+      // Apron, terminal, and control tower terrace zone (s in [-15, 135])
+      // In this zone, the mountain is leveled to form the aircraft parking apron and terminal plateau
+      if (s >= -15.0 && s <= 135.0) {
+        flatWMax = 85.0; // Encompasses apron (w up to 51m) and terminal/tower (w up to 70m)
+        blendW = 50.0;
+        if (w > 15.0) {
+          // Apron terrace elevation sits cleanly at ~2844m
+          targetH = Math.max(rwyH, 2844.0);
+        }
+      }
+
+      if (w >= flatWMin && w <= flatWMax) {
+        return Math.min(naturalH, targetH);
+      } else if (w < flatWMin) {
+        const dist = flatWMin - w;
+        if (dist < blendW) {
+          const t = dist / blendW;
+          const weight = 0.5 * (1.0 + Math.cos(t * Math.PI));
+          return Math.min(naturalH, targetH) * weight + naturalH * (1.0 - weight);
+        }
+      } else if (w > flatWMax) {
+        const dist = w - flatWMax;
+        if (dist < blendW) {
+          const t = dist / blendW;
+          const weight = 0.5 * (1.0 + Math.cos(t * Math.PI));
+          return Math.min(naturalH, targetH) * weight + naturalH * (1.0 - weight);
+        }
+      }
+    } else if (s > halfLength && s < halfLength + 140.0) {
       // Beyond Runway 24 upper end: steep retaining rock wall and mountain slope
       const wallDist = s - halfLength;
       const wallH = this.threshold24Elevation + wallDist * 1.8;
       const absW = Math.abs(w);
-      if (absW <= halfWidth) {
+      if (absW <= 35.0) {
         return Math.max(naturalH, wallH);
-      } else if (absW < halfWidth + lateralBlend) {
-        const t = (absW - halfWidth) / lateralBlend;
+      } else if (absW < 80.0) {
+        const t = (absW - 35.0) / 45.0;
         const weight = 0.5 * (1.0 + Math.cos(t * Math.PI));
-        const targetH = Math.max(naturalH, wallH);
-        return targetH * weight + naturalH * (1.0 - weight);
+        return Math.max(naturalH, wallH) * weight + naturalH * (1.0 - weight);
       }
     } else if (s < -halfLength && s > -halfLength - 160.0) {
       // Beyond Runway 06 lower end: sheer cliff plunging into Dudh Kosi canyon
       const dropDist = -halfLength - s;
       const dropH = this.threshold06Elevation - dropDist * 2.2;
       const absW = Math.abs(w);
-      if (absW <= halfWidth) {
+      if (absW <= 35.0) {
         return Math.min(naturalH, dropH);
-      } else if (absW < halfWidth + lateralBlend) {
-        const t = (absW - halfWidth) / lateralBlend;
+      } else if (absW < 80.0) {
+        const t = (absW - 35.0) / 45.0;
         const weight = 0.5 * (1.0 + Math.cos(t * Math.PI));
-        const targetH = Math.min(naturalH, dropH);
-        return targetH * weight + naturalH * (1.0 - weight);
+        return Math.min(naturalH, dropH) * weight + naturalH * (1.0 - weight);
       }
     }
 

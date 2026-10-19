@@ -487,6 +487,11 @@ class FlightSimulator {
       }
     }
 
+    // Sync cloud layer altitude with active airport elevation
+    if (this.sky && typeof this.sky.setAirport === 'function') {
+      this.sky.setAirport(id);
+    }
+
     // Reconfigure cockpit navigation displays for active airport
     if (this.ndCanvas && typeof this.ndCanvas.setAirport === 'function') {
       this.ndCanvas.setAirport(id);
