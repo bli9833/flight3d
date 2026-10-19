@@ -16,6 +16,9 @@ export class LandingGear {
     // Contact points relative to aircraft Center of Gravity (m)
     // In Three.js aircraft local coordinates:
     // +X = Right, +Y = Up, -Z = Forward
+    // Matches authentic Boeing 737-800 Airport Planning specifications:
+    // - Wheel Track: 5.72m (Main bogies at x = ±2.86m)
+    // - Wheelbase: 15.60m (Nose gear at z = -13.8m, Main bogies at z = +1.8m)
     this.contacts = [
       {
         id: 'nose',
@@ -176,15 +179,17 @@ export class LandingGear {
         const angVelWorld = angularVelocity.clone().applyQuaternion(worldQuat);
         const contactVel = linearVelocity.clone().add(angVelWorld.clone().cross(rWorld));
         const groundSpeed = Math.sqrt(linearVelocity.x * linearVelocity.x + linearVelocity.z * linearVelocity.z);
+        const sinkRate = -contactVel.y;
 
-        if (!wasGrounded && penetration > 0.03) {
+        // Touchdown impact requires descending from the air into the runway surface (sinkRate > 0.25 m/s)
+        if (!wasGrounded && penetration > 0.03 && sinkRate > 0.25) {
           c.touchdownThisFrame = true;
           this.touchdownEvent = true;
           touchdownContacts.push({
             id: c.id,
             worldPos: c.worldPos.clone(),
             groundSpeed,
-            sinkRate: Math.max(0.1, -contactVel.y),
+            sinkRate,
             compression: c.compression
           });
         } else {

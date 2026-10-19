@@ -253,8 +253,9 @@ export class DemoFlightDirector {
       case DemoFlightDirector.STAGES.ROTATION_CLIMB:
         this.updateBanner(
           '✈️ [3/8] V_r 로테이션 & 이륙 상승 (Rotation & Initial Climb)',
-          '133 KT 부드러운 기수 인상(2.2°/s) • 랜딩 기어 접기 • 기체 외형 및 도심 전경'
+          '133 KT 부드러운 기수 인상(2.2°/s) • 앞/뒷바퀴 이륙 & 랜딩 기어 접기 • 기체 외형 및 도심 전경'
         );
+        this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
         // Rotate smoothly at 2.2°/s
         this.sim.controls.setVirtualInput('elevator', 0.65);
         break;
@@ -293,7 +294,7 @@ export class DemoFlightDirector {
       case DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT:
         this.updateBanner(
           '🛑 [7/8] 활주로 접지 & 역추진 제동 (Touchdown & Reverser Rollout)',
-          '랜딩 기어 뷰: 올레오 서스펜션 완충 접지 • 타이어 연기 • 스포일러 & 역추진 제동'
+          '랜딩 기어 뷰: 뒷바퀴/앞바퀴 순차 완충 접지 • 타이어 연기 • 스포일러 & 역추진 제동'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
         break;
@@ -380,8 +381,8 @@ export class DemoFlightDirector {
           this.sim.controls.setVirtualInput('elevator', Math.max(0.08, Math.min(0.35, elevatorCmd)));
         }
 
-        // Once gear is retracting, let the gear cam view showcase retraction (~6.0s), then switch to exterior chase
-        if (this.stageTimer > 6.0 && this.sim.cameraSystem.mode !== CameraSystem.MODES.CHASE) {
+        // Once gear is retracting and aircraft climbs away, switch to exterior chase
+        if (!tel.onGround && tel.radioAltFt > 25.0 && this.sim.cameraSystem.mode !== CameraSystem.MODES.CHASE) {
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
@@ -495,6 +496,7 @@ export class DemoFlightDirector {
           this.sim.controls.setVirtualInput('throttle', 0.0);
           this.sim.engines.setThrottle(0.0);
           this.sim.controls.setVirtualInput('elevator', 0.14); // Gentle flare
+          this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
         }
 
         // Detect touchdown strictly over paved runway tarmac

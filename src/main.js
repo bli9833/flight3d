@@ -135,6 +135,8 @@ class FlightSimulator {
     this.crashResult = null;
     this.lastOnGround = true;
     this.lastGearTarget = true;
+    this.airborneTime = 0.0;
+    this.hasTouchedDownThisFlight = false;
 
     // 8. Rigid Body Physics State
     // Linear state
@@ -259,6 +261,8 @@ class FlightSimulator {
     }
     this.lastOnGround = (type === 'runway');
     this.lastGearTarget = (type !== 'cruise');
+    this.airborneTime = (type === 'runway') ? 0.0 : 15.0;
+    this.hasTouchedDownThisFlight = false;
 
     if (this.isCrashed) {
       this.isCrashed = false;
@@ -529,22 +533,39 @@ class FlightSimulator {
       z: this.position.z
     };
 
-    // 11. Touchdown Tire Smoke & Runway Friction Particles
-    if (gearResult.touchdown && gearResult.touchdownContacts && gearResult.touchdownContacts.length > 0) {
-      this.tireSmokeSystem.spawnTouchdownSmoke(gearResult.touchdownContacts, this.linearVelocity);
-    }
-    if (gearResult.onGround && this.controls.brakes > 0.6) {
-      this.tireSmokeSystem.spawnBrakingSmoke(this.gear.contacts, this.linearVelocity, this.controls.brakes);
+    // 11. Touchdown Tire Smoke & Landing Contact Gate
+    const gsKnots = Atmosphere.msToKnots(groundSpeed);
+    let genuineLandingTouchdown = false;
+
+    if (!gearResult.onGround) {
+      this.airborneTime += dt;
+      if (this.airborneTime > 2.0) {
+        // Once aircraft has climbed out and sustained flight, prime for next landing
+        this.hasTouchedDownThisFlight = false;
+      }
+    } else {
+      // Aircraft has gear on ground
+      // Genuine touchdown requires coming from sustained flight (> 1.5s), with landing airspeed (> 45 knots),
+      // and only triggers on the initial touchdown frame of this landing.
+      const isGenuineTouchdown = this.airborneTime >= 1.5 && gsKnots > 45 && !this.hasTouchedDownThisFlight;
+      if (isGenuineTouchdown && (gearResult.touchdown || !this.lastOnGround)) {
+        genuineLandingTouchdown = true;
+        this.hasTouchedDownThisFlight = true;
+        const contactsToSmoke = (gearResult.touchdownContacts && gearResult.touchdownContacts.length > 0)
+          ? gearResult.touchdownContacts
+          : this.gear.contacts.filter(c => c.id !== 'nose');
+        this.tireSmokeSystem.spawnTouchdownSmoke(contactsToSmoke, this.linearVelocity);
+      }
+      this.airborneTime = 0.0;
     }
 
     // 12. Cinematic Camera Cuts: Automatic temporary gear view for Takeoff, Touchdown, and Gear Retract/Extend
-    const gsKnots = Atmosphere.msToKnots(groundSpeed);
     if (this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
       // Takeoff liftoff
       this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
       this.showToast('🎥 랜딩 기어 뷰: 이륙 상승 (Takeoff Climb)');
-    } else if (((!this.lastOnGround && gearResult.onGround && gsKnots > 45) || gearResult.touchdown) && this.totalSimTime > 2.0) {
-      // Touchdown landing
+    } else if (genuineLandingTouchdown && this.totalSimTime > 2.0) {
+      // Touchdown landing (only on genuine landing touchdown)
       this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 5.0);
       this.showToast('🎥 랜딩 기어 뷰: 활주로 접지 & 서스펜션 완충 (Touchdown)');
     }
@@ -671,6 +692,7 @@ class FlightSimulator {
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry, (x, z) => this.terrain.getHeight(x, z));
     this.sky.updateSun(this.position, this.camera.position);
+    this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
     this.touchControls.updateUI(this.telemetry);
@@ -718,7 +740,6 @@ class FlightSimulator {
     this.cduCanvas.updateData(this.telemetry);
 
     // 3. Update Environment Animations & Explosion Particles
-    this.water.update(frameDelta);
     this.airport.update(frameDelta, this.position);
     this.ships.update(frameDelta, this.totalSimTime);
     this.sky.updateSun(this.position, this.camera.position);
@@ -744,6 +765,7 @@ class FlightSimulator {
       this.camera.updateProjectionMatrix();
     }
     this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry, (x, z) => this.terrain.getHeight(x, z));
+    this.water.update(frameDelta, this.camera ? this.camera.position : this.position);
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
@@ -881,6 +903,7 @@ class FlightSimulator {
 function initFlightSimulator() {
   if (!window.simulator) {
     window.simulator = new FlightSimulator();
+    window.sim = window.simulator;
   }
 }
 
