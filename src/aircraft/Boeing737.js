@@ -62,6 +62,21 @@ export class Boeing737 {
     this.gltfGear = null;
     this.landingGearLoaded = false;
 
+    // GLTF Articulated Control Surfaces
+    this.gltfAileronL = null;
+    this.gltfAileronR = null;
+    this.gltfFlapL = null;
+    this.gltfFlapR = null;
+    this.gltfSpoilersL = null;
+    this.gltfSpoilersR = null;
+    this.gltfElevatorL = null;
+    this.gltfElevatorR = null;
+    this.gltfRudder = null;
+    this.gltfFlapLInitY = 0;
+    this.gltfFlapLInitZ = 0;
+    this.gltfFlapRInitY = 0;
+    this.gltfFlapRInitZ = 0;
+
     // Lighting
     this.strobeLights = [];
     this.beaconLights = [];
@@ -645,6 +660,8 @@ export class Boeing737 {
     const aileronVal = flightState.aileron || 0;
     if (this.aileronL) this.aileronL.rotation.x = aileronVal * 0.35;
     if (this.aileronR) this.aileronR.rotation.x = -aileronVal * 0.35;
+    if (this.gltfAileronL) this.gltfAileronL.rotation.x = aileronVal * 0.35;
+    if (this.gltfAileronR) this.gltfAileronR.rotation.x = -aileronVal * 0.35;
 
     // Flaps (Fractions 0° to 40°)
     const flapAngleRad = THREE.MathUtils.degToRad(flightState.flapDegree || 0);
@@ -658,21 +675,36 @@ export class Boeing737 {
       this.flapR.position.y = 0.35 - Math.sin(flapAngleRad) * 0.4;
       this.flapR.position.z = 2.5 + Math.cos(flapAngleRad) * 0.3;
     }
+    if (this.gltfFlapL) {
+      this.gltfFlapL.rotation.x = flapAngleRad;
+      this.gltfFlapL.position.y = this.gltfFlapLInitY - Math.sin(flapAngleRad) * 0.35;
+      this.gltfFlapL.position.z = this.gltfFlapLInitZ + (1.0 - Math.cos(flapAngleRad)) * 0.35;
+    }
+    if (this.gltfFlapR) {
+      this.gltfFlapR.rotation.x = flapAngleRad;
+      this.gltfFlapR.position.y = this.gltfFlapRInitY - Math.sin(flapAngleRad) * 0.35;
+      this.gltfFlapR.position.z = this.gltfFlapRInitZ + (1.0 - Math.cos(flapAngleRad)) * 0.35;
+    }
 
     // Spoilers (Pop up on upper wing)
     const spoilerVal = flightState.spoilers || 0;
     const spAngle = spoilerVal * THREE.MathUtils.degToRad(-50.0);
     this.spoilersL.forEach(sp => { sp.rotation.x = spAngle; });
     this.spoilersR.forEach(sp => { sp.rotation.x = spAngle; });
+    if (this.gltfSpoilersL) this.gltfSpoilersL.rotation.x = spAngle;
+    if (this.gltfSpoilersR) this.gltfSpoilersR.rotation.x = spAngle;
 
     // Elevators (Pitch)
     const elevVal = flightState.elevator || 0;
     if (this.elevatorL) this.elevatorL.rotation.x = elevVal * 0.45;
     if (this.elevatorR) this.elevatorR.rotation.x = elevVal * 0.45;
+    if (this.gltfElevatorL) this.gltfElevatorL.rotation.x = elevVal * 0.45;
+    if (this.gltfElevatorR) this.gltfElevatorR.rotation.x = elevVal * 0.45;
 
     // Rudder (Yaw)
     const rudderVal = flightState.rudder || 0;
     if (this.rudder) this.rudder.rotation.y = rudderVal * 0.45;
+    if (this.gltfRudder) this.gltfRudder.rotation.y = rudderVal * 0.45;
 
     // 3. Landing Gear Retraction & Dynamic Suspension Compression Animation
     const gearState = flightState.gearState !== undefined ? flightState.gearState : 1.0;
@@ -751,6 +783,7 @@ export class Boeing737 {
       const fanAngle = flightState.engineN1 * (Math.PI * 2.0) * 0.08;
       this.gltfFans.forEach(fan => {
         fan.rotation.x += fanAngle;
+        fan.rotation.z += fanAngle;
       });
     }
 
@@ -776,8 +809,11 @@ export class Boeing737 {
         (gltf) => {
           this.loadingGltf = false;
           this.gltfModel = gltf.scene;
-          // Rotate 90° clockwise around Y so nose (-X in raw asset) faces -Z (simulator flight direction)
-          this.gltfModel.rotation.y = Math.PI * 0.5;
+
+          // If the model is an articulated B737_Aircraft (already -Z aligned), keep rotation.y = 0.
+          // Otherwise, if legacy amvlab model, rotate 90° clockwise around Y so nose faces -Z.
+          const isArticulated = Boolean(this.gltfModel.getObjectByName('ControlSurfacesGroup') || this.gltfModel.getObjectByName('B737_Aircraft'));
+          this.gltfModel.rotation.y = isArticulated ? 0 : Math.PI * 0.5;
           this.gltfModel.position.set(0, 0, 0);
 
           // PBR enhancements: cast/receive shadow and tune roughness/metalness
@@ -786,8 +822,8 @@ export class Boeing737 {
               child.castShadow = true;
               child.receiveShadow = true;
               if (child.material) {
-                child.material.roughness = Math.min(child.material.roughness, 0.35);
-                child.material.metalness = Math.max(child.material.metalness, 0.3);
+                child.material.roughness = Math.min(child.material.roughness, 0.38);
+                child.material.metalness = Math.max(child.material.metalness, 0.15);
                 child.material.envMapIntensity = 1.35;
                 child.material.needsUpdate = true;
               }
@@ -800,6 +836,31 @@ export class Boeing737 {
           const fan2 = this.gltfModel.getObjectByName('turbs');
           if (fan1) this.gltfFans.push(fan1);
           if (fan2) this.gltfFans.push(fan2);
+
+          // Articulated Control Surfaces
+          this.gltfAileronL = this.gltfModel.getObjectByName('Aileron_L');
+          this.gltfAileronR = this.gltfModel.getObjectByName('Aileron_R');
+          this.gltfFlapL = this.gltfModel.getObjectByName('Flap_L');
+          this.gltfFlapR = this.gltfModel.getObjectByName('Flap_R');
+          this.gltfSpoilersL = this.gltfModel.getObjectByName('Spoilers_L');
+          this.gltfSpoilersR = this.gltfModel.getObjectByName('Spoilers_R');
+          this.gltfElevatorL = this.gltfModel.getObjectByName('Elevator_L');
+          this.gltfElevatorR = this.gltfModel.getObjectByName('Elevator_R');
+          this.gltfRudder = this.gltfModel.getObjectByName('Rudder');
+
+          if (this.gltfFlapL) {
+            this.gltfFlapLInitY = this.gltfFlapL.position.y;
+            this.gltfFlapLInitZ = this.gltfFlapL.position.z;
+          }
+          if (this.gltfFlapR) {
+            this.gltfFlapRInitY = this.gltfFlapR.position.y;
+            this.gltfFlapRInitZ = this.gltfFlapR.position.z;
+          }
+
+          // If the model includes integrated landing gear, bind it!
+          if (this.gltfModel.getObjectByName('B737_LandingGear')) {
+            this.bindGltfLandingGear(this.gltfModel);
+          }
 
           this.gltfGroup.add(this.gltfModel);
           this.gltfGroup.visible = !this.isCockpit;
