@@ -184,7 +184,7 @@ class FlightSimulator {
 
     this.initControls();
     this.initUI();
-    this.setPreset('runway');
+    this.setAirport('lukla');
 
     // Resize handler
     window.addEventListener('resize', () => this.handleResize());
