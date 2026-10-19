@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MCPCanvas } from './MCPCanvas.js';
 import { ISFDCanvas } from './ISFDCanvas.js';
 import { CDUCanvas } from './CDUCanvas.js';
@@ -34,6 +36,18 @@ export class Cockpit {
     this.isfdCanvas = isfdCanvas || new ISFDCanvas(256, 256);
     this.cduCanvas = cduCanvas || new CDUCanvas(512, 512);
     this.checklistCanvas = new CockpitChecklistCanvas(512, 768);
+
+    // 3D GLTF Cockpit Asset group (primary) & Procedural Cockpit group (fallback)
+    this.gltfCockpitGroup = new THREE.Group();
+    this.gltfCockpitGroup.name = 'GLTF_Cockpit';
+    this.group.add(this.gltfCockpitGroup);
+    this.gltfCockpitModel = null;
+    this.gltfCockpitLoaded = false;
+    this.gltfDisplays = null;
+
+    this.proceduralCockpitGroup = new THREE.Group();
+    this.proceduralCockpitGroup.name = 'Procedural_Cockpit';
+    this.group.add(this.proceduralCockpitGroup);
 
     // Cockpit eye viewpoint (Captain's seat eye position in local aircraft space)
     this.captainEyePos = new THREE.Vector3(-0.48, 0.94, -12.08);
@@ -130,46 +144,46 @@ export class Cockpit {
     const floorGeo = new THREE.BoxGeometry(2.4, 0.08, 2.6);
     const floor = new THREE.Mesh(floorGeo, darkInteriorMat);
     floor.position.set(0, 0.04, -12.0);
-    this.group.add(floor);
+    this.proceduralCockpitGroup.add(floor);
 
     // 4. Rear Bulkhead Wall & Door (behind pilot at z = -10.8)
     const bulkheadGeo = new THREE.BoxGeometry(2.4, 1.9, 0.08);
     const bulkhead = new THREE.Mesh(bulkheadGeo, darkInteriorMat);
     bulkhead.position.set(0, 0.95, -10.75);
-    this.group.add(bulkhead);
+    this.proceduralCockpitGroup.add(bulkhead);
 
     // 5. Glare Shield Hood (Sculpted sun visor brow sloping from base of windshield forward to MCP)
     const glareGeo = new THREE.BoxGeometry(2.14, 0.028, 0.22);
     const glareShield = new THREE.Mesh(glareGeo, glareshieldMat);
     glareShield.position.set(0, 0.65, -12.62);
     glareShield.rotation.x = 0.12;
-    this.group.add(glareShield);
+    this.proceduralCockpitGroup.add(glareShield);
 
     // Glareshield front lip / beveled brow
     const browLip = new THREE.Mesh(new THREE.BoxGeometry(2.14, 0.045, 0.04), glareshieldMat);
     browLip.position.set(0, 0.61, -12.53);
-    this.group.add(browLip);
+    this.proceduralCockpitGroup.add(browLip);
 
     // MCP (Mode Control Panel) mounted on the front face of the glareshield brow
     const mcpBackGeo = new THREE.BoxGeometry(1.74, 0.10, 0.02);
     const mcpBackMesh = new THREE.Mesh(mcpBackGeo, darkInteriorMat);
     mcpBackMesh.position.set(0, 0.545, -12.56);
     mcpBackMesh.rotation.x = -0.15;
-    this.group.add(mcpBackMesh);
+    this.proceduralCockpitGroup.add(mcpBackMesh);
 
     const mcpGeo = new THREE.PlaneGeometry(1.72, 0.098);
     const mcpMat = new THREE.MeshBasicMaterial({ map: this.mcpCanvas.texture });
     this.mcpMesh = new THREE.Mesh(mcpGeo, mcpMat);
     this.mcpMesh.position.set(0, 0.545, -12.548);
     this.mcpMesh.rotation.x = -0.15;
-    this.group.add(this.mcpMesh);
+    this.proceduralCockpitGroup.add(this.mcpMesh);
 
     // 6. Main Instrument Panel (MIP)
     const mipGeo = new THREE.BoxGeometry(2.12, 0.40, 0.04);
     const mipMesh = new THREE.Mesh(mipGeo, boeingGreyMat);
     mipMesh.position.set(0, 0.30, -12.60);
     mipMesh.rotation.x = -0.10;
-    this.group.add(mipMesh);
+    this.proceduralCockpitGroup.add(mipMesh);
 
     // Photorealistic MIP Texture Faceplate Overlay (with subtle warm backlight)
     const mipPlateGeo = new THREE.PlaneGeometry(2.10, 0.395);
@@ -184,7 +198,7 @@ export class Cockpit {
     const mipPlate = new THREE.Mesh(mipPlateGeo, mipPlateMat);
     mipPlate.position.set(0, 0.30, -12.578);
     mipPlate.rotation.x = -0.10;
-    this.group.add(mipPlate);
+    this.proceduralCockpitGroup.add(mipPlate);
 
     // Windshield Pillars, Compass & Wipers
     this.buildWindshield(glassMat, darkInteriorMat, metalMat);
@@ -222,6 +236,9 @@ export class Cockpit {
     this.cockpitLight = new THREE.PointLight(0xffeedd, 0.8, 3.5);
     this.cockpitLight.position.set(0, 1.15, -12.1);
     this.group.add(this.cockpitLight);
+
+    // 7. Asynchronous High-Detail 3D GLTF Cockpit Asset Loading with Live Instruments
+    this.loadCockpitModel('/models/b737-cockpit-draco.glb');
   }
 
   buildWindshield(glassMat, frameMat, metalMat) {
@@ -229,19 +246,19 @@ export class Cockpit {
     const frontL = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.52), glassMat);
     frontL.position.set(-0.45, 0.95, -12.82);
     frontL.rotation.set(-0.38, 0.20, -0.06);
-    this.group.add(frontL);
+    this.proceduralCockpitGroup.add(frontL);
 
     // Right Front Windshield Glass
     const frontR = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.52), glassMat);
     frontR.position.set(0.45, 0.95, -12.82);
     frontR.rotation.set(-0.38, -0.20, 0.06);
-    this.group.add(frontR);
+    this.proceduralCockpitGroup.add(frontR);
 
     // Center Windshield Center Post (Mullion)
     const postCenter = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.65, 0.07), frameMat);
     postCenter.position.set(0, 0.95, -12.82);
     postCenter.rotation.x = -0.38;
-    this.group.add(postCenter);
+    this.proceduralCockpitGroup.add(postCenter);
 
     // Standby Magnetic Compass mounted on Center Post
     const compassGroup = new THREE.Group();
@@ -257,30 +274,30 @@ export class Cockpit {
     );
     compassFace.position.z = 0.018;
     compassGroup.add(compassBody, compassFace);
-    this.group.add(compassGroup);
+    this.proceduralCockpitGroup.add(compassGroup);
 
     // Left A-Pillar (angled windshield corner beam)
     const postLeft = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.68, 0.07), frameMat);
     postLeft.position.set(-0.88, 0.96, -12.72);
     postLeft.rotation.set(-0.32, 0.25, -0.20);
-    this.group.add(postLeft);
+    this.proceduralCockpitGroup.add(postLeft);
 
     // Right A-Pillar (angled windshield corner beam)
     const postRight = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.68, 0.07), frameMat);
     postRight.position.set(0.88, 0.96, -12.72);
     postRight.rotation.set(-0.32, -0.25, 0.20);
-    this.group.add(postRight);
+    this.proceduralCockpitGroup.add(postRight);
 
     // Top Roof Windshield Header Beam
     const roofHeader = new THREE.Mesh(new THREE.BoxGeometry(1.88, 0.08, 0.12), frameMat);
     roofHeader.position.set(0, 1.22, -12.68);
     roofHeader.rotation.x = 0.05;
-    this.group.add(roofHeader);
+    this.proceduralCockpitGroup.add(roofHeader);
 
     // Lower Windshield Glareshield Sill Beam
     const sillBeam = new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.06, 0.08), frameMat);
     sillBeam.position.set(0, 0.68, -12.72);
-    this.group.add(sillBeam);
+    this.proceduralCockpitGroup.add(sillBeam);
 
     // Windshield Wipers parked neatly along lower windshield sill
     const buildWiper = (xBase, isLeft) => {
@@ -309,20 +326,20 @@ export class Cockpit {
       return wiperGroup;
     };
 
-    this.group.add(buildWiper(-0.25, true));
-    this.group.add(buildWiper(0.25, false));
+    this.proceduralCockpitGroup.add(buildWiper(-0.25, true));
+    this.proceduralCockpitGroup.add(buildWiper(0.25, false));
 
     // Left Side Window
     const sideL = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.48), glassMat);
     sideL.position.set(-0.95, 0.96, -12.5);
     sideL.rotation.set(-0.15, 1.05, 0);
-    this.group.add(sideL);
+    this.proceduralCockpitGroup.add(sideL);
 
     // Right Side Window
     const sideR = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.48), glassMat);
     sideR.position.set(0.95, 0.96, -12.5);
     sideR.rotation.set(-0.15, -1.05, 0);
-    this.group.add(sideR);
+    this.proceduralCockpitGroup.add(sideR);
   }
 
   /**
@@ -398,7 +415,7 @@ export class Cockpit {
       bezel.position.set(x, y, dispZ + 0.004);
       bezel.rotation.x = mipRotX;
 
-      this.group.add(screenMesh, bezel);
+      this.proceduralCockpitGroup.add(screenMesh, bezel);
       return screenMesh;
     };
 
@@ -416,7 +433,7 @@ export class Cockpit {
     const isfdBezel = this.createDisplayBezel(0.10, 0.10, bezelMat, knobMat, chromeMat);
     isfdBezel.position.set(-0.06, 0.36, dispZ + 0.004);
     isfdBezel.rotation.x = mipRotX;
-    this.group.add(this.isfdScreen, isfdBezel);
+    this.proceduralCockpitGroup.add(this.isfdScreen, isfdBezel);
 
     // 4. Center Upper EICAS
     this.eicasScreen = addDisplayWithBezel(0.11, 0.32, eicasMat);
@@ -458,7 +475,7 @@ export class Cockpit {
     leverWheelKnob.position.y = -0.040;
     this.gearLever.add(leverRod, leverWheelKnob);
     gearModuleGroup.add(this.gearLever);
-    this.group.add(gearModuleGroup);
+    this.proceduralCockpitGroup.add(gearModuleGroup);
 
     // 6. Flap Position Indicator Gauge (below gear lever at x = 0.27, y = 0.265)
     const flapGaugeGroup = new THREE.Group();
@@ -487,7 +504,7 @@ export class Cockpit {
     this.flapGaugeNeedle.position.z = 0.007;
 
     flapGaugeGroup.add(flapDialBezel, flapDial, this.flapGaugeNeedle);
-    this.group.add(flapGaugeGroup);
+    this.proceduralCockpitGroup.add(flapGaugeGroup);
 
     // 7. Autobrake Rotary Switch Module (to the left of gear unit at x = 0.19)
     const autobrakeGroup = new THREE.Group();
@@ -498,7 +515,7 @@ export class Cockpit {
     abKnob.rotation.x = Math.PI * 0.5;
     abKnob.position.z = 0.008;
     autobrakeGroup.add(abPlate, abKnob);
-    this.group.add(autobrakeGroup);
+    this.proceduralCockpitGroup.add(autobrakeGroup);
 
     // 8. First Officer ND (Inboard right)
     this.foNdScreen = addDisplayWithBezel(0.42, 0.32, ndMat);
@@ -683,17 +700,17 @@ export class Cockpit {
     this.parkBrakeHandle.position.set(0, 0.23, 0.24);
     this.pedestalGroup.add(this.parkBrakeHandle);
 
-    this.group.add(this.pedestalGroup);
+    this.proceduralCockpitGroup.add(this.pedestalGroup);
   }
 
   buildYokes(boeingGreyMat, metalMat, chromeMat) {
     this.captainYoke = this.createBoeingYoke(boeingGreyMat, metalMat, chromeMat);
     this.captainYoke.root.position.set(-0.48, 0.08, -12.35);
-    this.group.add(this.captainYoke.root);
+    this.proceduralCockpitGroup.add(this.captainYoke.root);
 
     this.foYoke = this.createBoeingYoke(boeingGreyMat, metalMat, chromeMat);
     this.foYoke.root.position.set(0.48, 0.08, -12.35);
-    this.group.add(this.foYoke.root);
+    this.proceduralCockpitGroup.add(this.foYoke.root);
   }
 
   createBoeingYoke(yokeMat, metalMat, chromeMat) {
@@ -792,7 +809,7 @@ export class Cockpit {
     this.pedalRight.rotation.x = -0.35;
 
     this.pedalsGroup.add(this.pedalLeft, this.pedalRight);
-    this.group.add(this.pedalsGroup);
+    this.proceduralCockpitGroup.add(this.pedalsGroup);
   }
 
   buildSeats(leatherMat, frameMat) {
@@ -823,8 +840,8 @@ export class Cockpit {
       return seatGroup;
     };
 
-    this.group.add(makeSeat(-0.48)); // Captain
-    this.group.add(makeSeat(0.48));  // First Officer
+    this.proceduralCockpitGroup.add(makeSeat(-0.48)); // Captain
+    this.proceduralCockpitGroup.add(makeSeat(0.48));  // First Officer
   }
 
   buildOverheadPanel(boeingGreyMat) {
@@ -849,7 +866,7 @@ export class Cockpit {
     oScreen.rotation.x = Math.PI * 0.5;
     overhead.add(oScreen);
 
-    this.group.add(overhead);
+    this.proceduralCockpitGroup.add(overhead);
   }
 
   /**
@@ -922,5 +939,168 @@ export class Cockpit {
       if (this.trimWheelL) this.trimWheelL.rotation.x += flightState.pitchTrimRate * 0.1;
       if (this.trimWheelR) this.trimWheelR.rotation.x += flightState.pitchTrimRate * 0.1;
     }
+  }
+
+  /**
+   * Asynchronously loads the high-detail 3D Boeing 737 cockpit GLTF model
+   * and mounts live glass-cockpit flight displays.
+   */
+  loadCockpitModel(url = '/models/b737-cockpit-draco.glb') {
+    if (typeof window === 'undefined') {
+      // In non-browser / Node.js test environment, keep procedural cockpit active
+      return;
+    }
+
+    try {
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath('/draco/gltf/');
+
+      const gltfLoader = new GLTFLoader();
+      gltfLoader.setDRACOLoader(dracoLoader);
+
+      gltfLoader.load(
+        url,
+        (gltf) => {
+          const model = gltf.scene;
+          this.gltfCockpitModel = model;
+          model.name = 'B737_Cockpit_Model';
+
+          // Calibrated alignment transform:
+          // Raw model coordinates: Forward +Z, Captain -X. Eye at (-0.44, 2.25, 0.65).
+          // Flight3D local space: Forward -Z, Captain -X. Eye at (-0.48, 0.94, -12.08).
+          model.rotation.y = Math.PI;
+          model.scale.set(-1, 1, 1);
+          model.position.set(0, -1.31, -11.43);
+
+          model.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              if (child.material) {
+                child.material.side = THREE.DoubleSide;
+                if (child.material.roughness !== undefined) {
+                  child.material.roughness = Math.max(0.25, child.material.roughness);
+                }
+              }
+            }
+          });
+
+          this.gltfCockpitGroup.add(model);
+
+          // Mount live 60 FPS flight displays onto the GLTF MIP & Pedestal
+          this.setupGltfFlightDisplays();
+
+          // Seamless transition: enable GLTF cockpit and disable procedural cockpit
+          this.proceduralCockpitGroup.visible = false;
+          this.gltfCockpitGroup.visible = true;
+          this.gltfCockpitLoaded = true;
+        },
+        undefined,
+        (error) => {
+          console.warn('Failed to load 3D GLTF Cockpit model, keeping procedural cockpit:', error);
+          this.proceduralCockpitGroup.visible = true;
+          this.gltfCockpitGroup.visible = false;
+          this.gltfCockpitLoaded = false;
+        }
+      );
+    } catch (err) {
+      console.warn('GLTFLoader initialization error:', err);
+      this.proceduralCockpitGroup.visible = true;
+      this.gltfCockpitGroup.visible = false;
+      this.gltfCockpitLoaded = false;
+    }
+  }
+
+  /**
+   * Mounts real-time dynamic flight instrument displays (PFD, ND, EICAS, ISFD, MCP, CDU)
+   * precisely onto the 3D GLTF Main Instrument Panel (MIP) and Pedestal.
+   */
+  setupGltfFlightDisplays() {
+    this.gltfDisplays = new THREE.Group();
+    this.gltfDisplays.name = 'GLTF_Live_Displays';
+
+    // Display materials referencing CanvasTextures with depth/polygonOffset to avoid Z-fighting
+    const createDisplayMat = (canvas) => new THREE.MeshBasicMaterial({
+      map: canvas.texture,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
+
+    const pfdMat = createDisplayMat(this.pfdCanvas);
+    const ndMat = createDisplayMat(this.ndCanvas);
+    const eicasMat = createDisplayMat(this.eicasCanvas);
+    const isfdMat = createDisplayMat(this.isfdCanvas);
+    const mcpMat = createDisplayMat(this.mcpCanvas);
+    const cduMat = createDisplayMat(this.cduCanvas);
+
+    // Standard B737-800 CDS LCD Display Unit: 0.145m x 0.145m
+    const duGeo = new THREE.PlaneGeometry(0.145, 0.145);
+    const mipZ = -12.960;
+    const mipY = 0.365;
+
+    // 1. Captain Outboard Primary Flight Display (PFD)
+    this.gltfCaptainPfd = new THREE.Mesh(duGeo, pfdMat);
+    this.gltfCaptainPfd.name = 'GLTF_Captain_PFD';
+    this.gltfCaptainPfd.position.set(-0.33, mipY, mipZ);
+    this.gltfDisplays.add(this.gltfCaptainPfd);
+
+    // 2. Captain Inboard Navigation Display (ND)
+    this.gltfCaptainNd = new THREE.Mesh(duGeo, ndMat);
+    this.gltfCaptainNd.name = 'GLTF_Captain_ND';
+    this.gltfCaptainNd.position.set(-0.18, mipY, mipZ);
+    this.gltfDisplays.add(this.gltfCaptainNd);
+
+    // 3. Integrated Standby Flight Display (ISFD)
+    const isfdGeo = new THREE.PlaneGeometry(0.08, 0.08);
+    this.gltfIsfd = new THREE.Mesh(isfdGeo, isfdMat);
+    this.gltfIsfd.name = 'GLTF_Standby_ISFD';
+    this.gltfIsfd.position.set(-0.075, mipY, mipZ);
+    this.gltfDisplays.add(this.gltfIsfd);
+
+    // 4. Center Upper EICAS (Engine Indications & Crew Alerting System)
+    this.gltfUpperEicas = new THREE.Mesh(duGeo, eicasMat);
+    this.gltfUpperEicas.name = 'GLTF_Upper_EICAS';
+    this.gltfUpperEicas.position.set(0.00, mipY, mipZ);
+    this.gltfDisplays.add(this.gltfUpperEicas);
+
+    // 5. First Officer Inboard Navigation Display (ND)
+    this.gltfFoNd = new THREE.Mesh(duGeo, ndMat);
+    this.gltfFoNd.name = 'GLTF_FO_ND';
+    this.gltfFoNd.position.set(0.18, mipY, mipZ);
+    this.gltfDisplays.add(this.gltfFoNd);
+
+    // 6. First Officer Outboard Primary Flight Display (PFD)
+    this.gltfFoPfd = new THREE.Mesh(duGeo, pfdMat);
+    this.gltfFoPfd.name = 'GLTF_FO_PFD';
+    this.gltfFoPfd.position.set(0.33, mipY, mipZ);
+    this.gltfDisplays.add(this.gltfFoPfd);
+
+    // 7. Mode Control Panel (MCP / Autopilot & Flight Director)
+    const mcpGeo = new THREE.PlaneGeometry(0.72, 0.08);
+    this.gltfMcp = new THREE.Mesh(mcpGeo, mcpMat);
+    this.gltfMcp.name = 'GLTF_MCP';
+    this.gltfMcp.position.set(0.00, 0.64, -12.855);
+    this.gltfMcp.rotation.x = -0.12;
+    this.gltfDisplays.add(this.gltfMcp);
+
+    // 8. Dual FMC / CDU screens on center console
+    const cduGeo = new THREE.PlaneGeometry(0.10, 0.10);
+
+    // Captain CDU (Left)
+    this.gltfCaptainCdu = new THREE.Mesh(cduGeo, cduMat);
+    this.gltfCaptainCdu.name = 'GLTF_Captain_CDU';
+    this.gltfCaptainCdu.position.set(-0.10, 0.28, -12.415);
+    this.gltfCaptainCdu.rotation.x = -0.78;
+    this.gltfDisplays.add(this.gltfCaptainCdu);
+
+    // First Officer CDU (Right)
+    this.gltfFoCdu = new THREE.Mesh(cduGeo, cduMat);
+    this.gltfFoCdu.name = 'GLTF_FO_CDU';
+    this.gltfFoCdu.position.set(0.10, 0.28, -12.415);
+    this.gltfFoCdu.rotation.x = -0.78;
+    this.gltfDisplays.add(this.gltfFoCdu);
+
+    this.gltfCockpitGroup.add(this.gltfDisplays);
   }
 }
