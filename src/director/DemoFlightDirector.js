@@ -60,6 +60,10 @@ export class DemoFlightDirector {
 
     // Audio initial click flag
     this.audioInitiated = false;
+
+    // Track whether user has manually changed camera view in current stage
+    this.userCameraOverridden = false;
+    this._boundOnCycleMode = () => this.onUserCameraChange();
   }
 
   getActiveScenario() {
@@ -164,6 +168,10 @@ export class DemoFlightDirector {
     this.approachFlarInitiated = false;
     this.touchdownConfirmed = false;
     this.isBannerMinimized = false;
+    this.userCameraOverridden = false;
+    if (this.sim?.cameraSystem) {
+      this.sim.cameraSystem.onCycleMode = this._boundOnCycleMode;
+    }
 
     if (this.bannerEl) {
       this.bannerEl.style.display = 'flex';
@@ -241,14 +249,24 @@ export class DemoFlightDirector {
       this.demoBtn.classList.remove('active');
     }
 
+    this.userCameraOverridden = false;
+    if (this.sim?.cameraSystem?.onCycleMode === this._boundOnCycleMode) {
+      this.sim.cameraSystem.onCycleMode = null;
+    }
+
     if (message && this.sim.showToast) {
       this.sim.showToast(message);
     }
   }
 
+  onUserCameraChange() {
+    this.userCameraOverridden = true;
+  }
+
   setStage(newStage) {
     this.currentStage = newStage;
     this.stageTimer = 0;
+    this.userCameraOverridden = false;
 
     const scenario = this.getActiveScenario();
     scenario.enterStage(newStage);

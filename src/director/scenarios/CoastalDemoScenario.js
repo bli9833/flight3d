@@ -21,9 +21,11 @@ export class CoastalDemoScenario {
   constructor(director, simulator) {
     this.director = director;
     this.sim = simulator;
+    this.stageCameraCutDone = false;
   }
 
   enterStage(stage) {
+    this.stageCameraCutDone = false;
     switch (stage) {
       case CoastalDemoScenario.STAGES.PREFLIGHT_ORBIT:
         this.director.updateBanner(
@@ -184,7 +186,8 @@ export class CoastalDemoScenario {
           this.sim.controls.setVirtualInput('elevator', Math.max(0.08, Math.min(0.35, elevatorCmd)));
         }
 
-        if (this.director.stageTimer > 6.0 && this.sim.cameraSystem.mode !== CameraSystem.MODES.CHASE) {
+        if (!this.stageCameraCutDone && !this.director.userCameraOverridden && this.director.stageTimer > 6.0) {
+          this.stageCameraCutDone = true;
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
@@ -239,7 +242,8 @@ export class CoastalDemoScenario {
         this.sim.controls.setVirtualInput('rudder', 0.0);
         this.sim.controls.setVirtualInput('throttle', 0.65);
 
-        if (this.director.stageTimer > 5.5 && this.sim.cameraSystem.mode !== CameraSystem.MODES.CHASE) {
+        if (!this.stageCameraCutDone && !this.director.userCameraOverridden && this.director.stageTimer > 5.5) {
+          this.stageCameraCutDone = true;
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
@@ -298,7 +302,8 @@ export class CoastalDemoScenario {
         this.sim.controls.setVirtualInput('throttle', 0.0);
         if (this.sim.engines) this.sim.engines.setThrottle(0.0);
 
-        if (this.director.stageTimer > 4.5 && this.sim.cameraSystem.mode === CameraSystem.MODES.GEAR) {
+        if (!this.stageCameraCutDone && !this.director.userCameraOverridden && this.director.stageTimer > 4.5) {
+          this.stageCameraCutDone = true;
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 

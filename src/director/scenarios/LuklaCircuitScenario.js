@@ -30,9 +30,11 @@ export class LuklaCircuitScenario {
     this.sim = simulator;
     this.sin58 = 0.848048;
     this.cos58 = 0.529919;
+    this.stageCameraCutDone = false;
   }
 
   enterStage(stage) {
+    this.stageCameraCutDone = false;
     switch (stage) {
       case LuklaCircuitScenario.STAGES.CLIFF_TAKEOFF:
         this.director.updateBanner(
@@ -167,7 +169,8 @@ export class LuklaCircuitScenario {
             this.sim.gear.setGearTarget(false);
           }
 
-          if (this.director.stageTimer > 4.5 && this.sim.cameraSystem.mode !== CameraSystem.MODES.CHASE) {
+          if (!this.stageCameraCutDone && !this.director.userCameraOverridden && this.director.stageTimer > 4.5) {
+            this.stageCameraCutDone = true;
             this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
           }
         }
@@ -240,7 +243,8 @@ export class LuklaCircuitScenario {
         }
 
         // Showcase wing view halfway through canyon climb
-        if (this.director.stageTimer > 4.5 && this.sim.cameraSystem.mode !== CameraSystem.MODES.WING) {
+        if (!this.stageCameraCutDone && !this.director.userCameraOverridden && this.director.stageTimer > 4.5) {
+          this.stageCameraCutDone = true;
           this.sim.cameraSystem.setMode(CameraSystem.MODES.WING);
         }
 
@@ -305,7 +309,8 @@ export class LuklaCircuitScenario {
         this.sim.controls.setVirtualInput('throttle', THREE.MathUtils.clamp(0.76 + speedErr * 0.015, 0.62, 0.84));
 
         // Switch to chase camera at 10.0s
-        if (this.director.stageTimer > 10.0 && this.sim.cameraSystem.mode !== CameraSystem.MODES.CHASE) {
+        if (!this.stageCameraCutDone && !this.director.userCameraOverridden && this.director.stageTimer > 10.0) {
+          this.stageCameraCutDone = true;
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
@@ -448,7 +453,8 @@ export class LuklaCircuitScenario {
         this.sim.controls.setVirtualInput('throttle', 1.0); // Full 100% reverse thrust!
 
         // Switch to exterior chase camera at 3.0s after showcasing touchdown impact
-        if (this.director.stageTimer > 3.0 && this.sim.cameraSystem.mode === CameraSystem.MODES.GEAR) {
+        if (!this.stageCameraCutDone && !this.director.userCameraOverridden && this.director.stageTimer > 3.0) {
+          this.stageCameraCutDone = true;
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
