@@ -29,6 +29,12 @@ export class NDCanvas {
 
     // Range setting in Nautical Miles (10 NM = 18,520m)
     this.rangeNm = 10;
+    this.airportId = 'coastal';
+  }
+
+  setAirport(airportId) {
+    this.airportId = airportId;
+    this.render();
   }
 
   updateData(state) {
@@ -181,14 +187,47 @@ export class NDCanvas {
       };
     };
 
-    // Runway 09L/27R: Center at world (0, 0), length 3000m, orientation East-West (heading 090°)
-    const rwyStart = projectToScreen(-1500, 0);
-    const rwyEnd = projectToScreen(1500, 0);
+    const isLukla = this.airportId === 'lukla';
+    const sin58 = 0.848048;
+    const cos58 = 0.529919;
+
+    let rwyStart, rwyEnd, extStart, extEnd, activeWpt, threshPos, vor1, vor2, fixes;
+
+    if (isLukla) {
+      activeWpt = 'RW06';
+      threshPos = { x: -223.5, z: 139.6 };
+      rwyStart = projectToScreen(-223.5, 139.6);
+      rwyEnd = projectToScreen(223.5, -139.6);
+      extStart = projectToScreen(-8480, 5299);
+      extEnd = projectToScreen(848, -530);
+      vor1 = 'VOR 1  112.30';
+      vor2 = 'NDB    390.0';
+      fixes = [
+        { name: 'SURKE', x: -6784, z: 4239 },
+        { name: 'PHAKD', x: -3816, z: 2385 },
+        { name: 'GORGE', x: -1696, z: 1060 },
+        { name: 'RW06', x: -224, z: 140 },
+        { name: 'NAMCH', x: 2500, z: -5500 }
+      ];
+    } else {
+      activeWpt = 'RW09L';
+      threshPos = { x: -1350, z: 0 };
+      rwyStart = projectToScreen(-1500, 0);
+      rwyEnd = projectToScreen(1500, 0);
+      extStart = projectToScreen(-10000, 0);
+      extEnd = projectToScreen(8000, 0);
+      vor1 = 'VOR 1  109.50';
+      vor2 = 'VOR 2  113.80';
+      fixes = [
+        { name: 'MERIT', x: -12000, z: 2500 },
+        { name: 'APPR1', x: -6500, z: 0 },
+        { name: 'RW09L', x: -1350, z: 0 },
+        { name: 'COAST', x: 3500, z: 4500 },
+        { name: 'BAY', x: -2000, z: 8000 }
+      ];
+    }
 
     // Extended Runway Centerline (dashed line extending 5 NM with 1 NM cross ticks)
-    const extStart = projectToScreen(-10000, 0);
-    const extEnd = projectToScreen(8000, 0);
-
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1.8;
     ctx.setLineDash([8, 8]);
@@ -200,7 +239,13 @@ export class NDCanvas {
 
     // 1 NM tick marks along final approach course
     for (let nm = 1; nm <= 5; nm++) {
-      const tickPos = projectToScreen(-1350 - nm * 1852, 0);
+      let tickPos;
+      if (isLukla) {
+        const sTick = -263.5 - nm * 1852;
+        tickPos = projectToScreen(sTick * sin58, -sTick * cos58);
+      } else {
+        tickPos = projectToScreen(-1350 - nm * 1852, 0);
+      }
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -210,14 +255,6 @@ export class NDCanvas {
     }
 
     // Active Flight Plan Route (Vivid Magenta Line connecting fixes)
-    const fixes = [
-      { name: 'MERIT', x: -12000, z: 2500 },
-      { name: 'APPR1', x: -6500, z: 0 },
-      { name: 'RW09L', x: -1350, z: 0 },
-      { name: 'COAST', x: 3500, z: 4500 },
-      { name: 'BAY', x: -2000, z: 8000 }
-    ];
-
     ctx.strokeStyle = '#f72585';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
@@ -258,19 +295,20 @@ export class NDCanvas {
     ctx.fillStyle = '#f72585';
     ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'right';
-    ctx.fillText('RW09L', w - 24, 46);
+    ctx.fillText(activeWpt, w - 24, 46);
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 12px monospace';
-    const distToThreshold = Math.max(0.1, (Math.abs(this.planePos.x - (-1350)) / 1852.0));
+    const distMeters = Math.hypot(this.planePos.x - threshPos.x, this.planePos.y - threshPos.z);
+    const distToThreshold = Math.max(0.1, distMeters / 1852.0);
     ctx.fillText(`${distToThreshold.toFixed(1)} NM`, w - 24, 62);
 
     // Bottom Left & Right VOR Frequency Data
     ctx.fillStyle = '#10b981';
     ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('VOR 1  109.50', 24, h - 24);
+    ctx.fillText(vor1, 24, h - 24);
     ctx.textAlign = 'right';
-    ctx.fillText('VOR 2  113.80', w - 24, h - 24);
+    ctx.fillText(vor2, w - 24, h - 24);
 
     // Aircraft symbol at bottom-center (Authentic Boeing white aircraft glyph)
     ctx.fillStyle = '#ffffff';

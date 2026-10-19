@@ -35,20 +35,20 @@ export class LuklaAirport {
     this.beaconLights = [];
     this.windsock = null;
 
-    // Collision metadata for terminal and rock face
+    // Collision metadata for terminal and tower (safely offset to the apron at w ≈ 48m)
     this.terminalData = {
-      x: 48,
-      y: 2855,
-      z: -35,
-      width: 48,
+      x: 76.3,
+      y: 2844,
+      z: 8.9,
+      width: 44,
       height: 18,
-      depth: 26
+      depth: 24
     };
 
     this.controlTowerData = {
-      x: 52,
-      y: 2864,
-      z: -32,
+      x: 83.1,
+      y: 2855,
+      z: 4.7,
       radius: 4.5,
       height: 16.0
     };
@@ -101,8 +101,8 @@ export class LuklaAirport {
     rwyMesh.receiveShadow = true;
 
     // Transform: yaw heading 058°, pitch 11.7% (6.71° uphill towards NE)
-    // Local forward (-Z) points along 058° (+X, -Z in world)
-    const euler = new THREE.Euler(this.pitchRad, -this.headingRad + Math.PI, 0, 'YXZ');
+    // Local forward (-Z) points along 058° (+X, -Z in world), rising to 2,867m at Threshold 24
+    const euler = new THREE.Euler(this.pitchRad, -this.headingRad, 0, 'YXZ');
     rwyGroup.quaternion.setFromEuler(euler);
     rwyGroup.add(rwyMesh);
 
@@ -187,11 +187,11 @@ export class LuklaAirport {
    */
   buildApronAndHelipads() {
     const apronGroup = new THREE.Group();
-    // Apron sits to the right of upper runway (approx world x: +55, z: -15, y: 2854m)
-    apronGroup.position.set(56, 2854.5, -12);
+    // Apron sits to the right of upper runway (s ≈ 60m, w ≈ 33m -> world x: 68.4, z: -4.1, y: 2843.5m)
+    apronGroup.position.set(68.4, 2843.5, -4.1);
 
-    // Concrete tarmac geometry (80m x 45m)
-    const apronGeom = new THREE.PlaneGeometry(80, 48);
+    // Concrete tarmac geometry: 36m wide (lateral across w) x 80m long (along s)
+    const apronGeom = new THREE.PlaneGeometry(36, 80);
     apronGeom.rotateX(-Math.PI * 0.5);
 
     const apronMat = new THREE.MeshStandardMaterial({
@@ -206,36 +206,36 @@ export class LuklaAirport {
     const apronMesh = new THREE.Mesh(apronGeom, apronMat);
     apronMesh.receiveShadow = true;
 
-    // Slight slope matching local topography
-    apronGroup.rotation.y = -this.headingRad + Math.PI;
-    apronGroup.rotation.x = this.pitchRad * 0.6;
+    // Aligned with runway heading and uphill slope
+    apronGroup.rotation.y = -this.headingRad;
+    apronGroup.rotation.x = this.pitchRad;
     apronGroup.add(apronMesh);
 
-    // Helipads on the southwest side of the apron
+    // Helipads on the southwest side of the apron (local +Z)
     const heliMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const ringMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
 
     for (let h = 0; h < 2; h++) {
-      const hx = -24 + h * 24;
-      const hz = 14;
+      const hx = -6 + h * 12;
+      const hz = 20;
 
       // Outer yellow ring
-      const ringGeom = new THREE.RingGeometry(5.2, 5.8, 32);
+      const ringGeom = new THREE.RingGeometry(4.8, 5.4, 32);
       ringGeom.rotateX(-Math.PI * 0.5);
       const ringMesh = new THREE.Mesh(ringGeom, ringMat);
       ringMesh.position.set(hx, 0.05, hz);
       apronGroup.add(ringMesh);
 
       // White "H" marking
-      const barGeom1 = new THREE.PlaneGeometry(1.0, 5.5);
+      const barGeom1 = new THREE.PlaneGeometry(0.9, 4.8);
       barGeom1.rotateX(-Math.PI * 0.5);
-      const barGeom2 = new THREE.PlaneGeometry(3.0, 1.0);
+      const barGeom2 = new THREE.PlaneGeometry(2.6, 0.9);
       barGeom2.rotateX(-Math.PI * 0.5);
 
       const hLeft = new THREE.Mesh(barGeom1, heliMat);
-      hLeft.position.set(hx - 1.5, 0.06, hz);
+      hLeft.position.set(hx - 1.3, 0.06, hz);
       const hRight = new THREE.Mesh(barGeom1, heliMat);
-      hRight.position.set(hx + 1.5, 0.06, hz);
+      hRight.position.set(hx + 1.3, 0.06, hz);
       const hMid = new THREE.Mesh(barGeom2, heliMat);
       hMid.position.set(hx, 0.06, hz);
 
@@ -406,18 +406,37 @@ export class LuklaAirport {
   }
 
   /**
+   * Determine if world coordinates fall within Lukla's sloped runway or apron tarmac
+   */
+  isOnRunway(x, z) {
+    const s = x * this.sin58 - z * this.cos58;
+    const w = x * this.cos58 + z * this.sin58;
+
+    // Runway 06/24: 527m length (|s| <= 265m), 30m width (|w| <= 16m)
+    const onRunway = Math.abs(s) <= 265.0 && Math.abs(w) <= 16.0;
+
+    // Apron tarmac and helipads: s in [15, 105], w in [12, 52]
+    const onApron = (s >= 15.0 && s <= 105.0 && w >= 12.0 && w <= 52.0);
+
+    return onRunway || onApron;
+  }
+
+  /**
    * Frame update for windsock and hazard light flashing
    */
-  update(dt, simTime = 0) {
+  update(dt, aircraftPos, simTime = 0) {
+    // Accommodate both update(dt, simTime) and update(dt, aircraftPos, simTime)
+    const time = (typeof aircraftPos === 'number') ? aircraftPos : simTime;
+
     // Flash red hazard beacon on control tower mast (1 Hz)
-    const flash = (Math.sin(simTime * 6.28) > 0.0) ? 2.5 : 0.2;
+    const flash = (Math.sin(time * 6.28) > 0.0) ? 2.5 : 0.2;
     for (const b of this.beaconLights) {
       b.intensity = flash;
     }
 
     // Flutter windsock slightly
     if (this.windsock) {
-      this.windsock.rotation.y = Math.sin(simTime * 2.5) * 0.15;
+      this.windsock.rotation.y = Math.sin(time * 2.5) * 0.15;
     }
   }
 }

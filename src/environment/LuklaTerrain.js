@@ -69,20 +69,45 @@ export class LuklaTerrain {
    * Procedural Himalayan fallback algorithm while real DEM loads or in tests
    */
   initProceduralFallback() {
+    const sin58 = 0.848048;
+    const cos58 = 0.529919;
+
     for (let gy = 0; gy < this.gridSize; gy++) {
       for (let gx = 0; gx < this.gridSize; gx++) {
-        const nx = (gx / (this.gridSize - 1) - 0.5);
-        const nz = (gy / (this.gridSize - 1) - 0.5);
+        // Map grid indices to world coordinates (inverting shiftX/shiftZ applied in getHeight)
+        const worldX = ((gx / (this.gridSize - 1)) - 0.5) * this.size - this.shiftX;
+        const worldZ = ((gy / (this.gridSize - 1)) - 0.5) * this.size - this.shiftZ;
 
-        // V-shaped Dudh Kosi canyon running SW to NE
-        const canyonDist = Math.abs(nx * 0.85 - nz * 0.52);
-        const canyonDepth = Math.max(0, 1.0 - canyonDist * 3.5);
+        // s: distance along runway axis (SW to NE)
+        // w: distance lateral / perpendicular to runway axis (SE to NW)
+        const s = worldX * sin58 - worldZ * cos58;
+        const w = worldX * cos58 + worldZ * sin58;
 
-        // Mountain ridges flanking canyon
-        const ridgeLeft = Math.exp(-Math.pow((nx + 0.35) * 3.0, 2)) * 2800;
-        const ridgeRight = Math.exp(-Math.pow((nx - 0.38) * 3.0, 2)) * 3200;
+        // Along the approach path (s < -263.5, w ≈ 0), Dudh Kosi canyon drops down to ~2,000m-2,400m
+        // Behind runway 24 (s > +263.5), terrain rises into high mountain peaks
+        let canyonFloor = 2836.0;
+        if (s < -263.5) {
+          // Drops into Dudh Kosi river gorge (elevation down to ~2,000m at s = -5000m)
+          const distSW = -s - 263.5;
+          canyonFloor = Math.max(1950.0, 2805.0 - distSW * 0.22);
+        } else if (s > 263.5) {
+          // Rises into mountain wall
+          const distNE = s - 263.5;
+          canyonFloor = 2867.0 + distNE * 0.35;
+        } else {
+          // On runway: slope from 2805m to 2867m
+          canyonFloor = 2836.0 + s * 0.1176;
+        }
 
-        let baseH = 2850.0 - canyonDepth * 700.0 + (ridgeLeft + ridgeRight) * 0.7;
+        // Canyon walls rise steeply on both lateral sides (|w| > 100m)
+        const absW = Math.abs(w);
+        let ridgeH = 0.0;
+        if (absW > 100.0) {
+          const latDist = absW - 100.0;
+          ridgeH = Math.min(2800.0, Math.pow(latDist / 400.0, 1.6) * 450.0);
+        }
+
+        const baseH = canyonFloor + ridgeH;
         this.elevations[gy * this.gridSize + gx] = baseH;
       }
     }

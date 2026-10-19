@@ -81,6 +81,11 @@ export class DemoFlightDirector {
   }
 
   start() {
+    // Demo flight targets coastal runway 09L, bay, and ocean; switch back to coastal if currently in Lukla
+    if (this.sim.activeAirport && this.sim.activeAirport !== 'coastal') {
+      this.sim.setAirport('coastal');
+    }
+
     this.isActive = true;
     this.totalTimer = 0;
     this.approachFlarInitiated = false;

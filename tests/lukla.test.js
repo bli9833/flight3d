@@ -97,20 +97,56 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
     assert.ok(norm.y > 0.85);
   });
 
-  it('should construct LuklaAirport 3D elements and collision bounds', () => {
+  it('should construct LuklaAirport 3D elements, collision bounds, and keep facilities off the runway', () => {
     const airport = new LuklaAirport();
     assert.ok(airport.group instanceof THREE.Group);
     assert.strictEqual(airport.runwayLength, 527.0);
     assert.strictEqual(airport.runwayWidth, 30.0);
 
-    // Check collision metadata
+    // Check collision metadata exists
     assert.ok(airport.terminalData);
     assert.ok(airport.controlTowerData);
     assert.strictEqual(airport.controlTowerData.height, 16.0);
 
-    // Check dynamic updates
+    // Verify terminal and tower are safely clear of the 30m runway centerline (|w| > 25m)
+    const sin58 = Math.sin(THREE.MathUtils.degToRad(58.0));
+    const cos58 = Math.cos(THREE.MathUtils.degToRad(58.0));
+    const termW = airport.terminalData.x * cos58 + airport.terminalData.z * sin58;
+    const towerW = airport.controlTowerData.x * cos58 + airport.controlTowerData.z * sin58;
+    assert.ok(Math.abs(termW) > 25.0, `Terminal lateral position (${termW.toFixed(1)}m) must be outside runway clearance`);
+    assert.ok(Math.abs(towerW) > 25.0, `Tower lateral position (${towerW.toFixed(1)}m) must be outside runway clearance`);
+
+    // Verify isOnRunway containment
+    assert.strictEqual(airport.isOnRunway(0, 0), true, 'Runway midpoint must be recognized as runway');
+    assert.strictEqual(airport.isOnRunway(-210 * sin58, 210 * cos58), true, 'Runway 06 threshold must be recognized as runway');
+    // Coordinates inside coastal box but outside Lukla runway
+    assert.strictEqual(airport.isOnRunway(500, 200), false, 'Surrounding mountain terrain must NOT be recognized as runway');
+
+    // Check dynamic updates support both 2-arg and 3-arg signatures without producing NaN
     airport.update(0.016, 1.0);
     assert.ok(airport.beaconLights.length > 0);
+    assert.strictEqual(typeof airport.beaconLights[0].intensity, 'number');
+    assert.ok(!Number.isNaN(airport.beaconLights[0].intensity));
+
+    airport.update(0.016, new THREE.Vector3(0, 2800, 0), 2.5);
+    assert.ok(!Number.isNaN(airport.beaconLights[0].intensity));
+    if (airport.windsock) {
+      assert.ok(!Number.isNaN(airport.windsock.rotation.y));
+    }
+  });
+
+  it('should ensure procedural fallback terrain is safely clear of the approach corridor', () => {
+    const terrain = new LuklaTerrain(22000, 128);
+    const sin58 = Math.sin(THREE.MathUtils.degToRad(58.0));
+    const cos58 = Math.cos(THREE.MathUtils.degToRad(58.0));
+
+    // Approach preset start position: s = -3800m, w = 0m
+    const appX = -3800.0 * sin58;
+    const appZ = 3800.0 * cos58;
+    const fallbackH = terrain.getHeight(appX, appZ);
+
+    // Initial approach altitude is 3,070m; fallback terrain must be safely below this altitude
+    assert.ok(fallbackH < 2600.0, `Procedural fallback height ${fallbackH}m must leave clear airspace below 3,070m`);
   });
 
   it('should detect collisions against Lukla control tower and terminal', () => {
@@ -125,7 +161,7 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
     const groundH = terrain.getHeight(-210 * sin58, 210 * cos58);
     const pos = new THREE.Vector3(-210 * sin58, groundH + 2.15, 210 * cos58);
     const quat = new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(THREE.MathUtils.degToRad(6.71), -THREE.MathUtils.degToRad(58.0) - Math.PI * 0.5, 0, 'YXZ')
+      new THREE.Euler(THREE.MathUtils.degToRad(6.71), -THREE.MathUtils.degToRad(58.0), 0, 'YXZ')
     );
     const vel = new THREE.Vector3(50 * sin58, 0, -50 * cos58);
 

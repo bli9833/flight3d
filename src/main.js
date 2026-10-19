@@ -277,14 +277,15 @@ class FlightSimulator {
 
       if (type === 'runway') {
         // Aligned on Lukla Runway 06 Threshold (Elevation 2,805m, Heading 058°, 11.7% uphill slope)
-        this.position.set(-210.0, 2808.8, 131.0);
+        // At s = -210m: x = s*sin58, z = -s*cos58, groundH = 2811.3m (+2.15m gear = 2813.45m)
+        this.position.set(-210.0 * sin58, 2813.45, 210.0 * cos58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
 
-        // Pitch 6.71° nose-up aligned with 11.7% gradient, Heading 058°
+        // Pitch 6.71° nose-up aligned with 11.7% gradient, Heading 058° (yaw -58°)
         const euler = new THREE.Euler(
           THREE.MathUtils.degToRad(6.71),
-          -THREE.MathUtils.degToRad(58.0) - Math.PI * 0.5,
+          -THREE.MathUtils.degToRad(58.0),
           0,
           'YXZ'
         );
@@ -301,41 +302,43 @@ class FlightSimulator {
 
         this.showToast('Preset: 루클라 활주로 06 (해발 2,805m, 11.7% 급경사 대기)');
       } else if (type === 'approach') {
-        // Final Approach 2.5 NM out in Dudh Kosi Canyon (Alt 3,120m / 10,230ft)
+        // Final Approach 2.0 NM out in Dudh Kosi Canyon (Alt 3,070m / 10,070ft)
+        // Distance to threshold 06 (s = -263.5m) is 3,536.5m
+        // Elevation drop to threshold (2,805m): 265m -> slope = 4.28°
+        // At 69.4 m/s (135 kts), required sink rate is -5.20 m/s (-1,025 FPM)
         const distSW = -3800.0;
-        this.position.set(distSW * sin58, 3120.0, -distSW * cos58);
-        // Speed 135 knots (69.4 m/s) heading 058°, descending at -3.6 m/s (-700 fpm)
-        this.linearVelocity.set(69.4 * sin58, -3.6, -69.4 * cos58);
+        this.position.set(distSW * sin58, 3070.0, -distSW * cos58);
+        this.linearVelocity.set(69.4 * sin58, -5.20, -69.4 * cos58);
         this.angularVelocity.set(0, 0, 0);
 
-        // Pitch 2.0° nose-up, heading 058°
+        // Pitch 1.0° nose-up on 4.3° descent path, Heading 058° (yaw -58°)
         const euler = new THREE.Euler(
-          THREE.MathUtils.degToRad(2.0),
-          -THREE.MathUtils.degToRad(58.0) - Math.PI * 0.5,
+          THREE.MathUtils.degToRad(1.0),
+          -THREE.MathUtils.degToRad(58.0),
           0,
           'YXZ'
         );
         this.quaternion.setFromEuler(euler);
 
-        this.controls.throttle = 0.58;
-        this.engines.setThrottle(0.58);
+        this.controls.throttle = 0.56;
+        this.engines.setThrottle(0.56);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
         this.aero.setFlapPosition(5); // Flaps 30 for short runway landing
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 6.2;
 
-        this.showToast('Preset: 루클라 협곡 착륙 챌린지 (고도 10,230 FT, Rwy 06)');
+        this.showToast('Preset: 루클라 협곡 착륙 챌린지 (고도 10,070 FT, Rwy 06)');
       } else if (type === 'cliff') {
         // Lukla Runway 24 Downhill Cliff Dive Takeoff!
-        // Starts at upper threshold 24 (x: 210, y: 2868.5, z: -131), heading 238° downhill
-        this.position.set(210.0, 2868.5, -131.0);
+        // Starts at upper threshold 24 (s = +210m, groundH = 2860.7m + 2.15m gear = 2862.85m)
+        this.position.set(210.0 * sin58, 2862.85, -210.0 * cos58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
-        // Pitch nose down -6.71° along 11.7% downhill slope, Yaw 238°
+        // Pitch nose down -6.71° along 11.7% downhill slope, Heading 238° (yaw -238°)
         const euler = new THREE.Euler(
           THREE.MathUtils.degToRad(-6.71),
-          -THREE.MathUtils.degToRad(238.0) - Math.PI * 0.5,
+          -THREE.MathUtils.degToRad(238.0),
           0,
           'YXZ'
         );
@@ -472,6 +475,24 @@ class FlightSimulator {
 
     if (this.tireSmokeSystem) {
       this.tireSmokeSystem.terrain = this.currentTerrain;
+    }
+
+    // Relocate tower camera position for the active airport environment
+    if (this.cameraSystem) {
+      if (isLukla) {
+        const t = this.luklaAirport.controlTowerData;
+        this.cameraSystem.towerPos.set(t.x, t.y + t.height - 1.5, t.z);
+      } else {
+        this.cameraSystem.towerPos.set(120, 78, 280);
+      }
+    }
+
+    // Reconfigure cockpit navigation displays for active airport
+    if (this.ndCanvas && typeof this.ndCanvas.setAirport === 'function') {
+      this.ndCanvas.setAirport(id);
+    }
+    if (this.cduCanvas && typeof this.cduCanvas.setAirport === 'function') {
+      this.cduCanvas.setAirport(id);
     }
 
     // Update UI preset button labels

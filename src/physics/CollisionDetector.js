@@ -412,9 +412,11 @@ export class CollisionDetector {
     if (!this.terrain) return null;
 
     const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
-    const isAirportRunway = Math.abs(aircraftPos.x) < 1950 && Math.abs(aircraftPos.z) < 450;
+    const isAirportRunway = (this.airport && typeof this.airport.isOnRunway === 'function')
+      ? this.airport.isOnRunway(aircraftPos.x, aircraftPos.z)
+      : (Math.abs(aircraftPos.x) < 1950 && Math.abs(aircraftPos.z) < 450);
     const isGearDeployed = gearState > 0.75;
-    const isPitchSafe = pitchDeg >= -5.5 && pitchDeg <= 14.5;
+    const isPitchSafe = pitchDeg >= -9.5 && pitchDeg <= 16.5;
     const isRollSafe = Math.abs(rollDeg) <= 16.5;
 
     // 1. Runway operations (Takeoff roll, rotation, flare, touchdown, and braking)
