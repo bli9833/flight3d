@@ -1,0 +1,23 @@
+{
+  "gridSize": 256,
+  "worldSize": 22000,
+  "minElevation": 1535.52,
+  "maxElevation": 6687.56,
+  "luklaAirport": {
+    "lat": 27.6878,
+    "lon": 86.7314,
+    "gridX": 134.20498488890007,
+    "gridY": 147.97934788211714,
+    "interpolatedElevation": 2856.4069138995214,
+    "publishedElevation": 2845.0,
+    "runway": {
+      "designator": "06/24",
+      "lengthM": 527.0,
+      "widthM": 30.0,
+      "headingDeg": 58.0,
+      "gradientPercent": 11.7,
+      "threshold06Elevation": 2805.0,
+      "threshold24Elevation": 2867.0
+    }
+  }
+}

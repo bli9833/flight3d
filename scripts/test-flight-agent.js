@@ -91,8 +91,13 @@ class FlightTestAgent {
       throw new Error('window.simulator not found in page scope!');
     }
     this.log('Simulator confirmed ready in browser context!', '✅');
-    // Ensure demo director is stopped so standalone scenario tests run cleanly
-    await this.eval('if (window.simulator.demoDirector) window.simulator.demoDirector.stop();');
+    // Ensure demo director is stopped and coastal airport is selected so standalone scenario tests run cleanly
+    await this.eval(`
+      if (window.simulator) {
+        if (window.simulator.demoDirector) window.simulator.demoDirector.stop();
+        if (typeof window.simulator.setAirport === 'function') window.simulator.setAirport('coastal');
+      }
+    `);
   }
 
   connectWebSocket(url) {

@@ -22,7 +22,14 @@ export class CDUCanvas {
     this.activeWpt = 'RW09L';
     this.distNm = 5.2;
     this.v2Speed = 142;
+    this.airportId = 'coastal';
 
+    this.render();
+  }
+
+  setAirport(airportId) {
+    this.airportId = airportId;
+    this.activeWpt = (airportId === 'lukla') ? 'RW06' : 'RW09L';
     this.render();
   }
 
@@ -107,9 +114,15 @@ export class CDUCanvas {
       ctx.fillText(spdAlt, sx + sw - 12, y);
     };
 
-    drawRow(sy + 70, 'MERIT', '14NM', '250/10000');
-    drawRow(sy + 102, 'APPR1', '08NM', '210/ 5000');
-    drawRow(sy + 134, 'RW09L', '05NM', '142/  50FL', true);
+    if (this.airportId === 'lukla') {
+      drawRow(sy + 70, 'SURKE', '08NM', '160/12000');
+      drawRow(sy + 102, 'PHAKD', '04NM', '140/10500');
+      drawRow(sy + 134, 'RW06', '01NM', '125/ 9200', true);
+    } else {
+      drawRow(sy + 70, 'MERIT', '14NM', '250/10000');
+      drawRow(sy + 102, 'APPR1', '08NM', '210/ 5000');
+      drawRow(sy + 134, 'RW09L', '05NM', '142/  50FL', true);
+    }
 
     ctx.fillStyle = '#64748b';
     ctx.font = '11px monospace';

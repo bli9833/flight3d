@@ -101,9 +101,10 @@ export class LandingGear {
    * @param {THREE.Vector3} linearVelocity (world m/s)
    * @param {THREE.Vector3} angularVelocity (body rad/s)
    * @param {Function} getTerrainHeight (x, z) => height in meters
+   * @param {Function} [getTerrainNormal=null] (x, z) => THREE.Vector3 surface normal
    * @returns {{ forces: THREE.Vector3, moments: THREE.Vector3, onGround: boolean, touchdown: boolean }}
    */
-  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight) {
+  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null) {
     // Animate gear transit
     if (Math.abs(this.targetGearState - this.gearState) > 0.001) {
       this.isTransit = true;
@@ -174,6 +175,15 @@ export class LandingGear {
         this.onGround = true;
         c.compression = Math.min(c.restLength, penetration);
 
+        // Surface normal at contact point (defaults to vertical up)
+        const groundNormal = new THREE.Vector3(0, 1, 0);
+        if (typeof getTerrainNormal === 'function') {
+          const norm = getTerrainNormal(hubWorld.x, hubWorld.z);
+          if (norm && norm.isVector3 && norm.lengthSq() > 0.0001) {
+            groundNormal.copy(norm).normalize();
+          }
+        }
+
         // Contact point velocity in world space = linearVel + angularVel x r
         const rWorld = hubWorld.clone().sub(aircraftMesh.position);
         const angVelWorld = angularVelocity.clone().applyQuaternion(worldQuat);
@@ -196,32 +206,34 @@ export class LandingGear {
           c.touchdownThisFrame = false;
         }
 
-        // Suspension normal force (Hooke's spring + damping)
-        const vUp = contactVel.y;
-        let normalForceMag = c.kSpring * c.compression - c.cDamper * vUp;
+        // Suspension normal force along terrain surface normal (Hooke's spring + damping)
+        const vNormal = contactVel.dot(groundNormal);
+        let normalForceMag = c.kSpring * c.compression - c.cDamper * vNormal;
         if (normalForceMag < 0) normalForceMag = 0; // Strut can only push away
 
         this.totalWeightOnWheels += normalForceMag;
 
-        // Normal force pushes upwards along terrain normal (approx vertical)
-        const fNormal = new THREE.Vector3(0, normalForceMag, 0);
+        // Normal force pushes upwards perpendicular to the surface
+        const fNormal = groundNormal.clone().multiplyScalar(normalForceMag);
 
-        // Wheel forward and lateral vectors in world space
+        // Wheel forward and lateral vectors in world space tangent to surface
         let wheelForwardLocal = new THREE.Vector3(0, 0, -1);
         if (c.isSteerable) {
           wheelForwardLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.steerAngle);
         }
-        const wheelForwardWorld = wheelForwardLocal.clone().applyQuaternion(worldQuat);
-        wheelForwardWorld.y = 0;
+        const wheelForwardRaw = wheelForwardLocal.clone().applyQuaternion(worldQuat);
+        // Project onto terrain tangent plane: vTangent = v - (v . n) * n
+        const wheelForwardWorld = wheelForwardRaw.clone().sub(groundNormal.clone().multiplyScalar(wheelForwardRaw.dot(groundNormal)));
         if (wheelForwardWorld.lengthSq() > 0.0001) {
           wheelForwardWorld.normalize();
         } else {
           wheelForwardWorld.set(0, 0, -1);
         }
 
-        const wheelLateralWorld = new THREE.Vector3(-wheelForwardWorld.z, 0, wheelForwardWorld.x);
+        // Wheel lateral vector on the sloped surface tangent plane (Forward x Normal)
+        const wheelLateralWorld = wheelForwardWorld.clone().cross(groundNormal).normalize();
 
-        // Decompose contact velocity onto wheel plane
+        // Decompose contact velocity onto wheel tangent plane
         const vForward = contactVel.dot(wheelForwardWorld);
         const vLateral = contactVel.dot(wheelLateralWorld);
 

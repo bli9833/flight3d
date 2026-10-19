@@ -85,6 +85,17 @@ export class CollisionDetector {
     }
   }
 
+  setEnvironment(terrain, airport, foliage = null, ships = null, water = null) {
+    this.terrain = terrain;
+    this.airport = airport;
+    this.foliage = foliage;
+    this.ships = ships;
+    this.water = water;
+    this.treeGrid.clear();
+    this.buildingGrid.clear();
+    this.buildSpatialGrids();
+  }
+
   /**
    * Main collision evaluation called every physics step
    * Returns null if no collision, or a collision result object
@@ -118,16 +129,19 @@ export class CollisionDetector {
       };
     }
 
-    // 2. Airport Buildings Check (Terminal & Hangars)
+    // 2. Airport Buildings Check (Terminal, Hangars & Upper Retaining Wall)
     const airportBldgResult = this.checkAirportBuildings(position, worldProbes);
     if (airportBldgResult) {
+      const isWall = airportBldgResult.isWall;
       return {
         collided: true,
-        type: 'BUILDING',
-        name: '공항 건물 충돌 (AIRPORT STRUCTURE COLLISION)',
+        type: isWall ? 'TERRAIN' : 'BUILDING',
+        name: isWall ? '석벽 방호벽 격돌 (ROCK WALL COLLISION)' : '공항 건물 충돌 (AIRPORT STRUCTURE COLLISION)',
         point: airportBldgResult.point,
         speedKnots,
-        description: `공항 터미널/격납고 시설에 ${airportBldgResult.part} 부위가 충돌했습니다.`
+        description: isWall
+          ? `활주로 끝단 암벽 방호벽에 ${airportBldgResult.part} 부위가 충돌했습니다.`
+          : `공항 터미널/격납고 시설에 ${airportBldgResult.part} 부위가 충돌했습니다.`
       };
     }
 
@@ -184,7 +198,7 @@ export class CollisionDetector {
     }
 
     // 7. Terrain & Hills Collision Check
-    const terrainResult = this.checkTerrain(position, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs);
+    const terrainResult = this.checkTerrain(position, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity);
     if (terrainResult) {
       return {
         collided: true,
@@ -228,20 +242,44 @@ export class CollisionDetector {
     // Check terminal concourse box
     const term = this.airport.terminalData;
     if (term) {
-      const minX = term.x - term.width * 0.5;
-      const maxX = term.x + term.width * 0.5;
-      const minZ = term.z - term.depth * 0.5;
-      const maxZ = term.z + term.depth * 0.5;
       const minY = term.y;
       const maxY = term.y + term.height;
 
-      for (const probe of worldProbes) {
-        if (
-          probe.pos.x >= minX - probe.radius && probe.pos.x <= maxX + probe.radius &&
-          probe.pos.z >= minZ - probe.radius && probe.pos.z <= maxZ + probe.radius &&
-          probe.pos.y >= minY && probe.pos.y <= maxY
-        ) {
-          return { point: probe.pos.clone(), part: probe.desc };
+      if (term.rotationY !== undefined) {
+        // Oriented bounding box check (local coordinate space of rotated building)
+        const cosR = Math.cos(-term.rotationY);
+        const sinR = Math.sin(-term.rotationY);
+        const halfW = (term.localWidth || term.width) * 0.5;
+        const halfD = (term.localDepth || term.depth) * 0.5;
+
+        for (const probe of worldProbes) {
+          const dx = probe.pos.x - term.x;
+          const dz = probe.pos.z - term.z;
+          const lx = dx * cosR - dz * sinR;
+          const lz = dx * sinR + dz * cosR;
+
+          if (
+            Math.abs(lx) <= halfW + probe.radius &&
+            Math.abs(lz) <= halfD + probe.radius &&
+            probe.pos.y >= minY && probe.pos.y <= maxY
+          ) {
+            return { point: probe.pos.clone(), part: probe.desc };
+          }
+        }
+      } else {
+        const minX = term.x - term.width * 0.5;
+        const maxX = term.x + term.width * 0.5;
+        const minZ = term.z - term.depth * 0.5;
+        const maxZ = term.z + term.depth * 0.5;
+
+        for (const probe of worldProbes) {
+          if (
+            probe.pos.x >= minX - probe.radius && probe.pos.x <= maxX + probe.radius &&
+            probe.pos.z >= minZ - probe.radius && probe.pos.z <= maxZ + probe.radius &&
+            probe.pos.y >= minY && probe.pos.y <= maxY
+          ) {
+            return { point: probe.pos.clone(), part: probe.desc };
+          }
         }
       }
     }
@@ -264,6 +302,32 @@ export class CollisionDetector {
           ) {
             return { point: probe.pos.clone(), part: probe.desc };
           }
+        }
+      }
+    }
+
+    // Check retaining wall (e.g. Lukla upper rock wall at Runway 24 threshold)
+    const wall = this.airport.retainingWallData;
+    if (wall) {
+      const minY = wall.y;
+      const maxY = wall.y + wall.height;
+      const cosR = Math.cos(-wall.rotationY);
+      const sinR = Math.sin(-wall.rotationY);
+      const halfW = (wall.localWidth || wall.width) * 0.5;
+      const halfD = (wall.localDepth || wall.depth) * 0.5;
+
+      for (const probe of worldProbes) {
+        const dx = probe.pos.x - wall.x;
+        const dz = probe.pos.z - wall.z;
+        const lx = dx * cosR - dz * sinR;
+        const lz = dx * sinR + dz * cosR;
+
+        if (
+          Math.abs(lx) <= halfW + probe.radius &&
+          Math.abs(lz) <= halfD + probe.radius &&
+          probe.pos.y >= minY && probe.pos.y <= maxY
+        ) {
+          return { point: probe.pos.clone(), part: probe.desc, isWall: true };
         }
       }
     }
@@ -397,19 +461,27 @@ export class CollisionDetector {
     return null;
   }
 
-  checkTerrain(aircraftPos, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs) {
+  checkTerrain(aircraftPos, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity = null) {
     if (!this.terrain) return null;
 
     const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
-    const isAirportRunway = Math.abs(aircraftPos.x) < 1950 && Math.abs(aircraftPos.z) < 450;
+    const isAirportRunway = (this.airport && typeof this.airport.isOnRunway === 'function')
+      ? this.airport.isOnRunway(aircraftPos.x, aircraftPos.z)
+      : (Math.abs(aircraftPos.x) < 1950 && Math.abs(aircraftPos.z) < 450);
     const isGearDeployed = gearState > 0.75;
-    const isPitchSafe = pitchDeg >= -5.5 && pitchDeg <= 14.5;
+    const isPitchSafe = pitchDeg >= -9.5 && pitchDeg <= 16.5;
     const isRollSafe = Math.abs(rollDeg) <= 16.5;
 
     // 1. Runway operations (Takeoff roll, rotation, flare, touchdown, and braking)
     if (isAirportRunway) {
-      // Hard landing: only checked when wheels actually contact ground (y <= groundH + 3.55m)
-      if (isGearDeployed && aircraftPos.y <= groundH + 3.55 && speedMs > 25.0) {
+      // Hard landing: only checked when wheels actually contact ground (y <= groundH + 2.15m)
+      if (aircraftPos.y <= groundH + 2.15 && speedMs > 25.0) {
+        // Compute impact velocity normal to the local runway surface
+        const normal = (typeof this.terrain.getNormal === 'function')
+          ? this.terrain.getNormal(aircraftPos.x, aircraftPos.z)
+          : new THREE.Vector3(0, 1, 0);
+        const normalImpactSpeed = linearVelocity ? -linearVelocity.dot(normal) : -vsiMs;
+
         // Gear collapse / belly impact onto runway concrete
         if (aircraftPos.y < groundH + 2.1) {
           return {
@@ -418,12 +490,13 @@ export class CollisionDetector {
             description: `과도한 충격으로 랜딩기어가 파손되며 동체가 활주로에 격돌했습니다.`
           };
         }
-        // Catastrophic extreme vertical slam (> 2400 FPM)
-        if (vsiMs < -12.5) {
+        // Catastrophic extreme vertical or surface-normal slam (> 12.5 m/s or > 2400 FPM)
+        if (normalImpactSpeed > 12.5 || vsiMs < -12.5) {
+          const impactFpm = Math.max(normalImpactSpeed, -vsiMs) * 196.85;
           return {
             name: '하드 랜딩 기체 파손 (HARD LANDING CRASH)',
             point: aircraftPos.clone(),
-            description: `과도한 강하율(${(-vsiMs * 196.85).toFixed(0)} FPM)로 인해 활주로에 격돌했습니다.`
+            description: `과도한 접지 충격율(${impactFpm.toFixed(0)} FPM)로 인해 활주로에 격돌했습니다.`
           };
         }
         // Severe wingtip scrape on runway
@@ -476,8 +549,11 @@ export class CollisionDetector {
     for (const probe of worldProbes) {
       const probeGroundH = this.terrain.getHeight(probe.pos.x, probe.pos.z);
 
-      // On runway plateau with gear deployed, ignore belly/engine/tail ground clearance
-      if (isAirportRunway && isGearDeployed) {
+      // On runway plateau with gear deployed, ignore belly/engine/tail ground clearance only if probe itself is within runway bounds
+      const probeOnRunway = (this.airport && typeof this.airport.isOnRunway === 'function')
+        ? this.airport.isOnRunway(probe.pos.x, probe.pos.z)
+        : isAirportRunway;
+      if (isAirportRunway && isGearDeployed && probeOnRunway) {
         continue;
       }
 

@@ -526,4 +526,11 @@ export class Airport {
       }
     }
   }
+
+  /**
+   * Determine if world coordinates fall within Coastal Airport's runway tarmac area
+   */
+  isOnRunway(x, z) {
+    return Math.abs(x) < 1950 && Math.abs(z) < 450;
+  }
 }

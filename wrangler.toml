@@ -6,3 +6,5 @@ preview_urls = true
 
 [assets]
 directory = "./dist"
+
+[previews]

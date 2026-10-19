@@ -132,6 +132,12 @@ class MobileTouchTestRunner {
       throw new Error('Simulator failed to initialize within 20s');
     }
     this.log('Simulator confirmed ready in browser DOM!', '✈️');
+    await this.evaluate(`
+      if (window.simulator) {
+        if (window.simulator.demoDirector) window.simulator.demoDirector.stop();
+        if (typeof window.simulator.setAirport === 'function') window.simulator.setAirport('coastal');
+      }
+    `);
 
     // 1. Check Touch Overlay Status
     const overlayStatus = await this.evaluate(`

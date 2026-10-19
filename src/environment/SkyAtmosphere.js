@@ -279,4 +279,17 @@ export class SkyAtmosphere {
   getSunDirection() {
     return this.sunPosition.clone().normalize();
   }
+
+  /**
+   * Adjust cloud base altitude depending on active airport
+   * Coastal airport sits at sea level (12m), while Lukla sits at 2,845m in the Himalayas.
+   */
+  setAirport(airportId) {
+    if (airportId === 'lukla') {
+      // Elevate fair-weather cloud deck high above Himalayan peaks (base ~6,200m / 20,300 FT)
+      this.cloudsGroup.position.y = 3400;
+    } else {
+      this.cloudsGroup.position.y = 0;
+    }
+  }
 }
