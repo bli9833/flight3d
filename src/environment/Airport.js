@@ -96,11 +96,14 @@ export class Airport {
     rwyGeo.rotateX(-Math.PI * 0.5);
     const rwyMesh = new THREE.Mesh(rwyGeo, asphaltMat);
     rwyMesh.position.set(0, this.elevation + 0.06, 0);
+    rwyMesh.receiveShadow = true;
     this.group.add(rwyMesh);
 
     // Runway Markings Material (polygonOffset & depthWrite: false prevents all flickering)
-    const whiteMarkMat = new THREE.MeshBasicMaterial({
+    const whiteMarkMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
+      roughness: 0.8,
+      metalness: 0.1,
       polygonOffset: true,
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -2,
@@ -214,22 +217,29 @@ export class Airport {
       c.fillText(text, 128, 128);
 
       const tex = new THREE.CanvasTexture(can);
-      const mat = new THREE.MeshBasicMaterial({
+      const mat = new THREE.MeshStandardMaterial({
         map: tex,
         transparent: true,
         polygonOffset: true,
         polygonOffsetFactor: -3,
         polygonOffsetUnits: -3,
-        depthWrite: false
+        depthWrite: false,
+        roughness: 0.8,
+        metalness: 0.1
       });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), mat);
       mesh.rotation.set(-Math.PI * 0.5, 0, rotY);
       mesh.position.set(x, 0.01, 0);
+      mesh.receiveShadow = true;
       return mesh;
     };
 
     markingsGroup.add(makeRunwayNumberDecal('09L', -this.runwayLength * 0.5 + 85, Math.PI * 0.5));
     markingsGroup.add(makeRunwayNumberDecal('27R', this.runwayLength * 0.5 - 85, -Math.PI * 0.5));
+
+    markingsGroup.traverse(child => {
+      if (child.isMesh) child.receiveShadow = true;
+    });
 
     this.group.add(markingsGroup);
   }
@@ -242,6 +252,7 @@ export class Airport {
     taxiGeo.rotateX(-Math.PI * 0.5);
     const taxiMesh = new THREE.Mesh(taxiGeo, asphaltMat);
     taxiMesh.position.set(0, this.elevation + 0.04, 160);
+    taxiMesh.receiveShadow = true;
     taxiGroup.add(taxiMesh);
 
     // Connector Taxiways linking runway to parallel taxiway (every 600m)
@@ -250,6 +261,7 @@ export class Airport {
       connGeo.rotateX(-Math.PI * 0.5);
       const conn = new THREE.Mesh(connGeo, asphaltMat);
       conn.position.set(x, this.elevation + 0.04, 80);
+      conn.receiveShadow = true;
       taxiGroup.add(conn);
     }
 
@@ -258,6 +270,7 @@ export class Airport {
     apronGeo.rotateX(-Math.PI * 0.5);
     const apron = new THREE.Mesh(apronGeo, asphaltMat);
     apron.position.set(0, this.elevation + 0.03, 270);
+    apron.receiveShadow = true;
     taxiGroup.add(apron);
 
     this.group.add(taxiGroup);
@@ -383,30 +396,39 @@ export class Airport {
     const shaftGeo = new THREE.CylinderGeometry(4.5, 7.5, 60.0, 12);
     const shaft = new THREE.Mesh(shaftGeo, concreteMat);
     shaft.position.y = 30.0;
+    shaft.castShadow = true;
+    shaft.receiveShadow = true;
     this.towerGroup.add(shaft);
 
     // Cantilevered Observation Deck Floor
     const deckGeo = new THREE.CylinderGeometry(9.5, 5.5, 4.0, 16);
     const deck = new THREE.Mesh(deckGeo, concreteMat);
     deck.position.y = 62.0;
+    deck.castShadow = true;
+    deck.receiveShadow = true;
     this.towerGroup.add(deck);
 
     // 360-Degree Canted Glass Cab
     const cabGeo = new THREE.CylinderGeometry(10.5, 9.2, 5.5, 16, 1, true);
     const cab = new THREE.Mesh(cabGeo, glassMat);
     cab.position.y = 66.5;
+    cab.castShadow = true;
+    cab.receiveShadow = true;
     this.towerGroup.add(cab);
 
     // Tower Roof & Radome
     const roofGeo = new THREE.ConeGeometry(10.6, 2.5, 16);
     const roof = new THREE.Mesh(roofGeo, concreteMat);
     roof.position.y = 70.0;
+    roof.castShadow = true;
+    roof.receiveShadow = true;
     this.towerGroup.add(roof);
 
     // Roof Antenna Mast
     const mastGeo = new THREE.CylinderGeometry(0.2, 0.35, 12.0, 8);
     const mast = new THREE.Mesh(mastGeo, new THREE.MeshStandardMaterial({ color: 0xdd2222 }));
     mast.position.y = 77.0;
+    mast.castShadow = true;
     this.towerGroup.add(mast);
 
     // Red Hazard Obstruction Beacon on Mast Tip
@@ -424,6 +446,7 @@ export class Airport {
       new THREE.MeshStandardMaterial({ color: 0xff6600, metalness: 0.6 })
     );
     dishCurved.rotation.x = Math.PI * 0.5;
+    dishCurved.castShadow = true;
     this.radarDish.add(dishCurved);
 
     this.towerGroup.add(this.radarDish);
@@ -438,6 +461,8 @@ export class Airport {
     const concourseGeo = new THREE.BoxGeometry(350, 18, 70);
     const termMesh = new THREE.Mesh(concourseGeo, concreteMat);
     termMesh.position.y = 9;
+    termMesh.castShadow = true;
+    termMesh.receiveShadow = true;
     termGroup.add(termMesh);
 
     // Terminal Glass Curtain Wall
@@ -445,6 +470,7 @@ export class Airport {
     const wallGeo = new THREE.BoxGeometry(340, 12, 2);
     const glassWall = new THREE.Mesh(wallGeo, glassWallMat);
     glassWall.position.set(0, 9, -34);
+    glassWall.castShadow = true;
     termGroup.add(glassWall);
 
     // 4 Passenger Jet Bridges
@@ -452,6 +478,8 @@ export class Airport {
     for (let b = -120; b <= 120; b += 80) {
       const bridge = new THREE.Mesh(bridgeGeo, concreteMat);
       bridge.position.set(b, 7, -46);
+      bridge.castShadow = true;
+      bridge.receiveShadow = true;
       termGroup.add(bridge);
     }
 
@@ -462,8 +490,12 @@ export class Airport {
 
     const hangar1 = new THREE.Mesh(hangarGeo, hangarMat);
     hangar1.position.set(-450, 0, 310);
+    hangar1.castShadow = true;
+    hangar1.receiveShadow = true;
     const hangar2 = new THREE.Mesh(hangarGeo, hangarMat);
     hangar2.position.set(-580, 0, 310);
+    hangar2.castShadow = true;
+    hangar2.receiveShadow = true;
 
     termGroup.add(hangar1, hangar2);
     this.group.add(termGroup);

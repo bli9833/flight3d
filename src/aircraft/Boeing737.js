@@ -27,6 +27,8 @@ export class Boeing737 {
     this.loadingGltf = false;
     this.modelLoaded = false;
     this.isCockpit = false;
+    this.gltfShadowProxy = null;
+    this.proceduralShadowProxy = null;
 
     // Control surfaces references
     this.aileronL = null;
@@ -126,6 +128,40 @@ export class Boeing737 {
 
     // 6. Navigation, Strobe & Landing Lights
     this.buildLights();
+
+    // Ensure all procedural exterior components cast and receive shadows
+    [
+      this.fuselageGroup,
+      this.wingGroup,
+      this.tailGroup,
+      this.empennageGroup,
+      this.enginesGroup,
+      this.noseGearGroup,
+      this.mainGearLGroup,
+      this.mainGearRGroup
+    ].forEach((grp) => {
+      if (!grp) return;
+      grp.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+    });
+
+    // Procedural shadow proxy for cockpit view (fuselage cylinder)
+    const procShadowMat = new THREE.MeshBasicMaterial({
+      colorWrite: false,
+      depthWrite: false
+    });
+    const procCabinGeo = new THREE.CylinderGeometry(1.88, 1.88, 24.0, 16);
+    procCabinGeo.rotateX(Math.PI * 0.5);
+    this.proceduralShadowProxy = new THREE.Mesh(procCabinGeo, procShadowMat);
+    this.proceduralShadowProxy.name = 'Procedural_Shadow_Proxy';
+    this.proceduralShadowProxy.castShadow = true;
+    this.proceduralShadowProxy.receiveShadow = false;
+    this.proceduralShadowProxy.visible = false;
+    this.group.add(this.proceduralShadowProxy);
 
     // 7. Asynchronous High-Detail GLTF PBR Model Loading with Procedural Fallback
     this.loadGltfModel('/models/b737-800.glb');
@@ -806,12 +842,33 @@ export class Boeing737 {
           this.modelLoaded = true;
           this.useGltf = true;
 
+          // Setup airframe shadow proxy so realistic airframe shadows are cast in cockpit view
+          // while preserving gltfGroup.visible = false contract in cockpit mode
+          const b737Mesh = this.gltfModel.getObjectByName('B737');
+          if (b737Mesh) {
+            const shadowMat = new THREE.MeshBasicMaterial({
+              colorWrite: false,
+              depthWrite: false
+            });
+            const shadowProxy = new THREE.Mesh(b737Mesh.geometry, shadowMat);
+            shadowProxy.name = 'Airframe_Shadow_Proxy';
+            shadowProxy.rotation.copy(this.gltfModel.rotation);
+            shadowProxy.position.copy(this.gltfModel.position);
+            shadowProxy.scale.copy(this.gltfModel.scale);
+            shadowProxy.castShadow = true;
+            shadowProxy.receiveShadow = false;
+            shadowProxy.visible = this.isCockpit;
+            this.gltfShadowProxy = shadowProxy;
+            this.group.add(shadowProxy);
+          }
+
           // Switch exterior visibility: hide procedural fuselage, wings and tail, keep landing gear & lights
           if (this.fuselageGroup) this.fuselageGroup.visible = false;
           if (this.wingGroup) this.wingGroup.visible = false;
           if (this.tailGroup) this.tailGroup.visible = false;
           if (this.empennageGroup) this.empennageGroup.visible = false;
           if (this.enginesGroup) this.enginesGroup.visible = false;
+          if (this.proceduralShadowProxy) this.proceduralShadowProxy.visible = false;
         },
         undefined,
         (err) => {
@@ -954,8 +1011,12 @@ export class Boeing737 {
     this.isCockpit = isCockpit;
     if (this.useGltf && this.gltfGroup) {
       this.gltfGroup.visible = !isCockpit;
+      if (this.gltfShadowProxy) {
+        this.gltfShadowProxy.visible = isCockpit;
+      }
     } else if (!this.loadingGltf) {
       if (this.fuselageGroup) this.fuselageGroup.visible = !isCockpit;
+      if (this.proceduralShadowProxy) this.proceduralShadowProxy.visible = isCockpit;
       if (this.wingGroup) this.wingGroup.visible = !isCockpit;
       if (this.tailGroup) this.tailGroup.visible = !isCockpit;
       if (this.empennageGroup) this.empennageGroup.visible = !isCockpit;
@@ -974,6 +1035,10 @@ export class Boeing737 {
       this.gltfGroup.rotation.z = -0.18;
       this.gltfGroup.rotation.x = 0.12;
     }
+    if (this.gltfShadowProxy) {
+      this.gltfShadowProxy.rotation.z = -0.18;
+      this.gltfShadowProxy.rotation.x = 0.12;
+    }
 
     // Dislocate/damage wing structures upon catastrophic impact
     if (this.wingGroup && this.wingGroup.children.length >= 2) {
@@ -991,6 +1056,10 @@ export class Boeing737 {
     if (this.gltfGroup) {
       this.gltfGroup.rotation.z = 0;
       this.gltfGroup.rotation.x = 0;
+    }
+    if (this.gltfShadowProxy) {
+      this.gltfShadowProxy.rotation.z = 0;
+      this.gltfShadowProxy.rotation.x = 0;
     }
 
     // Restore pristine wing geometry
