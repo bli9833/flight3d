@@ -44,6 +44,14 @@ export class DiagnosticsInspector {
           <div class="diag-row"><span class="k">현재 기체 질량</span><span id="m-mass" class="v">66,000 kg</span></div>
         </div>
 
+        <!-- Terrain PBR Rendering Metrics & Controls -->
+        <div class="diag-section">
+          <div class="diag-subheading">🏔️ 지형 PBR 셰이더 & 트라이플래너 (Terrain)</div>
+          <div class="diag-row"><span class="k">품질 프리셋 (Quality)</span><span id="m-terrain-quality" class="v cyan">HIGH (5 Layers + Triplanar)</span></div>
+          <div class="diag-row"><span class="k">지표면 고도 (AGL Height)</span><span id="m-terrain-h" class="v">12.0 m</span></div>
+          <button id="btn-toggle-terrain-quality" class="btn btn-demo-skip" style="margin-top:6px; width:100%;">지형 품질 전환 [High ⇄ Low]</button>
+        </div>
+
         <!-- Live Forces & Aerodynamic Vectors -->
         <div class="diag-section">
           <div class="diag-subheading">✈️ 실시간 공력 & 힘 벡터 (Forces)</div>
@@ -174,6 +182,19 @@ export class DiagnosticsInspector {
 
       this.sim.showToast('튜닝 수치가 Boeing 737 공장 사양으로 리셋되었습니다.');
     });
+
+    document.getElementById('btn-toggle-terrain-quality')?.addEventListener('click', () => {
+      if (!this.sim.terrain) return;
+      const cur = this.sim.terrain.getQuality();
+      const next = cur === 'high' ? 'low' : 'high';
+      this.sim.terrain.setQuality(next);
+      const qEl = document.getElementById('m-terrain-quality');
+      if (qEl) {
+        qEl.textContent = next === 'high' ? 'HIGH (5 Layers + Triplanar)' : 'LOW (2 Layers Planar)';
+        qEl.className = next === 'high' ? 'v cyan' : 'v amber';
+      }
+      this.sim.showToast(`지형 렌더링 품질: ${next.toUpperCase()}`);
+    });
   }
 
   toggle() {
@@ -234,6 +255,21 @@ export class DiagnosticsInspector {
     // Dynamic Pressure
     const elQ = document.getElementById('m-qdyn');
     if (elQ) elQ.textContent = `${Math.round(aero.qDyn || 0)} Pa`;
+
+    // Terrain status
+    if (this.sim.terrain) {
+      const q = this.sim.terrain.getQuality();
+      const qEl = document.getElementById('m-terrain-quality');
+      if (qEl) {
+        qEl.textContent = q === 'high' ? 'HIGH (5 Layers + Triplanar)' : 'LOW (2 Layers Planar)';
+        qEl.className = q === 'high' ? 'v cyan' : 'v amber';
+      }
+      const hEl = document.getElementById('m-terrain-h');
+      if (hEl && telemetry) {
+        const gh = this.sim.terrain.getHeight(telemetry.x || 0, telemetry.z || 0);
+        hEl.textContent = `${gh.toFixed(1)} m`;
+      }
+    }
 
     // Radio Alt
     const elRadAlt = document.getElementById('m-radalt');

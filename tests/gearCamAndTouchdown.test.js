@@ -38,6 +38,7 @@ describe('Landing Gear View & Touchdown Effects', () => {
       assert.strictEqual(camSystem.cycleMode(), 'AIRPORT TOWER');
       assert.strictEqual(camSystem.cycleMode(), 'CINEMATIC FLYBY');
       assert.strictEqual(camSystem.cycleMode(), 'GEAR CAM (BELLY)');
+      assert.strictEqual(camSystem.mode, CameraSystem.MODES.GEAR);
       assert.strictEqual(camSystem.cycleMode(), 'DRONE (ORBIT VIEW)');
       assert.strictEqual(camSystem.mode, CameraSystem.MODES.DRONE);
       assert.strictEqual(camSystem.cycleMode(), 'COCKPIT (CAPTAIN)');

@@ -1,0 +1,50 @@
+# Flight3d agent orientation
+
+Flight3d is a browser flight simulator built with Three.js and Vite, using npm
+and ES modules. Source and executable configuration take precedence over dated
+claims in README.md, ARCHITECTURE.md, or CODE_METRICS.md.
+
+## Start here
+
+- Read the relevant row in [the task map](docs/development/agent-task-map.md).
+- Follow [working rules](docs/development/agent-working-rules.md). Load only
+  references relevant to the change; exclude node_modules, dist, browser profiles,
+  and worktrees from routine searches.
+- Inspect git status before editing. Preserve existing user and concurrent edits.
+- Complete code/documentation changes by committing to a focused branch, pushing,
+  and opening a pull request unless the user explicitly requests local-only work.
+  Preserve unrelated in-progress work using a separate worktree when needed.
+- Keep this file an orientation index; put detailed procedures under docs/development.
+
+## Commands
+
+Use Node 22.23.2 (`.node-version`; Vite 8 requires at least 22.12.0) and npm from the repository root.
+
+```sh
+npm ci
+npm run check
+npm test
+npm run build
+```
+
+`check` verifies JavaScript syntax and immutable GitHub action references.
+GitHub Actions runs the same checks, tests, and production build. Use a focused
+`node --test tests/<name>.test.js` during development; run the complete gate when
+changing CI or when no remote CI result is available. Avoid repeated full runs
+without a new change or unresolved failure.
+
+Browser scenarios (`test:flight`, `test:crash`, `test:mobile`, `test:demo`) require
+separate setup and are not part of the default CI gate. See
+[CI and verification](docs/development/ci.md) before running them.
+
+## Simulation changes
+
+- Check coordinate frames, units, force/moment signs, and timestep assumptions in
+  ARCHITECTURE.md against current source before changing physics or cameras.
+- Keep pure physics behavior testable independently of DOM, WebGL, and audio.
+- Test stateful behavior across sequences: hold/release, reset, stage transitions,
+  touchdown, and recovery, as relevant. A single frame does not prove stability.
+- A production build proves bundling; Node tests prove only the logic exercised.
+  Rendering, touch, camera framing, and audio changes need browser evidence.
+- Record actual checks and limitations. Do not claim screenshots, deployment,
+  browser acceptance, or remote CI success from a build alone.

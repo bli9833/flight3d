@@ -105,6 +105,7 @@ class FlightSimulator {
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
+    this.cameraSystem.setTerrain(this.terrain);
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
 
@@ -645,7 +646,7 @@ class FlightSimulator {
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.aircraft.group.updateMatrixWorld(true);
-    this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry);
+    this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry, (x, z) => this.terrain.getHeight(x, z));
     this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
@@ -712,7 +713,7 @@ class FlightSimulator {
       this.camera.fov = targetFov;
       this.camera.updateProjectionMatrix();
     }
-    this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry);
+    this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry, (x, z) => this.terrain.getHeight(x, z));
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
