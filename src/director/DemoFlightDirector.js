@@ -478,9 +478,10 @@ export class DemoFlightDirector {
         const aileronCmd = rollDiff * 0.035 - rollRateDeg * 0.025;
         this.sim.controls.setVirtualInput('aileron', Math.max(-0.25, Math.min(0.25, aileronCmd)));
 
-        // Flare over cliff threshold (s >= -330m) at low radio altitude
-        const isNearThreshold = s >= -330.0;
-        if (!this.approachFlarInitiated && isNearThreshold && tel.radioAltFt <= 30.0 && tel.radioAltFt > 0) {
+        // Flare trigger based on height above Threshold 06 (2,805m) rather than canyon floor
+        const heightAboveThresholdM = this.sim.position.y - 2805.0;
+        const isNearThreshold = s >= -420.0;
+        if (!this.approachFlarInitiated && isNearThreshold && heightAboveThresholdM <= 14.0) {
           this.approachFlarInitiated = true;
         }
 
@@ -527,7 +528,7 @@ export class DemoFlightDirector {
         this.sim.controls.setVirtualInput('throttle', 0.75);
 
         // Switch to exterior chase camera at 3.5s after showcasing touchdown impact
-        if (this.stageTimer > 3.5 && this.sim.cameraSystem.mode !== CameraSystem.MODES.GEAR) {
+        if (this.stageTimer > 3.5 && this.sim.cameraSystem.mode === CameraSystem.MODES.GEAR) {
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 

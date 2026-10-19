@@ -66,6 +66,21 @@ export class LuklaAirport {
       height: 16.0
     };
 
+    // Upper retaining wall obstacle metadata at Runway 24 threshold (s = 265m)
+    const wallX = 265 * this.sin58;
+    const wallZ = -265 * this.cos58;
+    this.retainingWallData = {
+      x: wallX,
+      y: this.elevation24,
+      z: wallZ,
+      width: 45,
+      height: 6.0,
+      depth: 3.5,
+      localWidth: 45,
+      localDepth: 3.5,
+      rotationY: -this.headingRad
+    };
+
     this.initAirport();
   }
 
@@ -438,7 +453,7 @@ export class LuklaAirport {
     const upperWall = new THREE.Mesh(upperWallGeom, wallMat);
     const p24X = 265 * this.sin58;
     const p24Z = -265 * this.cos58;
-    upperWall.position.set(p24X, this.threshold24Elevation + 3.0, p24Z);
+    upperWall.position.set(p24X, this.elevation24 + 3.0, p24Z);
     upperWall.rotation.y = -this.headingRad;
     upperWall.castShadow = true;
     this.upperWall = upperWall;

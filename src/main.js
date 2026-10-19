@@ -490,8 +490,9 @@ class FlightSimulator {
       this.tireSmokeSystem.terrain = this.currentTerrain;
     }
 
-    // Relocate tower camera position for the active airport environment
+    // Relocate tower camera position and update active terrain for the active airport environment
     if (this.cameraSystem) {
+      this.cameraSystem.setTerrain(this.currentTerrain);
       if (isLukla) {
         const t = this.luklaAirport.controlTowerData;
         this.cameraSystem.towerPos.set(t.x, t.y + t.height - 1.5, t.z);
@@ -876,7 +877,7 @@ class FlightSimulator {
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.aircraft.group.updateMatrixWorld(true);
-    this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry, (x, z) => this.terrain.getHeight(x, z));
+    this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
     this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
@@ -954,7 +955,7 @@ class FlightSimulator {
       this.camera.fov = targetFov;
       this.camera.updateProjectionMatrix();
     }
-    this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry, (x, z) => this.terrain.getHeight(x, z));
+    this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();

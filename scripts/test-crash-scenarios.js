@@ -108,10 +108,15 @@ async function main() {
       await new Promise(r => setTimeout(r, 250));
     }
 
-    // Stop demo flight director to test manual crash dynamics
+    // Stop demo flight director and select coastal airport for coastal collision scenarios
     await evalJs(`
-      if (window.simulator && window.simulator.demoDirector) {
-        window.simulator.demoDirector.stop();
+      if (window.simulator) {
+        if (window.simulator.demoDirector) {
+          window.simulator.demoDirector.stop();
+        }
+        if (typeof window.simulator.setAirport === 'function') {
+          window.simulator.setAirport('coastal');
+        }
       }
     `);
 

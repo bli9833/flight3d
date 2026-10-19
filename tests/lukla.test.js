@@ -193,12 +193,31 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
     assert.strictEqual(termCrash.type, 'BUILDING');
   });
 
-  it('should construct upper retaining wall at Runway 24 threshold with defined elevation (no NaN)', () => {
+  it('should construct upper retaining wall at Runway 24 threshold with defined elevation (no NaN) and detect collision', () => {
     const airport = new LuklaAirport();
     assert.strictEqual(airport.threshold24Elevation, 2867.0);
     assert.ok(airport.upperWall, 'Upper retaining wall mesh must be created');
     assert.strictEqual(airport.upperWall.position.y, 2870.0, 'Upper wall elevation must equal elevation24 + 3.0m');
     assert.ok(!Number.isNaN(airport.upperWall.position.y), 'Upper wall elevation must not be NaN');
+
+    // Retaining wall collision metadata
+    assert.ok(airport.retainingWallData, 'Airport must publish retainingWallData metadata');
+    assert.strictEqual(airport.retainingWallData.y, 2867.0);
+
+    const terrain = new LuklaTerrain(22000, 128);
+    const detector = new CollisionDetector(terrain, airport, null, null, null);
+
+    // Aircraft rolling uphill heading 58° at s = 250m (on runway, gear down)
+    // Nose probe extends 17.5m ahead (-Z in aircraft local space, +s along 58°) to s = 267.5m, hitting wall at s = 265m
+    const sin58 = Math.sin(THREE.MathUtils.degToRad(58.0));
+    const cos58 = Math.cos(THREE.MathUtils.degToRad(58.0));
+    const centerPos = new THREE.Vector3(250 * sin58, 2868.0, -250 * cos58);
+    const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -THREE.MathUtils.degToRad(58.0), 0, 'YXZ'));
+    const vel = new THREE.Vector3(20 * sin58, 0, -20 * cos58);
+
+    const wallCrash = detector.checkCollision(centerPos, quat, vel, 1.0, 0.0, 0.0);
+    assert.ok(wallCrash !== null, 'Collision with retaining wall must be detected even with gear down');
+    assert.strictEqual(wallCrash.type, 'TERRAIN');
   });
 
   it('should impart sloped surface normal forces in landing gear physics on Lukla runway', () => {
@@ -240,6 +259,40 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
     // Force along runway axis s = fx * sin58 - fz * cos58 should push downhill (negative s)
     const forceAlongS = res.forces.x * sin58 - res.forces.z * cos58;
     assert.ok(forceAlongS < 0, `Force along runway axis (${forceAlongS.toFixed(0)}N) must be directed downhill (-s toward cliff)`);
+  });
+
+  it('should construct local high-resolution terrace mesh to preserve runway surface without coarse DEM bulging', () => {
+    const terrain = new LuklaTerrain(22000, 128);
+    assert.ok(terrain.localTerraceMesh, 'Local terrace mesh must exist');
+    assert.ok(terrain.localTerraceGeometry, 'Local terrace geometry must exist');
+    assert.strictEqual(terrain.mesh.children.includes(terrain.localTerraceMesh), true, 'Terrace mesh must be attached to terrain mesh');
+
+    const sin58 = Math.sin(THREE.MathUtils.degToRad(58.0));
+    const cos58 = Math.cos(THREE.MathUtils.degToRad(58.0));
+
+    // Centerline point at s = 200m (x = 200*sin58, z = -200*cos58)
+    const analyticalH200 = terrain.getHeight(200 * sin58, -200 * cos58);
+    assert.strictEqual(Math.round(analyticalH200 * 10) / 10, 2859.5, 'Centerline height at s=200m should be ~2859.5m');
+
+    // Find the closest vertex in localTerraceGeometry to (s = 200, w = 0)
+    const lPos = terrain.localTerraceGeometry.attributes.position;
+    let closestDistSq = Infinity;
+    let closestH = null;
+
+    for (let i = 0; i < lPos.count; i++) {
+      const x = lPos.getX(i);
+      const z = lPos.getZ(i);
+      const s = x * sin58 - z * cos58;
+      const w = x * cos58 + z * sin58;
+      const distSq = (s - 200) * (s - 200) + w * w;
+      if (distSq < closestDistSq) {
+        closestDistSq = distSq;
+        closestH = lPos.getY(i);
+      }
+    }
+
+    assert.ok(closestDistSq < 1.0, 'Must have a fine-tessellation vertex right at s=200, w=0');
+    assert.ok(Math.abs(closestH - analyticalH200) < 0.1, `Fine vertex height ${closestH} must match analytical height ${analyticalH200}`);
   });
 });
 

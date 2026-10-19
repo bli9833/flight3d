@@ -129,16 +129,19 @@ export class CollisionDetector {
       };
     }
 
-    // 2. Airport Buildings Check (Terminal & Hangars)
+    // 2. Airport Buildings Check (Terminal, Hangars & Upper Retaining Wall)
     const airportBldgResult = this.checkAirportBuildings(position, worldProbes);
     if (airportBldgResult) {
+      const isWall = airportBldgResult.isWall;
       return {
         collided: true,
-        type: 'BUILDING',
-        name: '공항 건물 충돌 (AIRPORT STRUCTURE COLLISION)',
+        type: isWall ? 'TERRAIN' : 'BUILDING',
+        name: isWall ? '석벽 방호벽 격돌 (ROCK WALL COLLISION)' : '공항 건물 충돌 (AIRPORT STRUCTURE COLLISION)',
         point: airportBldgResult.point,
         speedKnots,
-        description: `공항 터미널/격납고 시설에 ${airportBldgResult.part} 부위가 충돌했습니다.`
+        description: isWall
+          ? `활주로 끝단 암벽 방호벽에 ${airportBldgResult.part} 부위가 충돌했습니다.`
+          : `공항 터미널/격납고 시설에 ${airportBldgResult.part} 부위가 충돌했습니다.`
       };
     }
 
@@ -299,6 +302,32 @@ export class CollisionDetector {
           ) {
             return { point: probe.pos.clone(), part: probe.desc };
           }
+        }
+      }
+    }
+
+    // Check retaining wall (e.g. Lukla upper rock wall at Runway 24 threshold)
+    const wall = this.airport.retainingWallData;
+    if (wall) {
+      const minY = wall.y;
+      const maxY = wall.y + wall.height;
+      const cosR = Math.cos(-wall.rotationY);
+      const sinR = Math.sin(-wall.rotationY);
+      const halfW = (wall.localWidth || wall.width) * 0.5;
+      const halfD = (wall.localDepth || wall.depth) * 0.5;
+
+      for (const probe of worldProbes) {
+        const dx = probe.pos.x - wall.x;
+        const dz = probe.pos.z - wall.z;
+        const lx = dx * cosR - dz * sinR;
+        const lz = dx * sinR + dz * cosR;
+
+        if (
+          Math.abs(lx) <= halfW + probe.radius &&
+          Math.abs(lz) <= halfD + probe.radius &&
+          probe.pos.y >= minY && probe.pos.y <= maxY
+        ) {
+          return { point: probe.pos.clone(), part: probe.desc, isWall: true };
         }
       }
     }
@@ -506,8 +535,11 @@ export class CollisionDetector {
     for (const probe of worldProbes) {
       const probeGroundH = this.terrain.getHeight(probe.pos.x, probe.pos.z);
 
-      // On runway plateau with gear deployed, ignore belly/engine/tail ground clearance
-      if (isAirportRunway && isGearDeployed) {
+      // On runway plateau with gear deployed, ignore belly/engine/tail ground clearance only if probe itself is within runway bounds
+      const probeOnRunway = (this.airport && typeof this.airport.isOnRunway === 'function')
+        ? this.airport.isOnRunway(probe.pos.x, probe.pos.z)
+        : isAirportRunway;
+      if (isAirportRunway && isGearDeployed && probeOnRunway) {
         continue;
       }
 

@@ -42,7 +42,29 @@ export class LuklaTerrain {
     this.geometry = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
     this.geometry.rotateX(-Math.PI * 0.5);
 
-    // Initial elevation setup
+    // High-resolution local terrace mesh for the carved runway and airport grounds
+    // Tessellates the 800m x 300m airport envelope at 10m spacing (80 x 30 segments)
+    // to preserve exact carved runway and terrace geometry without coarse DEM interpolation bulge
+    const sLength = 800; // -400m to +400m along runway heading 058°
+    const wWidth = 300;  // -150m to +150m across runway
+    const sSegs = 80;
+    const wSegs = 30;
+    const sin58 = 0.848048;
+    const cos58 = 0.529919;
+
+    this.localTerraceGeometry = new THREE.PlaneGeometry(sLength, wWidth, sSegs, wSegs);
+    this.localTerraceGeometry.rotateX(-Math.PI * 0.5);
+
+    const localPos = this.localTerraceGeometry.attributes.position;
+    for (let i = 0; i < localPos.count; i++) {
+      const s = localPos.getX(i);
+      const w = localPos.getZ(i);
+      const x = s * sin58 + w * cos58;
+      const z = -s * cos58 + w * sin58;
+      localPos.setXYZ(i, x, 0, z);
+    }
+
+    // Initial elevation setup (both coarse mesh and local terrace mesh)
     this.updateGeometryElevations();
 
     // Material with high-resolution satellite texture
@@ -59,6 +81,10 @@ export class LuklaTerrain {
 
     this.mesh = new THREE.Mesh(this.geometry, defaultColorMat);
     this.mesh.receiveShadow = true;
+
+    this.localTerraceMesh = new THREE.Mesh(this.localTerraceGeometry, defaultColorMat);
+    this.localTerraceMesh.receiveShadow = true;
+    this.mesh.add(this.localTerraceMesh);
 
     // Load real DEM and satellite imagery if in browser environment
     if (!this.isLoaded) {
@@ -182,6 +208,9 @@ export class LuklaTerrain {
             side: THREE.DoubleSide
           });
           this.mesh.material.needsUpdate = true;
+          if (this.localTerraceMesh) {
+            this.localTerraceMesh.material = this.mesh.material;
+          }
         });
       }
     } catch (e) {
@@ -193,6 +222,8 @@ export class LuklaTerrain {
    * Updates PlaneGeometry vertex heights using the DEM data and runway blend
    */
   updateGeometryElevations() {
+    const sin58 = 0.848048;
+    const cos58 = 0.529919;
     const pos = this.geometry.attributes.position;
     const uvs = this.geometry.attributes.uv;
     const count = pos.count;
@@ -201,8 +232,16 @@ export class LuklaTerrain {
       const x = pos.getX(i);
       const z = pos.getZ(i);
 
-      // Height from DEM + runway slope blend
-      const h = this.getHeight(x, z);
+      let h = this.getHeight(x, z);
+
+      // Depress coarse mesh vertices within the local high-res terrace envelope
+      // so coarse 86m triangles never bulge above the carved terrace or runway surface
+      const s = x * sin58 - z * cos58;
+      const w = x * cos58 + z * sin58;
+      if (Math.abs(s) <= 360.0 && Math.abs(w) <= 130.0) {
+        h -= 10.0;
+      }
+
       pos.setY(i, h);
 
       // Adjust UV mapping so satellite image perfectly aligns with world coordinates
@@ -216,6 +255,30 @@ export class LuklaTerrain {
     pos.needsUpdate = true;
     if (uvs) uvs.needsUpdate = true;
     this.geometry.computeVertexNormals();
+
+    // Update local high-resolution terrace mesh (10m spacing)
+    if (this.localTerraceGeometry) {
+      const lPos = this.localTerraceGeometry.attributes.position;
+      const lUvs = this.localTerraceGeometry.attributes.uv;
+      const lCount = lPos.count;
+
+      for (let i = 0; i < lCount; i++) {
+        const x = lPos.getX(i);
+        const z = lPos.getZ(i);
+        const h = this.getHeight(x, z);
+        lPos.setY(i, h);
+
+        if (lUvs) {
+          const u = ((x + this.shiftX) / this.size) + 0.5;
+          const v = 1.0 - (((z + this.shiftZ) / this.size) + 0.5);
+          lUvs.setXY(i, Math.max(0, Math.min(1, u)), Math.max(0, Math.min(1, v)));
+        }
+      }
+
+      lPos.needsUpdate = true;
+      if (lUvs) lUvs.needsUpdate = true;
+      this.localTerraceGeometry.computeVertexNormals();
+    }
   }
 
   /**
