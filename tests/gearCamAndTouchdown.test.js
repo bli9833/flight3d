@@ -129,6 +129,24 @@ describe('Landing Gear View & Touchdown Effects', () => {
       assert.ok(contact.worldPos instanceof THREE.Vector3, 'World position must be a Vector3');
       assert.ok(res.compressions.mainLeft > 0 || res.compressions.mainRight > 0, 'Strut compression must be positive');
     });
+
+    it('should NOT trigger touchdown event during takeoff roll or horizontal level contact (sinkRate <= 0.25)', () => {
+      const gear = new LandingGear();
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(0, 14.0, 0);
+      aircraft.updateMatrixWorld(true);
+
+      const terrainFn = () => 12.0;
+      // High speed takeoff roll (75 m/s, ~145 KT), but level/climbing (sink rate = 0 m/s)
+      const linVel = new THREE.Vector3(75.0, 0.0, 0);
+      const angVel = new THREE.Vector3(0, 0, 0);
+
+      const res = gear.update(0.016, aircraft, linVel, angVel, terrainFn);
+
+      assert.strictEqual(res.onGround, true, 'Aircraft is rolling on ground');
+      assert.strictEqual(res.touchdown, false, 'Touchdown event MUST NOT trigger during takeoff roll or level contact');
+      assert.strictEqual(res.touchdownContacts.length, 0, 'No touchdown contacts should be emitted');
+    });
   });
 
   describe('TireSmokeSystem (Touchdown Rubber Smoke Particles)', () => {
@@ -183,6 +201,41 @@ describe('Landing Gear View & Touchdown Effects', () => {
       // Clear particles
       smokeSystem.clear();
       assert.strictEqual(smokeSystem.particles.length, 0);
+    });
+
+    it('should NOT spawn touchdown smoke when ground speed is low (< 20 m/s)', () => {
+      const scene = new THREE.Scene();
+      const smokeSystem = new TireSmokeSystem(scene);
+
+      const taxiContacts = [
+        {
+          id: 'mainLeft',
+          worldPos: new THREE.Vector3(-3.2, 12.0, 1.8),
+          groundSpeed: 5.0, // Taxi speed
+          sinkRate: 1.0
+        }
+      ];
+
+      smokeSystem.spawnTouchdownSmoke(taxiContacts, new THREE.Vector3(5.0, 0, 0));
+      assert.strictEqual(smokeSystem.particles.length, 0, 'No smoke should spawn at taxi / low speeds');
+    });
+
+    it('should NOT spawn braking smoke during normal rollout or parked holding brakes', () => {
+      const scene = new THREE.Scene();
+      const smokeSystem = new TireSmokeSystem(scene);
+
+      const contacts = [
+        { id: 'mainLeft', worldPos: new THREE.Vector3(-3.2, 12.0, 1.8) },
+        { id: 'mainRight', worldPos: new THREE.Vector3(3.2, 12.0, 1.8) }
+      ];
+
+      // Parked with full brakes applied
+      smokeSystem.spawnBrakingSmoke(contacts, new THREE.Vector3(0, 0, 0), 1.0);
+      assert.strictEqual(smokeSystem.particles.length, 0, 'No braking smoke when parked with brakes held');
+
+      // Normal landing rollout (30 m/s ~ 58 knots with moderate braking)
+      smokeSystem.spawnBrakingSmoke(contacts, new THREE.Vector3(30, 0, 0), 0.8);
+      assert.strictEqual(smokeSystem.particles.length, 0, 'No braking smoke during normal rollout deceleration');
     });
   });
 

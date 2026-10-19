@@ -91,7 +91,7 @@ export const BOEING_737_800 = {
       {
         id: 'nose',
         name: 'Nose Gear',
-        localPos: { x: 0.0, y: -2.1, z: -12.5 },
+        localPos: { x: 0.0, y: -2.1, z: -13.8 },
         restLength: 1.2,
         kSpring: 420000, // N/m
         cDamper: 48000,  // N/(m/s)
@@ -101,7 +101,7 @@ export const BOEING_737_800 = {
       {
         id: 'mainLeft',
         name: 'Left Main Gear',
-        localPos: { x: -3.2, y: -2.2, z: 1.8 },
+        localPos: { x: -2.86, y: -2.2, z: 1.8 },
         restLength: 1.1,
         kSpring: 650000,
         cDamper: 62000,
@@ -110,7 +110,7 @@ export const BOEING_737_800 = {
       {
         id: 'mainRight',
         name: 'Right Main Gear',
-        localPos: { x: 3.2, y: -2.2, z: 1.8 },
+        localPos: { x: 2.86, y: -2.2, z: 1.8 },
         restLength: 1.1,
         kSpring: 650000,
         cDamper: 62000,
