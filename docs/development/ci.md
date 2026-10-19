@@ -1,7 +1,7 @@
 # CI and verification
 
 The GitHub Actions gate runs on main pushes, pull requests, and manual dispatch.
-It uses Node 22, npm's lockfile-based install and cache, syntax/action-pin checks,
+It uses Node 22.23.2 (Vite 8 requires at least 22.12.0), npm's lockfile-based install and cache, syntax/action-pin checks,
 Node logic tests, and a Vite production build. Run the same gate locally:
 
 ```sh
@@ -19,8 +19,10 @@ No repository secrets, deployment, or external-service accounts are required.
 ## Browser acceptance
 
 The existing browser scripts are separate acceptance tools, not portable CI yet.
-They expect a Vite server on port 5173, Google Chrome at /usr/bin/google-chrome,
-CDP ports, and WebGL/SwiftShader support. Inspect the chosen script for its exact
+They expect a Vite server on port 5173, CDP ports, and WebGL/SwiftShader support.
+`test:flight` and `test:crash` launch `google-chrome-stable` from PATH;
+`test:mobile` and `test:demo` launch `/usr/bin/google-chrome`. Provide both
+executables (or matching symlinks) before following the commands below. Inspect the chosen script for its exact
 ports and paths before running it. Some capture tools have machine-specific
 output paths; test-flight-agent.js accepts ARTIFACT_DIR. Use a writable output
 directory and preserve evidence relevant to the change.

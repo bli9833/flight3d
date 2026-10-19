@@ -18,7 +18,7 @@ claims in README.md, ARCHITECTURE.md, or CODE_METRICS.md.
 
 ## Commands
 
-Use Node 22 (`.node-version`) and npm from the repository root.
+Use Node 22.23.2 (`.node-version`; Vite 8 requires at least 22.12.0) and npm from the repository root.
 
 ```sh
 npm ci
