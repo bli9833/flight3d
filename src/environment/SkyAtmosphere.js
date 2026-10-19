@@ -7,8 +7,17 @@ import { Sky } from 'three/addons/objects/Sky.js';
  * and instanced cumulus cloud formations at 1,800m altitude.
  */
 export class SkyAtmosphere {
-  constructor(scene) {
+  constructor(scene, renderer = null, water = null) {
     this.scene = scene;
+    this.renderer = renderer;
+    this.water = water;
+
+    // Atmospheric Exponential Height Fog parameters
+    this.fogColor = new THREE.Color(0xc8def4);
+    this.baseDensity = 0.00020;
+    this.heightFalloff = 0.00068; // lambda: density drops to ~28% by 1,828m (6,000ft)
+    this.currentDensity = 0.00020;
+    this.currentExposure = 1.05;
 
     // Time of day (hours: 0.0 to 24.0, default 16.5 = Golden Hour Afternoon)
     this.timeOfDay = 16.8;
@@ -48,18 +57,33 @@ export class SkyAtmosphere {
     this.updateSun();
   }
 
-  setTimeOfDay(hours, targetPos = null) {
-    this.timeOfDay = (hours + 24) % 24;
-    this.updateSun(targetPos);
+  setRenderer(renderer) {
+    this.renderer = renderer;
+    if (this.renderer && this.currentExposure !== undefined) {
+      this.renderer.toneMappingExposure = this.currentExposure;
+    }
   }
 
-  updateSun(targetPos = null) {
+  setWater(water) {
+    this.water = water;
+    if (this.water && typeof this.water.syncWithAtmosphere === 'function') {
+      this.water.syncWithAtmosphere(this);
+    }
+  }
+
+  setTimeOfDay(hours, targetPos = null, cameraPos = null) {
+    this.timeOfDay = (hours + 24) % 24;
+    this.updateSun(targetPos, cameraPos);
+  }
+
+  updateSun(targetPos = null, cameraPos = null) {
     // Map 24h to solar elevation and azimuth
     // 06:00 = Sunrise (elev 0°), 12:00 = Noon (elev 65°), 18:00 = Sunset (elev 0°), 24:00 = Midnight
     const hourRad = ((this.timeOfDay - 6.0) / 24.0) * Math.PI * 2.0;
 
     const elevation = Math.sin(hourRad) * 65.0; // degrees
     const azimuth = 180.0 + Math.cos(hourRad) * 45.0; // degrees
+    const isMorning = Math.cos(hourRad) >= 0;
 
     const phi = THREE.MathUtils.degToRad(90 - elevation);
     const theta = THREE.MathUtils.degToRad(azimuth);
@@ -83,31 +107,88 @@ export class SkyAtmosphere {
       this.sunLight.position.copy(this.sunPosition).multiplyScalar(800);
     }
 
-    // Update Atmospheric Aerial Perspective Fog Color
-    if (!this.scene.fog) {
-      this.scene.fog = new THREE.FogExp2(0xc8def4, 0.000040);
-    }
+    // Determine observer altitude for exponential height fog
+    const altitude = cameraPos ? Math.max(0, cameraPos.y) : (targetPos ? Math.max(0, targetPos.y) : 0);
+
+    // 1. Time-of-Day Atmospheric Scattering, Light Colors & Base Fog Properties
+    let exposure = 1.05;
 
     if (elevation > 5.0) {
-      // Daylight / Afternoon
-      const t = Math.min(1.0, (elevation - 5.0) / 20.0);
-      this.sunLight.color.setRGB(1.0, 0.85 + t * 0.15, 0.70 + t * 0.30);
-      this.sunLight.intensity = 1.5 + t * 2.2;
-      this.ambientLight.intensity = 0.8 + t * 0.6;
-      this.scene.fog.color.setRGB(0.72 + t * 0.08, 0.84 + t * 0.06, 0.94 + t * 0.04);
+      // Daylight / Noon (elevation 5° to 65°)
+      const t = Math.min(1.0, (elevation - 5.0) / 25.0);
+      this.sunLight.color.setRGB(1.0, 0.95 + t * 0.05, 0.88 + t * 0.12);
+      this.sunLight.intensity = 2.0 + t * 1.5;
+      this.ambientLight.color.setRGB(0.85, 0.92, 1.0);
+      this.ambientLight.intensity = 0.85 + t * 0.45;
+
+      this.baseDensity = 0.00021 - t * 0.00003; // 0.00018 at noon
+      this.fogColor.setRGB(0.70 + t * 0.02, 0.82 + t * 0.04, 0.93 + t * 0.03); // Crisp Rayleigh sky-blue haze
+      exposure = 1.04 - t * 0.06; // 0.98 at noon to eliminate white fuselage highlight blowout
     } else if (elevation > -4.0) {
-      // Golden Hour Sunset / Sunrise (Warm atmospheric scatter as seen in MSFS 2024)
-      const t = (elevation + 4.0) / 9.0;
-      this.sunLight.color.setRGB(1.0, 0.45 * t + 0.3, 0.15 * t + 0.1);
-      this.sunLight.intensity = Math.max(0.2, t * 1.5);
-      this.ambientLight.intensity = 0.45 + t * 0.35;
-      this.scene.fog.color.setRGB(0.92, 0.58 * t + 0.25, 0.38 * t + 0.20);
+      // Twilight / Golden Hour: Dawn/Sunrise (06:00) vs Sunset (18:00)
+      const trans = (elevation + 4.0) / 9.0;
+      if (isMorning) {
+        // Dawn / Sunrise: soft rosy-peach & golden morning mist
+        this.sunLight.color.setRGB(1.0, 0.65 * trans + 0.35, 0.40 * trans + 0.15);
+        this.sunLight.intensity = Math.max(0.2, trans * 1.8);
+        this.ambientLight.color.setRGB(0.65, 0.65, 0.78);
+        this.ambientLight.intensity = 0.50 + trans * 0.35;
+
+        this.fogColor.setRGB(0.88, 0.64 * trans + 0.30, 0.54 * trans + 0.25);
+        this.baseDensity = 0.00023; // Richer low-level morning ground mist
+        exposure = 1.08;
+      } else {
+        // Sunset / Golden Hour: warm amber, fiery crimson & golden glow
+        this.sunLight.color.setRGB(1.0, 0.45 * trans + 0.25, 0.12 * trans + 0.08);
+        this.sunLight.intensity = Math.max(0.2, trans * 1.6);
+        this.ambientLight.color.setRGB(0.70, 0.52, 0.58);
+        this.ambientLight.intensity = 0.48 + trans * 0.32;
+
+        this.fogColor.setRGB(0.92, 0.54 * trans + 0.22, 0.32 * trans + 0.18);
+        this.baseDensity = 0.00022;
+        exposure = 1.06;
+      }
     } else {
-      // Night / Twilight
-      this.sunLight.intensity = 0.05;
-      this.sunLight.color.setRGB(0.1, 0.15, 0.3);
-      this.ambientLight.intensity = 0.25;
-      this.scene.fog.color.setRGB(0.04, 0.06, 0.12);
+      // Night / Twilight (elevation < -4.0°)
+      this.sunLight.intensity = 0.06;
+      this.sunLight.color.setRGB(0.2, 0.3, 0.5); // Cool lunar moonlight
+      this.ambientLight.color.setRGB(0.12, 0.16, 0.28);
+      this.ambientLight.intensity = 0.34;
+
+      this.fogColor.setRGB(0.03, 0.05, 0.10); // Deep midnight navy/indigo
+      this.baseDensity = 0.00020;
+      exposure = 1.15; // Preserves dark ground silhouettes and stars without muddy dark crushing
+    }
+
+    // 2. High-Altitude Rayleigh Blue Depth Cueing
+    // As aircraft ascends above 400m towards stratosphere (1,500m ~ 3,000m+),
+    // aerosol turbidity gives way to pure Rayleigh blue scatter
+    const altT = Math.min(1.0, Math.max(0.0, (altitude - 400.0) / 2200.0));
+    if (elevation > 5.0) {
+      this.fogColor.lerp(new THREE.Color(0.48, 0.64, 0.86), altT * 0.40);
+    }
+
+    // 3. Exponential Height Falloff: Density(y) = baseDensity * exp(-lambda * max(0, y))
+    const heightFactor = Math.exp(-this.heightFalloff * Math.max(0, altitude));
+    this.currentDensity = this.baseDensity * heightFactor;
+    this.currentExposure = exposure;
+
+    // 4. Update Three.js Scene Fog
+    if (!this.scene.fog) {
+      this.scene.fog = new THREE.FogExp2(this.fogColor.getHex(), this.currentDensity);
+    } else {
+      this.scene.fog.color.copy(this.fogColor);
+      this.scene.fog.density = this.currentDensity;
+    }
+
+    // 5. Update ACESFilmic Tone Mapping Exposure
+    if (this.renderer) {
+      this.renderer.toneMappingExposure = exposure;
+    }
+
+    // 6. Synchronize Water Ocean Atmospheric Shaders
+    if (this.water && typeof this.water.syncWithAtmosphere === 'function') {
+      this.water.syncWithAtmosphere(this);
     }
   }
 

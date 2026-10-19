@@ -6,7 +6,7 @@ import * as THREE from 'three';
  * deep oceanic color absorption, and wave height query for floating ships.
  */
 export class WaterOcean {
-  constructor(size = 22000) {
+  constructor(size = 36000) {
     this.size = size;
     this.waterLevel = 0.0;
     this.sunDirection = new THREE.Vector3(0.5, 0.6, 0.4).normalize();
@@ -16,7 +16,7 @@ export class WaterOcean {
 
   initWater() {
     // High-resolution plane geometry for wave displacement
-    const geom = new THREE.PlaneGeometry(this.size, this.size, 160, 160);
+    const geom = new THREE.PlaneGeometry(this.size, this.size, 180, 180);
     geom.rotateX(-Math.PI * 0.5);
 
     // Custom Water Shader Material with Gerstner Waves & Sunlight Specular Glint
@@ -27,7 +27,11 @@ export class WaterOcean {
         uDeepColor: { value: new THREE.Color(0x0a284a) },   // Deep ocean navy
         uShallowColor: { value: new THREE.Color(0x136a8a) },// Shallow coastal turquoise
         uFoamColor: { value: new THREE.Color(0xdcebf5) },
-        uSunColor: { value: new THREE.Color(0xffeedd) }
+        uSunColor: { value: new THREE.Color(0xffeedd) },
+        uFogColor: { value: new THREE.Color(0xc8def4) },
+        uFogDensity: { value: 0.00020 },
+        uFogHeightFalloff: { value: 0.00068 },
+        uBaseFogDensity: { value: 0.00020 }
       },
       vertexShader: `
         uniform float uTime;
@@ -78,6 +82,10 @@ export class WaterOcean {
         uniform vec3 uShallowColor;
         uniform vec3 uFoamColor;
         uniform vec3 uSunColor;
+        uniform vec3 uFogColor;
+        uniform float uFogDensity;
+        uniform float uFogHeightFalloff;
+        uniform float uBaseFogDensity;
         uniform float uTime;
 
         varying vec3 vWorldPos;
@@ -106,8 +114,8 @@ export class WaterOcean {
           float waveGradient = smoothstep(-1.2, 1.5, vWaveHeight);
           vec3 waterColor = mix(uDeepColor, uShallowColor, waveGradient * 0.65);
 
-          // Sky reflection color approximation
-          vec3 skyReflection = mix(vec3(0.35, 0.55, 0.85), vec3(0.7, 0.85, 1.0), fresnel);
+          // Synchronized atmospheric sky reflection adapting to time of day
+          vec3 skyReflection = mix(uFogColor * 0.70, uFogColor * 1.15, fresnel);
 
           // Blend water color with sky reflection via Fresnel
           vec3 finalColor = mix(waterColor, skyReflection, fresnel * 0.75);
@@ -122,13 +130,30 @@ export class WaterOcean {
             finalColor = mix(finalColor, uFoamColor, foamFactor);
           }
 
-          // Subtle distance fog blending
+          // Synchronized atmospheric aerial perspective fog
           float dist = length(cameraPosition - vWorldPos);
-          float fogFactor = clamp((dist - 3000.0) / 12000.0, 0.0, 0.85);
-          vec3 fogColor = vec3(0.55, 0.70, 0.88);
-          finalColor = mix(finalColor, fogColor, fogFactor);
+          float camY = max(0.0, cameraPosition.y);
+          float ptY = max(0.0, vWorldPos.y);
+          float deltaY = abs(camY - ptY);
+          float hWeight;
+          if (deltaY < 2.0) {
+            hWeight = exp(-uFogHeightFalloff * camY);
+          } else {
+            hWeight = (exp(-uFogHeightFalloff * min(camY, ptY)) - exp(-uFogHeightFalloff * max(camY, ptY))) / (uFogHeightFalloff * deltaY);
+          }
+          float effDensity = uBaseFogDensity * hWeight;
+          float fogExp = effDensity * dist;
+          float fogFactor = clamp(1.0 - exp(-fogExp * fogExp), 0.0, 1.0);
 
-          gl_FragColor = vec4(finalColor, 0.94);
+          // Far edge blending: ensure ocean water completely melts into horizon sky fog before boundary
+          float edgeDist = max(abs(vWorldPos.x), abs(vWorldPos.z));
+          float edgeFade = smoothstep(12500.0, 17500.0, edgeDist);
+          fogFactor = max(fogFactor, edgeFade);
+
+          finalColor = mix(finalColor, uFogColor, fogFactor);
+          float finalAlpha = mix(0.94, 1.0, fogFactor);
+
+          gl_FragColor = vec4(finalColor, finalAlpha);
         }
       `,
       transparent: true,
@@ -158,7 +183,21 @@ export class WaterOcean {
 
   setSunDirection(dir) {
     this.sunDirection.copy(dir).normalize();
-    this.material.uniforms.uSunDir.value.copy(this.sunDirection);
+    if (this.material && this.material.uniforms && this.material.uniforms.uSunDir) {
+      this.material.uniforms.uSunDir.value.copy(this.sunDirection);
+    }
+  }
+
+  syncWithAtmosphere(sky) {
+    if (!sky || !this.material || !this.material.uniforms) return;
+    if (sky.fogColor) this.material.uniforms.uFogColor.value.copy(sky.fogColor);
+    if (sky.currentDensity !== undefined) this.material.uniforms.uFogDensity.value = sky.currentDensity;
+    if (sky.baseDensity !== undefined) this.material.uniforms.uBaseFogDensity.value = sky.baseDensity;
+    if (sky.heightFalloff !== undefined) this.material.uniforms.uFogHeightFalloff.value = sky.heightFalloff;
+    if (sky.sunLight && sky.sunLight.color) this.material.uniforms.uSunColor.value.copy(sky.sunLight.color);
+    if (typeof sky.getSunDirection === 'function') {
+      this.setSunDirection(sky.getSunDirection());
+    }
   }
 
   update(dt) {

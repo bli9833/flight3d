@@ -90,26 +90,38 @@ export class Terrain {
 
     // Runway approach corridor clearance (Runway 09L / 27R extended centerline along Z = 0)
     // Ensures obstacle clearance below the standard 3.0° glideslope (ICAO Annex 14 / TERPS OFZ)
-    const corridorHalfWidth = 650.0;
+    const corridorHalfWidth = 850.0;
     if (Math.abs(z) < corridorHalfWidth) {
       const zFactor = 1.0 - Math.abs(z) / corridorHalfWidth;
       const smoothZ = zFactor * zFactor * (3.0 - 2.0 * zFactor);
 
-      if (x < -1350 && x > -8500) {
-        // West approach: 3° glideslope clearance slope (0.022 allows 1.25° safety margin below 3° / 0.0524)
-        const distFromThreshold = -1350 - x;
-        const maxClearanceH = this.airportElevation + distFromThreshold * 0.022;
+      if (x < -1600 && x > -5500) {
+        // Flatten extended final approach corridor completely down to airport elevation
+        baseH = baseH * (1.0 - smoothZ) + this.airportElevation * smoothZ;
+      } else if (x <= -5500 && x > -8500) {
+        // Distant approach: 2.0° clearance slope
+        const distFromThreshold = -1600 - x;
+        const maxClearanceH = this.airportElevation + distFromThreshold * 0.020;
         if (baseH > maxClearanceH) {
           baseH = baseH * (1.0 - smoothZ) + maxClearanceH * smoothZ;
         }
-      } else if (x > 1350 && x < 8500) {
+      } else if (x > 1600 && x < 8500) {
         // East departure: climb corridor clearance
-        const distFromThreshold = x - 1350;
+        const distFromThreshold = x - 1600;
         const maxClearanceH = this.airportElevation + distFromThreshold * 0.030;
         if (baseH > maxClearanceH) {
           baseH = baseH * (1.0 - smoothZ) + maxClearanceH * smoothZ;
         }
       }
+    }
+
+    // Perimeter edge falloff: smoothly slope perimeter mountains down into coastal waters (-18m)
+    // so the terrain edge never clips as a sharp wall against the sky
+    const edgeMargin = Math.max(Math.abs(x), Math.abs(z));
+    if (edgeMargin > 8200.0) {
+      const t = Math.max(0.0, Math.min(1.0, (10800.0 - edgeMargin) / 2600.0));
+      const smoothEdge = t * t * (3.0 - 2.0 * t);
+      baseH = baseH * smoothEdge + (1.0 - smoothEdge) * (-18.0);
     }
 
     // Ocean floor clamp
@@ -184,6 +196,33 @@ export class Terrain {
       metalness: 0.05,
       flatShading: false
     });
+
+    terrainMat.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `#include <common>
+        varying vec3 vTerrainWorldPos;`
+      );
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <worldpos_vertex>',
+        `#include <worldpos_vertex>
+        vTerrainWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <common>',
+        `#include <common>
+        varying vec3 vTerrainWorldPos;`
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <fog_fragment>',
+        `#include <fog_fragment>
+        #ifdef USE_FOG
+          float tEdge = max(abs(vTerrainWorldPos.x), abs(vTerrainWorldPos.z));
+          float tFade = smoothstep(8800.0, 10700.0, tEdge);
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, tFade);
+        #endif`
+      );
+    };
 
     this.mesh = new THREE.Mesh(this.geometry, terrainMat);
     this.mesh.receiveShadow = true;

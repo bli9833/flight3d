@@ -186,9 +186,9 @@ export class DemoFlightDirector {
       case DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT:
         this.updateBanner(
           '🛑 [6/6] 활주로 접지 & 역추진 제동 (Touchdown & Reverser Rollout)',
-          '올레오 서스펜션 완충 접지 • 지상 스포일러 전개 • 역추진 & 안티스키드 제동 정지'
+          '랜딩 기어 뷰: 올레오 서스펜션 완충 접지 • 타이어 연기 • 스포일러 & 역추진 제동'
         );
-        this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
+        this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
         break;
 
       case DemoFlightDirector.STAGES.COMPLETED:
@@ -241,8 +241,8 @@ export class DemoFlightDirector {
           this.sim.controls.setVirtualInput('elevator', Math.max(0.08, Math.min(0.35, elevatorCmd)));
         }
 
-        // Switch to exterior chase camera at 2.5s to show gear retraction
-        if (this.stageTimer > 2.5 && this.sim.cameraSystem.mode !== CameraSystem.MODES.CHASE) {
+        // Once gear is retracting, let the gear cam view showcase retraction (~6.0s), then switch to exterior chase
+        if (this.stageTimer > 6.0 && this.sim.cameraSystem.mode !== CameraSystem.MODES.CHASE) {
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
@@ -329,13 +329,13 @@ export class DemoFlightDirector {
         const distToThreshold = targetTouchdownX - this.sim.position.x;
         const idealAltFt = Math.max(47, (distToThreshold * Math.tan(THREE.MathUtils.degToRad(3.0))) * 3.28084 + 47);
 
-        // Pitch guidance
+        // Pitch guidance with full glideslope authority
         const altDiff = idealAltFt - tel.altitudeFt;
-        const targetPitchDeg = Math.max(0.5, Math.min(4.0, 2.5 + altDiff * 0.02));
+        const targetPitchDeg = Math.max(-1.0, Math.min(6.5, 2.8 + altDiff * 0.035));
         const pitchDiff = targetPitchDeg - tel.pitchDeg;
         const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
-        const elevatorCmd = pitchDiff * 0.06 - pitchRateDeg * 0.02;
-        this.sim.controls.setVirtualInput('elevator', Math.max(-0.25, Math.min(0.25, elevatorCmd)));
+        const elevatorCmd = pitchDiff * 0.08 - pitchRateDeg * 0.03;
+        this.sim.controls.setVirtualInput('elevator', Math.max(-0.35, Math.min(0.45, elevatorCmd)));
 
         // Lateral guidance (keep z centered on runway centerline 0)
         const targetRoll = Math.max(-10.0, Math.min(10.0, -this.sim.position.z * 0.15));
@@ -344,20 +344,22 @@ export class DemoFlightDirector {
         const aileronCmd = rollDiff * 0.035 - rollRateDeg * 0.025;
         this.sim.controls.setVirtualInput('aileron', Math.max(-0.20, Math.min(0.20, aileronCmd)));
 
-        // Throttle management for V_ref (142 KT)
+        // Throttle management for V_ref (142 KT) with glideslope energy compensation
         const speedErr = 142 - tel.iasKnots;
-        this.sim.controls.setVirtualInput('throttle', Math.max(0.35, Math.min(0.65, 0.48 + speedErr * 0.02)));
+        const energyComp = altDiff > 25 ? 0.12 : (altDiff < -25 ? -0.08 : 0.0);
+        this.sim.controls.setVirtualInput('throttle', Math.max(0.35, Math.min(0.75, 0.48 + speedErr * 0.025 + energyComp)));
 
-        // Flare at 25 FT AGL
-        if (!this.approachFlarInitiated && tel.radioAltFt <= 25.0 && tel.radioAltFt > 0) {
+        // Flare at 30 FT AGL strictly past the runway threshold (x >= -1600m)
+        const isOverRunway = this.sim.position.x >= -1600;
+        if (!this.approachFlarInitiated && isOverRunway && tel.radioAltFt <= 30.0 && tel.radioAltFt > 0) {
           this.approachFlarInitiated = true;
           this.sim.controls.setVirtualInput('throttle', 0.0);
           this.sim.engines.setThrottle(0.0);
           this.sim.controls.setVirtualInput('elevator', 0.14); // Gentle flare
         }
 
-        // Detect touchdown
-        if (tel.onGround || (this.approachFlarInitiated && tel.radioAltFt <= 8.5)) {
+        // Detect touchdown strictly over paved runway tarmac
+        if (isOverRunway && (tel.onGround || (this.approachFlarInitiated && tel.radioAltFt <= 8.5))) {
           this.setStage(DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT);
         }
         break;
@@ -376,7 +378,10 @@ export class DemoFlightDirector {
         this.sim.gear.setBrakes(1.0);
         this.sim.controls.setVirtualInput('throttle', 0.0);
         this.sim.engines.setThrottle(0.0);
-        this.sim.engines.setReverser(true, true);
+        // Switch to exterior chase camera at 4.5s after showcasing touchdown impact and tire smoke
+        if (this.stageTimer > 4.5 && this.sim.cameraSystem.mode === CameraSystem.MODES.GEAR) {
+          this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
+        }
 
         // Aircraft brought to complete safe stop
         if (tel.iasKnots < 5.0 || this.stageTimer > 12.0) {

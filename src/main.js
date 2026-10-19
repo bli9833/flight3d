@@ -84,7 +84,7 @@ class FlightSimulator {
     this.terrain = new Terrain(22000, 256);
     this.scene.add(this.terrain.mesh);
 
-    this.water = new WaterOcean(24000);
+    this.water = new WaterOcean(36000);
     this.scene.add(this.water.mesh);
 
     this.airport = new Airport();
@@ -96,8 +96,8 @@ class FlightSimulator {
     this.ships = new Ships(this.water);
     this.scene.add(this.ships.group);
 
-    this.sky = new SkyAtmosphere(this.scene);
-    this.water.setSunDirection(this.sky.getSunDirection());
+    this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water);
+    this.water.syncWithAtmosphere(this.sky);
 
     // 6. Audio & Controls & Camera & Diagnostics
     this.audio = new FlightAudio();
@@ -215,8 +215,8 @@ class FlightSimulator {
     };
 
     this.controls.onCycleTimeOfDay = (deltaHours) => {
-      this.sky.setTimeOfDay(this.sky.timeOfDay + deltaHours);
-      this.water.setSunDirection(this.sky.getSunDirection());
+      this.sky.setTimeOfDay(this.sky.timeOfDay + deltaHours, this.position, this.camera.position);
+      this.water.syncWithAtmosphere(this.sky);
       const h = Math.floor(this.sky.timeOfDay);
       const m = Math.floor((this.sky.timeOfDay % 1) * 60);
       const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
@@ -600,6 +600,7 @@ class FlightSimulator {
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry);
+    this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(simSeconds);
     this.touchControls.updateUI(this.telemetry);
     this.updateHUD();
@@ -649,7 +650,7 @@ class FlightSimulator {
     this.water.update(frameDelta);
     this.airport.update(frameDelta, this.position);
     this.ships.update(frameDelta, this.totalSimTime);
-    this.sky.updateSun(this.position);
+    this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(frameDelta);
 
     // 4. Update Cockpit Visibility & Audio
