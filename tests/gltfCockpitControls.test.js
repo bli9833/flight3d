@@ -28,7 +28,7 @@ test('nested and batched GLB yokes preserve rest geometry and follow hold/revers
     updateGltfYokes(yokes, { aileron, elevator: aileron });
     for (const yoke of yokes) {
       assert.equal(yoke.rotation.z, aileron * Math.PI / 3);
-      assert.equal(yoke.position.z, 1.265 + aileron * .045);
+      assert.equal(yoke.position.z, 1.265 - aileron * .045);
     }
   }
   model.updateMatrixWorld(true);

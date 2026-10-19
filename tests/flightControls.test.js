@@ -118,4 +118,46 @@ describe('FlightControls (Keyboard & Touch Inputs)', () => {
       globalThis.window = prevWindow;
     }
   });
+
+  it('should set, hold, and auto-release parking brake upon throttle application', () => {
+    const mockDom = { addEventListener: () => {} };
+    const prevWindow = globalThis.window;
+    if (!globalThis.window) {
+      globalThis.window = { addEventListener: () => {}, innerWidth: 1920, innerHeight: 1080 };
+    }
+
+    const controls = new FlightControls(mockDom);
+    assert.strictEqual(controls.parkingBrake, false);
+    assert.strictEqual(controls.brakes, 0.0);
+
+    // Set parking brake
+    controls.setParkingBrake(true);
+    assert.strictEqual(controls.parkingBrake, true);
+    assert.strictEqual(controls.brakes, 1.0);
+
+    // Run frame updates with zero throttle: parking brake remains held
+    controls.update(0.1, 0);
+    assert.strictEqual(controls.parkingBrake, true);
+    assert.strictEqual(controls.brakes, 1.0);
+
+    // Advance throttle to taxi/takeoff (> 0.25)
+    controls.throttle = 0.4;
+    controls.update(0.1, 0);
+    assert.strictEqual(controls.parkingBrake, false);
+    assert.strictEqual(controls.brakes, 0.0);
+
+    // Re-engage and explicitly release
+    controls.setParkingBrake(true);
+    assert.strictEqual(controls.parkingBrake, true);
+    controls.setParkingBrake(false);
+    assert.strictEqual(controls.parkingBrake, false);
+    controls.update(0.1, 0);
+    assert.strictEqual(controls.brakes, 0.0);
+
+    if (prevWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = prevWindow;
+    }
+  });
 });

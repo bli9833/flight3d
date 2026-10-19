@@ -64,6 +64,6 @@ export function updateGltfYokes(yokes, state) {
   for (const yoke of yokes ?? []) {
     // Asset +Z points forward, opposite to aircraft +Z.
     yoke.rotation.z = (state.aileron || 0) * Math.PI / 3;
-    yoke.position.z = 1.265 + (state.elevator || 0) * 0.045;
+    yoke.position.z = 1.265 - (state.elevator || 0) * 0.045;
   }
 }

@@ -22,6 +22,12 @@ function createMockSimulator(activeAirport = 'lukla') {
       isTransit: false
     },
     controls: {
+      brakes: 0.0,
+      parkingBrake: false,
+      setParkingBrake: function(v) {
+        this.parkingBrake = Boolean(v);
+        if (this.parkingBrake) this.brakes = 1.0;
+      },
       setVirtualInput: (k, v) => { virtualInputs[k] = v; },
       clearVirtualInputs: () => {
         for (const k of Object.keys(virtualInputs)) delete virtualInputs[k];
@@ -33,7 +39,8 @@ function createMockSimulator(activeAirport = 'lukla') {
       setReverser: () => {}
     },
     gear: {
-      setBrakes: () => {},
+      brakes: 0.0,
+      setBrakes: function(v) { this.brakes = v; },
       setGearTarget: () => {}
     },
     aero: {
@@ -142,6 +149,21 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
     director.stop('Test Stop');
     assert.strictEqual(director.isActive, false);
     assert.strictEqual(sim.controls.getVirtualInput('throttle'), undefined);
+    assert.strictEqual(sim.controls.brakes, 0.0);
+    assert.strictEqual(sim.gear.brakes, 0.0);
+  });
+
+  it('should engage and retain parking brake when stop is called with keepParkingBrake=true', () => {
+    const sim = createMockSimulator('lukla');
+    const director = new DemoFlightDirector(sim);
+
+    director.start('lukla');
+    director.stop('Runway rollout complete', true);
+
+    assert.strictEqual(director.isActive, false);
+    assert.strictEqual(sim.controls.parkingBrake, true);
+    assert.strictEqual(sim.controls.brakes, 1.0);
+    assert.strictEqual(sim.gear.brakes, 1.0);
   });
 
   it('should bind #btn-demo click and toggle active class', () => {

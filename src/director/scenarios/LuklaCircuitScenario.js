@@ -118,7 +118,7 @@ export class LuklaCircuitScenario {
           '🎉 루클라 챌린지 데모 완료! 조종사 수동 조종 인계',
           '세계에서 가장 위험한 공항 착륙 성공! 원하는 뷰와 프리셋으로 직접 비행해보세요! [Esc]'
         );
-        this.director.stop('루클라 데모 비행이 완료되었습니다. 비행을 즐겨보세요!');
+        this.director.stop('루클라 데모 비행이 완료되었습니다. 비행을 즐겨보세요!', true);
         break;
     }
   }

@@ -194,14 +194,16 @@ export class DemoFlightDirector {
     }
   }
 
-  stop(message = null) {
+  stop(message = null, keepParkingBrake = false) {
     if (!this.isActive) return;
     this.isActive = false;
     this.currentStage = DemoFlightDirector.STAGES.IDLE;
     this.isBannerMinimized = false;
 
     // Clear programmatic virtual inputs
-    this.sim.controls.clearVirtualInputs();
+    if (this.sim.controls?.clearVirtualInputs) {
+      this.sim.controls.clearVirtualInputs();
+    }
 
     // Reset reverse thrust, engine throttle, spoilers, and brakes so manual handover is safe
     if (this.sim.engines) {
@@ -210,10 +212,20 @@ export class DemoFlightDirector {
     }
     if (this.sim.controls) {
       this.sim.controls.throttle = 0.0;
-      this.sim.controls.brakes = 0.0;
+      if (keepParkingBrake) {
+        if (typeof this.sim.controls.setParkingBrake === 'function') {
+          this.sim.controls.setParkingBrake(true);
+        }
+        this.sim.controls.brakes = 1.0;
+      } else {
+        if (typeof this.sim.controls.setParkingBrake === 'function') {
+          this.sim.controls.setParkingBrake(false);
+        }
+        this.sim.controls.brakes = 0.0;
+      }
     }
     if (this.sim.gear) {
-      this.sim.gear.setBrakes(0.0);
+      this.sim.gear.setBrakes(keepParkingBrake ? 1.0 : 0.0);
     }
     if (this.sim.aero) {
       this.sim.aero.spoilers = 0.0;
