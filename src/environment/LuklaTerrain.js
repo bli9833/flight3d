@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import metadata from '../../public/terrain/lukla_metadata.json' with { type: 'json' };
+import grid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 
 /**
  * Real-World Himalayan Terrain for Nepal Tenzing-Hillary Airport (Lukla, VNLK)
@@ -8,10 +8,10 @@ import metadata from '../../public/terrain/lukla_metadata.json' with { type: 'js
  * See docs/development/lukla-terrain.md for provenance and accuracy limits.
  */
 export class LuklaTerrain {
-  constructor(size = 22000, segments = 255, customElevations = null) {
+  constructor(size = grid.worldSize, segments = 255, customElevations = null) {
     this.size = size;
     this.segments = segments;
-    this.gridSize = metadata.gridSize;
+    this.gridSize = grid.gridSize;
 
     // Both assets are centered on the runway midpoint: +X east, +Z south.
     this.shiftX = 0;

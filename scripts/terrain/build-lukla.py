@@ -108,6 +108,8 @@ def main():
         'limitations': 'DSM includes vegetation/buildings. OSM alignment is not surveyed. Airport runway/apron grading is a simulator approximation; surrounding terrain is unmodified DEM.'
     }
     (OUT / 'lukla_metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
+    (ROOT / 'src/config/luklaTerrainGrid.json').write_text(
+        json.dumps({'gridSize': GRID, 'worldSize': SIZE}, indent=2) + '\n')
     print(f'Wrote {GRID}x{GRID} DEM ({spacing:.2f} m spacing) and georeferenced imagery')
 
 
