@@ -204,13 +204,15 @@ class FlightSimulator {
     // Resize handler
     window.addEventListener('resize', () => this.handleResize());
 
-    // Start audio context on first user interaction (touch, pointer, click, keydown)
-    const unlockAudio = () => {
-      this.audio.init();
+    // Keep audio active across Bluetooth device connection & system interruptions
+    const ensureAudio = () => {
+      if (!this.audio.isInitialized) {
+        this.audio.init();
+      }
       this.audio.ensureContextRunning();
     };
-    ['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt => {
-      window.addEventListener(evt, unlockAudio, { once: true, passive: true });
+    ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, ensureAudio, { passive: true });
     });
 
     // Begin Animation Loop
@@ -1051,7 +1053,10 @@ class FlightSimulator {
       if (state.muted) {
         btnSound.className = 'btn btn-preset btn-sound-toggle muted';
         btnSound.textContent = '🔇 음소거 [M]';
-      } else if (state.boost) {
+      } else if (state.mode === 'bluetooth') {
+        btnSound.className = 'btn btn-preset btn-sound-toggle active-bt';
+        btnSound.textContent = '🎧⚡ 블루투스 200%';
+      } else if (state.mode === 'mobile') {
         btnSound.className = 'btn btn-preset btn-sound-toggle active-boost';
         btnSound.textContent = '🔊⚡ 부스트 (150%)';
       } else {
@@ -1062,7 +1067,7 @@ class FlightSimulator {
 
     const btnSoundAction = document.getElementById('btn-sound-action');
     if (btnSoundAction) {
-      btnSoundAction.textContent = state.muted ? '🔇 음소거' : (state.boost ? '🔊⚡ 150%' : '🔊 볼륨 [M]');
+      btnSoundAction.textContent = state.muted ? '🔇 음소거' : (state.mode === 'bluetooth' ? '🎧⚡ 200%' : (state.mode === 'mobile' ? '🔊⚡ 150%' : '🔊 볼륨 [M]'));
     }
 
     if (this.touchControls && typeof this.touchControls.updateAudioUI === 'function') {

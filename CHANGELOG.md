@@ -1,11 +1,13 @@
 # Changelog
 
 ## [Unreleased]
-- **fix(audio):** boost mobile speaker loudness, frequency response, and volume controls
-  - Added Web Audio `DynamicsCompressorNode` mastering limiter to safely boost volume without distortion.
-  - Retuned turbofan engine acoustic filter from 180 Hz to 260–900 Hz sweet spot for mobile phone transducers.
+- **fix(audio):** boost mobile & Bluetooth headphone loudness, makeup gain, and route recovery
+  - Added post-compressor makeup gain (+4.1 dB, 1.6x) and normalized pink noise buffer to reach commercial game loudness standards (~ -14 LUFS RMS).
+  - Added 4-stage volume cycling: 100% (Normal) → 150% (Mobile Boost) → 200% (Bluetooth Max Boost) → Muted → 100%.
+  - Added continuous cockpit avionics cooling fan and ECS pack ventilation hum (`packSynth`) to eliminate dead silence on runway/idle.
+  - Implemented persistent keep-alive gesture listeners and Web Audio `interrupted`/`suspended` auto-resume to handle Bluetooth earphone route switches on iOS/Android.
+  - Retuned turbofan engine acoustic filter from 180 Hz to 280–1200 Hz sweet spot for mobile transducers and wireless earbuds.
   - Added dual-spool CFM56 N1/N2 turbine whine harmonics and ground rolling runway rumble.
-  - Added mobile speaker loudness boost mode (150%) and multi-touch audio gesture initialization.
   - Added on-screen sound & volume toggle button to preset bar, action panel, and mobile touch overlay.
 - **feat:** camera‑anchored infinite ocean mesh and touchdown smoke realism (merged #29)
   - Ocean mesh now anchored to camera with grid snapping (`snapStep`).

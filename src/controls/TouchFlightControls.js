@@ -589,7 +589,10 @@ export class TouchFlightControls {
     if (state.muted) {
       soundBtn.className = 'btn-touch-pill muted';
       soundBtn.innerHTML = '<span class="pill-icon">🔇</span> OFF';
-    } else if (state.boost) {
+    } else if (state.mode === 'bluetooth') {
+      soundBtn.className = 'btn-touch-pill active-cyan';
+      soundBtn.innerHTML = '<span class="pill-icon">🎧⚡</span> 200%';
+    } else if (state.mode === 'mobile') {
       soundBtn.className = 'btn-touch-pill active-amber';
       soundBtn.innerHTML = '<span class="pill-icon">🔊⚡</span> 150%';
     } else {
