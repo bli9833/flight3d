@@ -309,8 +309,8 @@ export class DemoFlightDirector {
       // LUKLA STAGE 1: Dudh Kosi Canyon Liftoff, Plunge & Banking Climb
       // -------------------------------------------------------------
       case DemoFlightDirector.LUKLA_STAGES.CANYON_CLIMB: {
-        // Retract gear if not already complete
-        if (tel.gearState > 0.1 && !tel.isTransit) {
+        // Retract gear only once safely airborne over the gorge (never on the runway)
+        if (!tel.onGround && tel.radioAltFt > 20.0 && tel.gearState > 0.1 && !tel.isTransit) {
           this.sim.gear.setGearTarget(false);
         }
 
