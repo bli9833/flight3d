@@ -945,7 +945,7 @@ export class Cockpit {
    * Asynchronously loads the high-detail 3D Boeing 737 cockpit GLTF model
    * and mounts live glass-cockpit flight displays.
    */
-  loadCockpitModel(url = '/models/b737-cockpit-draco.glb') {
+  loadCockpitModel(url = '/models/b737-cockpit-medium.glb') {
     if (typeof window === 'undefined') {
       // In non-browser / Node.js test environment, keep procedural cockpit active
       return;
@@ -997,6 +997,11 @@ export class Cockpit {
         },
         undefined,
         (error) => {
+          if (url !== '/models/b737-cockpit-draco.glb') {
+            console.warn('Falling back to lite draco cockpit model:', error);
+            this.loadCockpitModel('/models/b737-cockpit-draco.glb');
+            return;
+          }
           console.warn('Failed to load 3D GLTF Cockpit model, keeping procedural cockpit:', error);
           this.proceduralCockpitGroup.visible = true;
           this.gltfCockpitGroup.visible = false;
