@@ -38,6 +38,9 @@ export class WaterOcean {
         uEdgeFadeEnd: { value: this.size * 0.5 * 0.95 }
       },
       vertexShader: `
+        #include <common>
+        #include <logdepthbuf_pars_vertex>
+
         uniform float uTime;
         varying vec3 vWorldPos;
         varying vec3 vNormal;
@@ -92,9 +95,13 @@ export class WaterOcean {
 
           vWorldPos = displacedWorld;
           gl_Position = projectionMatrix * viewMatrix * vec4(displacedWorld, 1.0);
+          #include <logdepthbuf_vertex>
         }
       `,
       fragmentShader: `
+        #include <common>
+        #include <logdepthbuf_pars_fragment>
+
         uniform vec3 uSunDir;
         uniform vec3 uDeepColor;
         uniform vec3 uShallowColor;
@@ -114,6 +121,8 @@ export class WaterOcean {
         varying vec2 vLocalPos;
 
         void main() {
+          #include <logdepthbuf_fragment>
+
           vec3 viewDir = normalize(cameraPosition - vWorldPos);
           vec3 normal = normalize(vNormal);
 
@@ -173,12 +182,11 @@ export class WaterOcean {
           fogFactor = max(fogFactor, edgeFade);
 
           finalColor = mix(finalColor, uFogColor, fogFactor);
-          float finalAlpha = mix(0.94, 1.0, fogFactor);
 
-          gl_FragColor = vec4(finalColor, finalAlpha);
+          gl_FragColor = vec4(finalColor, 1.0);
         }
       `,
-      transparent: true,
+      transparent: false,
       depthWrite: true
     });
 

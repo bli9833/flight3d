@@ -965,7 +965,7 @@ class FlightSimulator {
 
     // 3. Update Environment Animations & Explosion Particles
     if (this.activeAirport !== 'lukla') {
-      this.water.update(frameDelta);
+      this.water.update(frameDelta, this.camera ? this.camera.position : this.position);
       this.ships.update(frameDelta, this.totalSimTime);
     }
     if (this.currentAirport) {
