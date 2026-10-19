@@ -168,22 +168,24 @@ export class NDCanvas {
 
     // Helper to project world (X, Z) into ND screen space
     const projectToScreen = (worldX, worldZ) => {
-      // Delta from aircraft
+      // Delta from aircraft in world coordinates (East is +X, North is -Z)
       const dxMeters = worldX - this.planePos.x;
       const dzMeters = worldZ - this.planePos.y; // world Z corresponds to planePos.y
 
-      const dxNm = dxMeters * metersToNm;
-      const dzNm = dzMeters * metersToNm; // South is +Z, North is -Z
+      const eastNm = dxMeters * metersToNm;
+      const northNm = -dzMeters * metersToNm;
 
-      // Rotate by aircraft heading so aircraft heading points UP (-Y on screen)
-      // North is -Z, East is +X
-      const angleRot = -hdgRad;
-      const rotX = dxNm * Math.cos(angleRot) - (-dzNm) * Math.sin(angleRot);
-      const rotY = dxNm * Math.sin(angleRot) + (-dzNm) * Math.cos(angleRot);
+      // Transform to aircraft heading-relative coordinates (Ahead / Right)
+      // Ahead is along heading hdgRad, Right is perpendicular (+90°)
+      const sinH = Math.sin(hdgRad);
+      const cosH = Math.cos(hdgRad);
+
+      const aheadNm = northNm * cosH + eastNm * sinH;
+      const rightNm = eastNm * cosH - northNm * sinH;
 
       return {
-        x: cx + rotX * pxPerNm,
-        y: cy - rotY * pxPerNm
+        x: cx + rightNm * pxPerNm,
+        y: cy - aheadNm * pxPerNm
       };
     };
 

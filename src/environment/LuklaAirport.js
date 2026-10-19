@@ -257,9 +257,9 @@ export class LuklaAirport {
     apronSkirtMesh.position.y = -8.0;
     apronSkirtMesh.receiveShadow = true;
 
-    // Aligned with runway heading and uphill slope
-    apronGroup.rotation.y = -this.headingRad;
-    apronGroup.rotation.x = this.pitchRad;
+    // Aligned with runway heading and uphill slope using runway-local YXZ order
+    const apronEuler = new THREE.Euler(this.pitchRad, -this.headingRad, 0, 'YXZ');
+    apronGroup.quaternion.setFromEuler(apronEuler);
     apronGroup.add(apronSkirtMesh);
     apronGroup.add(apronMesh);
 

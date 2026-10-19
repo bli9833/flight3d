@@ -223,6 +223,22 @@ export class DemoFlightDirector {
     // Clear programmatic virtual inputs
     this.sim.controls.clearVirtualInputs();
 
+    // Reset reverse thrust, engine throttle, spoilers, and brakes so manual handover is safe
+    if (this.sim.engines) {
+      this.sim.engines.setReverser(false, true);
+      this.sim.engines.setThrottle(0.0);
+    }
+    if (this.sim.controls) {
+      this.sim.controls.throttle = 0.0;
+      this.sim.controls.brakes = 0.0;
+    }
+    if (this.sim.gear) {
+      this.sim.gear.setBrakes(0.0);
+    }
+    if (this.sim.aero) {
+      this.sim.aero.spoilers = 0.0;
+    }
+
     if (this.bannerEl) {
       this.bannerEl.style.display = 'none';
     }

@@ -381,17 +381,35 @@ export class LuklaTerrain {
         const weight = 0.5 * (1.0 + Math.cos(t * Math.PI));
         return Math.max(naturalH, wallH) * weight + naturalH * (1.0 - weight);
       }
-    } else if (s < -halfLength && s > -halfLength - 160.0) {
-      // Beyond Runway 06 lower end: sheer cliff plunging into Dudh Kosi canyon
+    } else if (s < -halfLength) {
+      // Beyond Runway 06 lower end: cliff plunging into Dudh Kosi canyon, blended smoothly into DEM
       const dropDist = -halfLength - s;
-      const dropH = this.threshold06Elevation - dropDist * 2.2;
+      let canyonH;
+      if (dropDist <= 200.0) {
+        canyonH = this.threshold06Elevation - dropDist * 1.75;
+      } else {
+        canyonH = 2455.0 - (dropDist - 200.0) * 0.15;
+      }
+
+      // Smoothly blend canyonH into naturalH between dropDist = 200m and 1200m (s = -463.5 to -1463.5)
+      let targetH;
+      if (dropDist <= 200.0) {
+        targetH = canyonH;
+      } else if (dropDist < 1200.0) {
+        const t = (dropDist - 200.0) / 1000.0;
+        const weightS = 0.5 * (1.0 + Math.cos(t * Math.PI));
+        targetH = Math.min(naturalH, canyonH) * weightS + naturalH * (1.0 - weightS);
+      } else {
+        targetH = naturalH;
+      }
+
       const absW = Math.abs(w);
-      if (absW <= 35.0) {
-        return Math.min(naturalH, dropH);
-      } else if (absW < 80.0) {
-        const t = (absW - 35.0) / 45.0;
-        const weight = 0.5 * (1.0 + Math.cos(t * Math.PI));
-        return Math.min(naturalH, dropH) * weight + naturalH * (1.0 - weight);
+      if (absW <= 40.0) {
+        return Math.min(naturalH, targetH);
+      } else if (absW < 110.0) {
+        const t = (absW - 40.0) / 70.0;
+        const weightW = 0.5 * (1.0 + Math.cos(t * Math.PI));
+        return Math.min(naturalH, targetH) * weightW + naturalH * (1.0 - weightW);
       }
     }
 

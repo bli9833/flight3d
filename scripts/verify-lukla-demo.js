@@ -109,12 +109,16 @@ async function testLuklaDemo() {
       throw new Error(`Expected demoDirector.activeDemoAirport to be 'lukla', got '${state.demoAirport}'`);
     }
 
-    // Step simulation 25 times (approx 5 seconds of flight time)
-    for (let step = 0; step < 25; step++) {
+    // Step simulation across all 5 demo stages through touchdown and safe stop
+    const stagesSeen = new Set();
+    const maxSteps = 240; // up to 60s of sim time (0.25s per step)
+    let completed = false;
+
+    for (let step = 0; step < maxSteps; step++) {
       const stepData = await evalJs(`
         (() => {
           const sim = window.simulator;
-          sim.stepSimulation(0.2);
+          sim.stepSimulation(0.25);
           const d = sim.demoDirector;
           const tel = sim.telemetry;
           return {
@@ -123,15 +127,36 @@ async function testLuklaDemo() {
             ias: Math.round(tel.iasKnots),
             alt: Math.round(tel.altitudeFt),
             pitch: tel.pitchDeg.toFixed(1),
-            isCrashed: sim.isCrashed
+            isCrashed: sim.isCrashed,
+            crashDesc: sim.crashResult ? sim.crashResult.description : null,
+            touchdown: tel.touchdown,
+            onGround: tel.onGround
           };
         })()
       `);
-      if (step % 5 === 0) {
-        console.log(`⏱️ Step ${step * 0.2}s: Stage ${stepData.stage}, IAS: ${stepData.ias}kt, Alt: ${stepData.alt}ft, Pitch: ${stepData.pitch}°, Crashed: ${stepData.isCrashed}`);
+
+      stagesSeen.add(stepData.stage);
+
+      if (step % 8 === 0 || stepData.stage === 4 || stepData.stage === 5) {
+        console.log(`⏱️ T=${(step * 0.25).toFixed(1)}s: Stage ${stepData.stage}, IAS: ${stepData.ias}kt, Alt: ${stepData.alt}ft, Pitch: ${stepData.pitch}°, Crashed: ${stepData.isCrashed}`);
       }
+
       if (stepData.isCrashed) {
-        throw new Error('Plane crashed during takeoff roll!');
+        throw new Error(`Plane crashed during demo flight! Stage ${stepData.stage}: ${stepData.crashDesc}`);
+      }
+
+      if (stepData.stage === 5) { // LUKLA_STAGES.COMPLETED
+        completed = true;
+        console.log(`🎉 Demo flight reached COMPLETED stage at T=${(step * 0.25).toFixed(1)}s!`);
+        break;
+      }
+    }
+
+    // Verify that all flight stages (takeoff, climb, cruise, approach, touchdown) were traversed
+    const expectedStages = [0, 1, 2, 3, 4];
+    for (const stg of expectedStages) {
+      if (!stagesSeen.has(stg)) {
+        throw new Error(`Demo did not transition through expected stage ${stg}. Stages traversed: ${[...stagesSeen].join(', ')}`);
       }
     }
 

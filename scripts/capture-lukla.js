@@ -109,10 +109,11 @@ async function main() {
       }
     `);
 
-    // 1. Switch to Nepal Lukla Airport
+    // 1. Switch to Nepal Lukla Airport and reset to Runway 06 preset
     console.log('🏔️ Switching to Nepal Tenzing-Hillary Airport (Lukla VNLK)...');
     await evalJs(`
       window.simulator.setAirport('lukla');
+      window.simulator.setPreset('runway');
       window.simulator.cameraSystem.setMode(1); // CHASE view
     `);
     await new Promise(r => setTimeout(r, 2000));

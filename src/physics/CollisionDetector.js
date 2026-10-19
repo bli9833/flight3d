@@ -198,7 +198,7 @@ export class CollisionDetector {
     }
 
     // 7. Terrain & Hills Collision Check
-    const terrainResult = this.checkTerrain(position, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs);
+    const terrainResult = this.checkTerrain(position, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity);
     if (terrainResult) {
       return {
         collided: true,
@@ -461,7 +461,7 @@ export class CollisionDetector {
     return null;
   }
 
-  checkTerrain(aircraftPos, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs) {
+  checkTerrain(aircraftPos, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity = null) {
     if (!this.terrain) return null;
 
     const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
@@ -476,6 +476,12 @@ export class CollisionDetector {
     if (isAirportRunway) {
       // Hard landing: only checked when wheels actually contact ground (y <= groundH + 2.15m)
       if (aircraftPos.y <= groundH + 2.15 && speedMs > 25.0) {
+        // Compute impact velocity normal to the local runway surface
+        const normal = (typeof this.terrain.getNormal === 'function')
+          ? this.terrain.getNormal(aircraftPos.x, aircraftPos.z)
+          : new THREE.Vector3(0, 1, 0);
+        const normalImpactSpeed = linearVelocity ? -linearVelocity.dot(normal) : -vsiMs;
+
         // Gear collapse / belly impact onto runway concrete
         if (aircraftPos.y < groundH + 1.35) {
           return {
@@ -484,12 +490,13 @@ export class CollisionDetector {
             description: `과도한 충격으로 랜딩기어가 파손되며 동체가 활주로에 격돌했습니다.`
           };
         }
-        // Catastrophic extreme vertical slam (> 2400 FPM)
-        if (vsiMs < -12.5) {
+        // Catastrophic extreme vertical or surface-normal slam (> 12.5 m/s or > 2400 FPM)
+        if (normalImpactSpeed > 12.5 || vsiMs < -12.5) {
+          const impactFpm = Math.max(normalImpactSpeed, -vsiMs) * 196.85;
           return {
             name: '하드 랜딩 기체 파손 (HARD LANDING CRASH)',
             point: aircraftPos.clone(),
-            description: `과도한 강하율(${(-vsiMs * 196.85).toFixed(0)} FPM)로 인해 활주로에 격돌했습니다.`
+            description: `과도한 접지 충격율(${impactFpm.toFixed(0)} FPM)로 인해 활주로에 격돌했습니다.`
           };
         }
         // Severe wingtip scrape on runway
