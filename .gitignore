@@ -39,3 +39,6 @@ fog_*.png
 # Temporary test and worktree directories
 .worktrees/
 .chrome-profile/
+
+# Local Cloudflare state
+.wrangler/
