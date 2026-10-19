@@ -128,10 +128,41 @@ async function main() {
   `);
   await new Promise(r => setTimeout(r, 600));
 
+  function assertOceanAnchored(posCheck, scenarioName) {
+    if (!posCheck) {
+      throw new Error(`Ocean anchoring check failed for ${scenarioName}: received null or undefined position data`);
+    }
+    const { waterMeshX, waterMeshZ, camX, camZ, snapStep } = posCheck;
+    const step = snapStep || 200;
+    const halfCellTolerance = step * 0.5 + 0.01;
+
+    const diffX = Math.abs(waterMeshX - camX);
+    const diffZ = Math.abs(waterMeshZ - camZ);
+
+    if (diffX > halfCellTolerance || diffZ > halfCellTolerance) {
+      throw new Error(
+        `Ocean anchoring assertion failed for ${scenarioName}: mesh position (${waterMeshX}, ${waterMeshZ}) ` +
+        `deviates from camera position (${camX.toFixed(2)}, ${camZ.toFixed(2)}) by (${diffX.toFixed(2)}, ${diffZ.toFixed(2)}), ` +
+        `which exceeds half-cell tolerance (${halfCellTolerance}m for snapStep ${step}m).`
+      );
+    }
+    console.log(`✅ Ocean mesh position verified at ${scenarioName}: mesh=(${waterMeshX}, ${waterMeshZ}), cam=(${camX.toFixed(1)}, ${camZ.toFixed(1)}), maxDiff=${Math.max(diffX, diffZ).toFixed(1)}m <= ${halfCellTolerance}m`);
+  }
+
   const screenshot1 = await send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
   const img1Path = path.join(OUTPUT_DIR, 'ocean_verification_cruise.jpg');
   fs.writeFileSync(img1Path, Buffer.from(screenshot1.data, 'base64'));
   console.log(`Saved: ${img1Path}`);
+
+  const waterPosCheck1 = await evalJs(`({
+    waterMeshX: window.sim.water.mesh.position.x,
+    waterMeshZ: window.sim.water.mesh.position.z,
+    camX: window.sim.camera.position.x,
+    camZ: window.sim.camera.position.z,
+    snapStep: window.sim.water.snapStep
+  })`);
+  console.log('Water mesh position check at Cruise:', waterPosCheck1);
+  assertOceanAnchored(waterPosCheck1, 'Cruise (Z=3200)');
 
   // Test Case 2: Boundary test - Position plane at Z = 17,500 (where previously the 36km mesh cut off!)
   console.log('📸 Capturing View 2: Former mesh boundary test (Z = 17,500)...');
@@ -150,9 +181,11 @@ async function main() {
     waterMeshX: window.sim.water.mesh.position.x,
     waterMeshZ: window.sim.water.mesh.position.z,
     camX: window.sim.camera.position.x,
-    camZ: window.sim.camera.position.z
+    camZ: window.sim.camera.position.z,
+    snapStep: window.sim.water.snapStep
   })`);
   console.log('Water mesh position check at Z=17,500:', waterPosCheck);
+  assertOceanAnchored(waterPosCheck, 'Boundary test (Z=17,500)');
 
   const screenshot2 = await send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
   const img2Path = path.join(OUTPUT_DIR, 'ocean_verification_boundary_17500.jpg');
@@ -175,9 +208,11 @@ async function main() {
     waterMeshX: window.sim.water.mesh.position.x,
     waterMeshZ: window.sim.water.mesh.position.z,
     camX: window.sim.camera.position.x,
-    camZ: window.sim.camera.position.z
+    camZ: window.sim.camera.position.z,
+    snapStep: window.sim.water.snapStep
   })`);
   console.log('Water mesh position check at Z=45,000:', waterPosCheck2);
+  assertOceanAnchored(waterPosCheck2, 'Deep ocean test (Z=45,000)');
 
   const screenshot3 = await send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
   const img3Path = path.join(OUTPUT_DIR, 'ocean_verification_deep_ocean_45000.jpg');
