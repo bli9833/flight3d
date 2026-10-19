@@ -180,9 +180,9 @@ async function main() {
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
-        // High alpine rocky peak above tree line (elevation ~350m, no trees above 280m)
-        const peakGroundH = sim.terrain.getHeight(4500, -3500);
-        sim.position.set(4420, peakGroundH - 15, -3500);
+        // High mountain ridge (elevation > 120m, no trees along runway extended centerline z = 0)
+        const peakGroundH = sim.terrain.getHeight(2650, 0);
+        sim.position.set(2580, peakGroundH - 25, 0);
         sim.linearVelocity.set(90, 0, 0);
         sim.quaternion.setFromAxisAngle(new window.THREE.Vector3(0, 1, 0), -Math.PI * 0.5);
         sim.aircraft.group.position.copy(sim.position);
