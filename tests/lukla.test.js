@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { LuklaTerrain } from '../src/environment/LuklaTerrain.js';
 import { LuklaAirport } from '../src/environment/LuklaAirport.js';
 import { CollisionDetector } from '../src/physics/CollisionDetector.js';
+import { LandingGear } from '../src/physics/LandingGear.js';
 
 describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & Systems', () => {
   it('should initialize LuklaTerrain with procedural fallback and accurate specifications', () => {
@@ -177,5 +178,68 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
     const crashResult = detector.checkCollision(towerPos, quat, vel, 1.0, 0.0, 0.0);
     assert.ok(crashResult !== null, 'Collision with control tower must be detected');
     assert.strictEqual(crashResult.type, 'TOWER');
+
+    // 3. Collision with rotated terminal building corner
+    // Local corner of 44x24m terminal rotated by 32°
+    const rotY = airport.terminalData.rotationY;
+    const cosR = Math.cos(rotY);
+    const sinR = Math.sin(rotY);
+    // Point at local (lx = 18m, lz = 10m) inside rotated building
+    const cornerX = airport.terminalData.x + 18 * cosR + 10 * sinR;
+    const cornerZ = airport.terminalData.z - 18 * sinR + 10 * cosR;
+    const terminalCornerPos = new THREE.Vector3(cornerX, airport.terminalData.y + 5, cornerZ);
+    const termCrash = detector.checkCollision(terminalCornerPos, quat, vel, 1.0, 0.0, 0.0);
+    assert.ok(termCrash !== null, 'Collision with rotated terminal corner must be detected');
+    assert.strictEqual(termCrash.type, 'BUILDING');
+  });
+
+  it('should construct upper retaining wall at Runway 24 threshold with defined elevation (no NaN)', () => {
+    const airport = new LuklaAirport();
+    assert.strictEqual(airport.threshold24Elevation, 2867.0);
+    assert.ok(airport.upperWall, 'Upper retaining wall mesh must be created');
+    assert.strictEqual(airport.upperWall.position.y, 2870.0, 'Upper wall elevation must equal elevation24 + 3.0m');
+    assert.ok(!Number.isNaN(airport.upperWall.position.y), 'Upper wall elevation must not be NaN');
+  });
+
+  it('should impart sloped surface normal forces in landing gear physics on Lukla runway', () => {
+    const gear = new LandingGear();
+    const terrain = new LuklaTerrain(22000, 128);
+
+    const sin58 = Math.sin(THREE.MathUtils.degToRad(58.0));
+    const cos58 = Math.cos(THREE.MathUtils.degToRad(58.0));
+
+    // Position aircraft on Runway 24 facing downhill (heading 238°)
+    // Surface slopes downhill at 11.7% (~6.71° pitch)
+    const mesh = new THREE.Object3D();
+    const groundH = terrain.getHeight(0, 0);
+    mesh.position.set(0, groundH + 2.1, 0);
+    mesh.quaternion.setFromEuler(new THREE.Euler(0, THREE.MathUtils.degToRad(238.0), 0, 'YXZ'));
+    mesh.updateMatrixWorld(true);
+
+    const linearVel = new THREE.Vector3(0, 0, 0);
+    const angularVel = new THREE.Vector3(0, 0, 0);
+
+    // Update with terrain height and normal callback
+    const res = gear.update(
+      0.016,
+      mesh,
+      linearVel,
+      angularVel,
+      (x, z) => terrain.getHeight(x, z),
+      (x, z) => terrain.getNormal(x, z)
+    );
+
+    assert.strictEqual(res.onGround, true, 'Gear should be compressed on sloped runway');
+    assert.ok(res.forces.y > 100000, 'Suspension normal force should support aircraft weight');
+
+    // On an 11.7% sloped runway oriented at 58°/238°, normal force must have a horizontal component
+    // that accelerates the aircraft downhill towards Threshold 06 (-s direction)
+    const horizForce = Math.sqrt(res.forces.x * res.forces.x + res.forces.z * res.forces.z);
+    assert.ok(horizForce > 10000, `Horizontal surface normal force (${horizForce.toFixed(0)}N) should be significant on 11.7% slope`);
+
+    // Force along runway axis s = fx * sin58 - fz * cos58 should push downhill (negative s)
+    const forceAlongS = res.forces.x * sin58 - res.forces.z * cos58;
+    assert.ok(forceAlongS < 0, `Force along runway axis (${forceAlongS.toFixed(0)}N) must be directed downhill (-s toward cliff)`);
   });
 });
+

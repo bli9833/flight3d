@@ -25,6 +25,7 @@ export class LuklaAirport {
 
     this.elevation06 = 2805.0; // SW threshold
     this.elevation24 = 2867.0; // NE threshold
+    this.threshold24Elevation = this.elevation24;
     this.midElevation = 2836.0;
 
     // Vectors along and across runway
@@ -35,14 +36,26 @@ export class LuklaAirport {
     this.beaconLights = [];
     this.windsock = null;
 
+    // Terminal building dimensions and rotation (-58° + 90° = 32°)
+    const termRotY = -this.headingRad + Math.PI * 0.5;
+    const bodyW = 44;
+    const bodyD = 24;
+    const cosRot = Math.abs(Math.cos(termRotY));
+    const sinRot = Math.abs(Math.sin(termRotY));
+    const aabbW = bodyW * cosRot + bodyD * sinRot;
+    const aabbD = bodyW * sinRot + bodyD * cosRot;
+
     // Collision metadata for terminal and tower (safely offset to the apron at w ≈ 48m)
     this.terminalData = {
       x: 76.3,
       y: 2844,
       z: 8.9,
-      width: 44,
+      width: aabbW,
       height: 18,
-      depth: 24
+      depth: aabbD,
+      localWidth: bodyW,
+      localDepth: bodyD,
+      rotationY: termRotY
     };
 
     this.controlTowerData = {
@@ -285,7 +298,9 @@ export class LuklaAirport {
       metalness: 0.05
     });
 
-    const bodyGeom = new THREE.BoxGeometry(this.terminalData.width, 10, this.terminalData.depth);
+    const termW = this.terminalData.localWidth || 44;
+    const termD = this.terminalData.localDepth || 24;
+    const bodyGeom = new THREE.BoxGeometry(termW, 10, termD);
     const bodyMesh = new THREE.Mesh(bodyGeom, wallMat);
     bodyMesh.position.y = 5;
     bodyMesh.castShadow = true;
@@ -300,9 +315,9 @@ export class LuklaAirport {
     });
 
     // Gable triangular roof geometry
-    const roofGeom = new THREE.ConeGeometry(this.terminalData.width * 0.65, 5.5, 4);
+    const roofGeom = new THREE.ConeGeometry(termW * 0.65, 5.5, 4);
     roofGeom.rotateY(Math.PI * 0.25);
-    roofGeom.scale(1.0, 1.0, this.terminalData.depth / (this.terminalData.width * 0.65));
+    roofGeom.scale(1.0, 1.0, termD / (termW * 0.65));
     const roofMesh = new THREE.Mesh(roofGeom, roofMat);
     roofMesh.position.y = 12.5;
     roofMesh.castShadow = true;
@@ -426,6 +441,7 @@ export class LuklaAirport {
     upperWall.position.set(p24X, this.threshold24Elevation + 3.0, p24Z);
     upperWall.rotation.y = -this.headingRad;
     upperWall.castShadow = true;
+    this.upperWall = upperWall;
     this.group.add(upperWall);
   }
 

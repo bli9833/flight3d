@@ -524,4 +524,22 @@ export class Terrain {
     this.mesh = new THREE.Mesh(this.geometry, terrainMat);
     this.mesh.receiveShadow = true;
   }
+
+  /**
+   * Surface normal at (x, z) via finite differences
+   * @param {number} x
+   * @param {number} z
+   * @returns {THREE.Vector3}
+   */
+  getNormal(x, z) {
+    const eps = 2.0;
+    const hL = this.getHeight(x - eps, z);
+    const hR = this.getHeight(x + eps, z);
+    const hD = this.getHeight(x, z - eps);
+    const hU = this.getHeight(x, z + eps);
+
+    const normal = new THREE.Vector3(hL - hR, 2.0 * eps, hD - hU);
+    normal.normalize();
+    return normal;
+  }
 }

@@ -471,14 +471,6 @@ export class DemoFlightDirector {
         const distToThreshold = Math.max(0, targetThresholdS - s);
         const idealAltM = 2805.0 + distToThreshold * Math.tan(THREE.MathUtils.degToRad(4.28));
 
-        // Pitch guidance with glideslope authority
-        const altDiffM = idealAltM - this.sim.position.y;
-        const targetPitchDeg = Math.max(-2.5, Math.min(4.5, 1.0 + altDiffM * 0.04));
-        const pitchDiff = targetPitchDeg - tel.pitchDeg;
-        const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
-        const elevatorCmd = pitchDiff * 0.08 - pitchRateDeg * 0.03;
-        this.sim.controls.setVirtualInput('elevator', Math.max(-0.35, Math.min(0.40, elevatorCmd)));
-
         // Lateral guidance (keep w centered on runway centerline 0)
         const targetRoll = Math.max(-10.0, Math.min(10.0, -w * 0.25));
         const rollDiff = targetRoll - tel.rollDeg;
@@ -486,18 +478,30 @@ export class DemoFlightDirector {
         const aileronCmd = rollDiff * 0.035 - rollRateDeg * 0.025;
         this.sim.controls.setVirtualInput('aileron', Math.max(-0.25, Math.min(0.25, aileronCmd)));
 
-        // Throttle management for V_ref (135 KT)
-        const speedErr = 135 - tel.iasKnots;
-        const energyComp = altDiffM > 10 ? 0.08 : (altDiffM < -10 ? -0.08 : 0.0);
-        this.sim.controls.setVirtualInput('throttle', Math.max(0.35, Math.min(0.70, 0.54 + speedErr * 0.02 + energyComp)));
-
         // Flare over cliff threshold (s >= -330m) at low radio altitude
         const isNearThreshold = s >= -330.0;
         if (!this.approachFlarInitiated && isNearThreshold && tel.radioAltFt <= 30.0 && tel.radioAltFt > 0) {
           this.approachFlarInitiated = true;
+        }
+
+        if (this.approachFlarInitiated) {
+          // Maintain flare: idle thrust and gentle nose-up pitch attitude until touchdown
           this.sim.controls.setVirtualInput('throttle', 0.0);
           this.sim.engines.setThrottle(0.0);
           this.sim.controls.setVirtualInput('elevator', 0.16); // Gentle flare onto uphill slope
+        } else {
+          // Pitch guidance with glideslope authority
+          const altDiffM = idealAltM - this.sim.position.y;
+          const targetPitchDeg = Math.max(-2.5, Math.min(4.5, 1.0 + altDiffM * 0.04));
+          const pitchDiff = targetPitchDeg - tel.pitchDeg;
+          const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
+          const elevatorCmd = pitchDiff * 0.08 - pitchRateDeg * 0.03;
+          this.sim.controls.setVirtualInput('elevator', Math.max(-0.35, Math.min(0.40, elevatorCmd)));
+
+          // Throttle management for V_ref (135 KT)
+          const speedErr = 135 - tel.iasKnots;
+          const energyComp = altDiffM > 10 ? 0.08 : (altDiffM < -10 ? -0.08 : 0.0);
+          this.sim.controls.setVirtualInput('throttle', Math.max(0.35, Math.min(0.70, 0.54 + speedErr * 0.02 + energyComp)));
         }
 
         // Detect touchdown over runway tarmac (s >= -263.5m)
@@ -787,29 +791,34 @@ export class DemoFlightDirector {
         const distToThreshold = targetTouchdownX - this.sim.position.x;
         const idealAltFt = Math.max(47, (distToThreshold * Math.tan(THREE.MathUtils.degToRad(3.0))) * 3.28084 + 47);
 
-        const altDiff = idealAltFt - tel.altitudeFt;
-        const targetPitchDeg = Math.max(-1.0, Math.min(6.5, 2.8 + altDiff * 0.035));
-        const pitchDiff = targetPitchDeg - tel.pitchDeg;
-        const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
-        const elevatorCmd = pitchDiff * 0.08 - pitchRateDeg * 0.03;
-        this.sim.controls.setVirtualInput('elevator', Math.max(-0.35, Math.min(0.45, elevatorCmd)));
-
         const targetRoll = Math.max(-10.0, Math.min(10.0, -this.sim.position.z * 0.15));
         const rollDiff = targetRoll - tel.rollDeg;
         const rollRateDeg = -THREE.MathUtils.radToDeg(this.sim.angularVelocity.z);
         const aileronCmd = rollDiff * 0.035 - rollRateDeg * 0.025;
         this.sim.controls.setVirtualInput('aileron', Math.max(-0.20, Math.min(0.20, aileronCmd)));
 
-        const speedErr = 142 - tel.iasKnots;
-        const energyComp = altDiff > 25 ? 0.12 : (altDiff < -25 ? -0.08 : 0.0);
-        this.sim.controls.setVirtualInput('throttle', Math.max(0.35, Math.min(0.75, 0.48 + speedErr * 0.025 + energyComp)));
-
         const isOverRunway = this.sim.position.x >= -1600;
         if (!this.approachFlarInitiated && isOverRunway && tel.radioAltFt <= 30.0 && tel.radioAltFt > 0) {
           this.approachFlarInitiated = true;
+        }
+
+        if (this.approachFlarInitiated) {
+          // Maintain flare: idle thrust and gentle flare elevator until touchdown
           this.sim.controls.setVirtualInput('throttle', 0.0);
           this.sim.engines.setThrottle(0.0);
           this.sim.controls.setVirtualInput('elevator', 0.14);
+        } else {
+          // Pitch guidance with full glideslope authority
+          const altDiff = idealAltFt - tel.altitudeFt;
+          const targetPitchDeg = Math.max(-1.0, Math.min(6.5, 2.8 + altDiff * 0.035));
+          const pitchDiff = targetPitchDeg - tel.pitchDeg;
+          const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
+          const elevatorCmd = pitchDiff * 0.08 - pitchRateDeg * 0.03;
+          this.sim.controls.setVirtualInput('elevator', Math.max(-0.35, Math.min(0.45, elevatorCmd)));
+
+          const speedErr = 142 - tel.iasKnots;
+          const energyComp = altDiff > 25 ? 0.12 : (altDiff < -25 ? -0.08 : 0.0);
+          this.sim.controls.setVirtualInput('throttle', Math.max(0.35, Math.min(0.75, 0.48 + speedErr * 0.025 + energyComp)));
         }
 
         if (isOverRunway && (tel.onGround || (this.approachFlarInitiated && tel.radioAltFt <= 8.5))) {

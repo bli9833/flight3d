@@ -239,20 +239,44 @@ export class CollisionDetector {
     // Check terminal concourse box
     const term = this.airport.terminalData;
     if (term) {
-      const minX = term.x - term.width * 0.5;
-      const maxX = term.x + term.width * 0.5;
-      const minZ = term.z - term.depth * 0.5;
-      const maxZ = term.z + term.depth * 0.5;
       const minY = term.y;
       const maxY = term.y + term.height;
 
-      for (const probe of worldProbes) {
-        if (
-          probe.pos.x >= minX - probe.radius && probe.pos.x <= maxX + probe.radius &&
-          probe.pos.z >= minZ - probe.radius && probe.pos.z <= maxZ + probe.radius &&
-          probe.pos.y >= minY && probe.pos.y <= maxY
-        ) {
-          return { point: probe.pos.clone(), part: probe.desc };
+      if (term.rotationY !== undefined) {
+        // Oriented bounding box check (local coordinate space of rotated building)
+        const cosR = Math.cos(-term.rotationY);
+        const sinR = Math.sin(-term.rotationY);
+        const halfW = (term.localWidth || term.width) * 0.5;
+        const halfD = (term.localDepth || term.depth) * 0.5;
+
+        for (const probe of worldProbes) {
+          const dx = probe.pos.x - term.x;
+          const dz = probe.pos.z - term.z;
+          const lx = dx * cosR - dz * sinR;
+          const lz = dx * sinR + dz * cosR;
+
+          if (
+            Math.abs(lx) <= halfW + probe.radius &&
+            Math.abs(lz) <= halfD + probe.radius &&
+            probe.pos.y >= minY && probe.pos.y <= maxY
+          ) {
+            return { point: probe.pos.clone(), part: probe.desc };
+          }
+        }
+      } else {
+        const minX = term.x - term.width * 0.5;
+        const maxX = term.x + term.width * 0.5;
+        const minZ = term.z - term.depth * 0.5;
+        const maxZ = term.z + term.depth * 0.5;
+
+        for (const probe of worldProbes) {
+          if (
+            probe.pos.x >= minX - probe.radius && probe.pos.x <= maxX + probe.radius &&
+            probe.pos.z >= minZ - probe.radius && probe.pos.z <= maxZ + probe.radius &&
+            probe.pos.y >= minY && probe.pos.y <= maxY
+          ) {
+            return { point: probe.pos.clone(), part: probe.desc };
+          }
         }
       }
     }

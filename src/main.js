@@ -600,7 +600,8 @@ class FlightSimulator {
       this.aircraft.group,
       this.linearVelocity,
       this.angularVelocity,
-      (x, z) => this.currentTerrain.getHeight(x, z)
+      (x, z) => this.currentTerrain.getHeight(x, z),
+      (x, z) => (this.currentTerrain.getNormal ? this.currentTerrain.getNormal(x, z) : null)
     );
 
     // 5. Aerodynamic Forces & Moments
