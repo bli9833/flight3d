@@ -23,6 +23,7 @@ import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
 import { DemoFlightDirector } from './director/DemoFlightDirector.js';
 import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
+import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 
 // Expose THREE globally for test harness and browser console debugging
@@ -107,7 +108,7 @@ class FlightSimulator {
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
 
-    // 7. Collision Detection & Explosion Particle Systems
+    // 7. Collision Detection & Explosion & Tire Smoke Particle Systems
     this.collisionDetector = new CollisionDetector(
       this.terrain,
       this.airport,
@@ -116,8 +117,11 @@ class FlightSimulator {
       this.water
     );
     this.explosionSystem = new ExplosionSystem(this.scene, this.terrain);
+    this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.terrain);
     this.isCrashed = false;
     this.crashResult = null;
+    this.lastOnGround = true;
+    this.lastGearTarget = true;
 
     // 8. Rigid Body Physics State
     // Linear state
@@ -236,6 +240,12 @@ class FlightSimulator {
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
     }
+
+    if (this.tireSmokeSystem) {
+      this.tireSmokeSystem.clear();
+    }
+    this.lastOnGround = (type === 'runway');
+    this.lastGearTarget = (type !== 'cruise');
 
     if (this.isCrashed) {
       this.isCrashed = false;
@@ -406,8 +416,8 @@ class FlightSimulator {
 
     this.position.addScaledVector(this.linearVelocity, dt);
 
-    // Crash terrain penetration prevention (keep aircraft above ground)
-    const minSafeY = groundHeight + (gearResult.gearState > 0.5 ? 2.1 : 0.8);
+    // Crash terrain penetration prevention (allow dynamic suspension stroke of up to 0.55m)
+    const minSafeY = groundHeight + (gearResult.gearState > 0.5 ? 1.55 : 0.8);
     if (this.position.y < minSafeY) {
       this.position.y = minSafeY;
       if (this.linearVelocity.y < 0) this.linearVelocity.y = 0;
@@ -486,6 +496,7 @@ class FlightSimulator {
       reverserActive: engineData.reverserActive,
       gearState: gearResult.gearState,
       isTransit: gearResult.isTransit,
+      compressions: gearResult.compressions,
       flapDegree: this.aero.currentFlapAngle,
       flapIndex: this.aero.flapsIndex,
       spoilers: this.aero.spoilers,
@@ -501,7 +512,42 @@ class FlightSimulator {
       z: this.position.z
     };
 
-    // 11. Check Multi-Obstacle Collisions (Terrain, Water, Tower, Buildings, Trees, Ships)
+    // 11. Touchdown Tire Smoke & Runway Friction Particles
+    if (gearResult.touchdown && gearResult.touchdownContacts && gearResult.touchdownContacts.length > 0) {
+      this.tireSmokeSystem.spawnTouchdownSmoke(gearResult.touchdownContacts, this.linearVelocity);
+    }
+    if (gearResult.onGround && this.controls.brakes > 0.6) {
+      this.tireSmokeSystem.spawnBrakingSmoke(this.gear.contacts, this.linearVelocity, this.controls.brakes);
+    }
+
+    // 12. Cinematic Camera Cuts: Automatic temporary gear view for Takeoff, Touchdown, and Gear Retract/Extend
+    const gsKnots = Atmosphere.msToKnots(groundSpeed);
+    if (this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
+      // Takeoff liftoff
+      this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
+      this.showToast('🎥 랜딩 기어 뷰: 이륙 상승 (Takeoff Climb)');
+    } else if (((!this.lastOnGround && gearResult.onGround && gsKnots > 45) || gearResult.touchdown) && this.totalSimTime > 2.0) {
+      // Touchdown landing
+      this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 5.0);
+      this.showToast('🎥 랜딩 기어 뷰: 활주로 접지 & 서스펜션 완충 (Touchdown)');
+    }
+
+    const currentGearTarget = this.gear.targetGearState > 0.5;
+    if (this.lastGearTarget !== currentGearTarget && this.totalSimTime > 1.0) {
+      if (!currentGearTarget) {
+        // Gear retracting
+        this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
+        this.showToast('🎥 랜딩 기어 뷰: 기어 수납 (Gear Retracting)');
+      } else {
+        // Gear extending
+        this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
+        this.showToast('🎥 랜딩 기어 뷰: 기어 전개 (Gear Extending)');
+      }
+      this.lastGearTarget = currentGearTarget;
+    }
+    this.lastOnGround = gearResult.onGround;
+
+    // 13. Check Multi-Obstacle Collisions (Terrain, Water, Tower, Buildings, Trees, Ships)
     if (!this.isCrashed) {
       const crash = this.collisionDetector.checkCollision(
         this.position,
@@ -602,6 +648,7 @@ class FlightSimulator {
     this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry);
     this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(simSeconds);
+    this.tireSmokeSystem.update(simSeconds);
     this.touchControls.updateUI(this.telemetry);
     this.updateHUD();
     return this.telemetry;
@@ -652,6 +699,7 @@ class FlightSimulator {
     this.ships.update(frameDelta, this.totalSimTime);
     this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(frameDelta);
+    this.tireSmokeSystem.update(frameDelta);
 
     // 4. Update Cockpit Visibility & Audio
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;

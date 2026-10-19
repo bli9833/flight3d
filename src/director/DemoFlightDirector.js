@@ -383,6 +383,11 @@ export class DemoFlightDirector {
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
+        // Switch to exterior chase camera at 4.5s after showcasing touchdown impact and tire smoke
+        if (this.stageTimer > 4.5 && this.sim.cameraSystem.mode === CameraSystem.MODES.GEAR) {
+          this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
+        }
+
         // Aircraft brought to complete safe stop
         if (tel.iasKnots < 5.0 || this.stageTimer > 12.0) {
           this.sim.engines.setReverser(false, true);

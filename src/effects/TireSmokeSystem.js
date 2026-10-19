@@ -1,0 +1,216 @@
+import * as THREE from 'three';
+
+/**
+ * Realistic Aviation Tire Touchdown Smoke & Friction System
+ * 
+ * Simulates high-energy tire spin-up rubber smoke when airliner tires impact
+ * the runway at 130-150 knots, producing expanding, billowing white-grey
+ * smoke plumes that trail rearward with the slipstream and wind.
+ */
+export class TireSmokeSystem {
+  constructor(scene, terrain = null) {
+    this.scene = scene;
+    this.terrain = terrain;
+
+    this.group = new THREE.Group();
+    this.group.name = 'TireSmokeSystem';
+    this.scene.add(this.group);
+
+    this.particles = [];
+    this.activeSpinUpEmitters = [];
+
+    // Realistic soft feathered smoke texture
+    this.smokeTexture = this.createSmokeTexture();
+
+    // Reusable vectors for performance
+    this._tempVec = new THREE.Vector3();
+  }
+
+  createSmokeTexture() {
+    if (typeof document === 'undefined') {
+      return new THREE.Texture();
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+
+    // Multi-stop radial gradient creating a soft, billowing smoke puff
+    const grad = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
+    grad.addColorStop(0.0, 'rgba(242, 244, 248, 0.95)');
+    grad.addColorStop(0.25, 'rgba(230, 234, 240, 0.85)');
+    grad.addColorStop(0.55, 'rgba(215, 220, 228, 0.50)');
+    grad.addColorStop(0.85, 'rgba(200, 205, 212, 0.15)');
+    grad.addColorStop(1.0, 'rgba(190, 195, 200, 0.0)');
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 64);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  /**
+   * Spawns touchdown tire smoke for contacting landing gear bogies
+   * @param {Array<{id: string, worldPos: THREE.Vector3, groundSpeed: number, sinkRate: number}>} contacts 
+   * @param {THREE.Vector3} linearVelocity 
+   */
+  spawnTouchdownSmoke(contacts, linearVelocity) {
+    if (!contacts || contacts.length === 0) return;
+
+    for (const c of contacts) {
+      const pos = c.worldPos;
+      const groundSpeed = c.groundSpeed || 70.0;
+      const sinkRate = Math.max(0.8, c.sinkRate || 1.5);
+
+      // Number of initial particles proportional to impact energy
+      const count = Math.min(45, Math.max(16, Math.round(sinkRate * 12 + (groundSpeed / 30.0) * 6)));
+
+      this.emitSmokeBurst(pos, linearVelocity, groundSpeed, count);
+
+      // Start a short tire spin-up emitter (tires scrub for ~0.25 - 0.35s)
+      this.activeSpinUpEmitters.push({
+        worldPos: pos.clone(),
+        linearVelocity: linearVelocity.clone(),
+        groundSpeed,
+        duration: 0.28,
+        elapsed: 0.0,
+        interval: 0.035,
+        timer: 0.0
+      });
+    }
+  }
+
+  /**
+   * Emits a burst of smoke particles at a specific contact patch
+   */
+  emitSmokeBurst(origin, linearVelocity, groundSpeed, count) {
+    // Determine horizontal movement direction
+    const velNorm = this._tempVec.set(linearVelocity.x, 0, linearVelocity.z);
+    if (velNorm.lengthSq() > 0.001) {
+      velNorm.normalize();
+    } else {
+      velNorm.set(1, 0, 0);
+    }
+
+    const groundY = this.terrain ? this.terrain.getHeight(origin.x, origin.z) : origin.y;
+
+    for (let i = 0; i < count; i++) {
+      if (this.particles.length > 200) break; // Particle budget cap
+
+      const spriteMat = new THREE.SpriteMaterial({
+        map: this.smokeTexture,
+        transparent: true,
+        opacity: 0.85 + Math.random() * 0.15,
+        depthWrite: false
+      });
+
+      const sprite = new THREE.Sprite(spriteMat);
+
+      // Spawn at contact point with lateral tire spread
+      const lateralSpread = (Math.random() - 0.5) * 1.4;
+      const longitudinalSpread = (Math.random() - 0.5) * 1.0;
+      const latVec = new THREE.Vector3(-velNorm.z, 0, velNorm.x);
+
+      sprite.position.copy(origin).addScaledVector(latVec, lateralSpread).addScaledVector(velNorm, longitudinalSpread);
+      sprite.position.y = groundY + 0.25 + Math.random() * 0.35;
+
+      // Realistic tire smoke dynamics:
+      // High-speed backward throw from runway friction into slipstream
+      const slipstreamFactor = 0.25 + Math.random() * 0.35;
+      const vel = new THREE.Vector3(
+        -velNorm.x * groundSpeed * slipstreamFactor + (Math.random() - 0.5) * 3.5,
+        1.2 + Math.random() * 3.2, // Upward buoyant billow
+        -velNorm.z * groundSpeed * slipstreamFactor + (Math.random() - 0.5) * 3.5
+      );
+
+      const baseScale = 1.0 + Math.random() * 1.4;
+      sprite.scale.set(baseScale, baseScale, 1.0);
+
+      this.group.add(sprite);
+      this.particles.push({
+        sprite,
+        vel,
+        scale: baseScale,
+        growth: 4.0 + Math.random() * 4.5,
+        life: 0.0,
+        maxLife: 1.6 + Math.random() * 0.9,
+        baseOpacity: 0.85
+      });
+    }
+  }
+
+  /**
+   * Spawns lighter smoke puffs for heavy anti-skid wheel braking on runway
+   */
+  spawnBrakingSmoke(contacts, linearVelocity, brakeIntensity) {
+    if (!contacts || brakeIntensity < 0.6) return;
+    if (Math.random() > 0.4) return; // Stagger braking emission
+
+    for (const c of contacts) {
+      if (c.id === 'nose') continue; // Main brakes do the heavy stopping
+      this.emitSmokeBurst(c.worldPos, linearVelocity, c.groundSpeed || 40.0, 3);
+    }
+  }
+
+  update(dt) {
+    // 1. Process active spin-up emitters
+    for (let i = this.activeSpinUpEmitters.length - 1; i >= 0; i--) {
+      const em = this.activeSpinUpEmitters[i];
+      em.elapsed += dt;
+      em.timer += dt;
+
+      if (em.elapsed >= em.duration) {
+        this.activeSpinUpEmitters.splice(i, 1);
+      } else if (em.timer >= em.interval) {
+        em.timer = 0;
+        this.emitSmokeBurst(em.worldPos, em.linearVelocity, em.groundSpeed * (1.0 - em.elapsed / em.duration), 3);
+      }
+    }
+
+    // 2. Update active smoke particles
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.life += dt;
+      const t = p.life / p.maxLife;
+
+      if (t >= 1.0) {
+        this.group.remove(p.sprite);
+        p.sprite.material.dispose();
+        this.particles.splice(i, 1);
+      } else {
+        // Drag deceleration
+        p.vel.x *= Math.max(0.0, 1.0 - dt * 1.8);
+        p.vel.z *= Math.max(0.0, 1.0 - dt * 1.8);
+        // Buoyancy lift decreases over time
+        p.vel.y = Math.max(0.4, p.vel.y - dt * 0.8);
+
+        p.sprite.position.addScaledVector(p.vel, dt);
+
+        // Keep smoke rolling above ground
+        const groundY = this.terrain ? this.terrain.getHeight(p.sprite.position.x, p.sprite.position.z) : 0.0;
+        if (p.sprite.position.y < groundY + 0.2) {
+          p.sprite.position.y = groundY + 0.2;
+          p.vel.y = Math.abs(p.vel.y) * 0.3; // Gentle surface deflection
+        }
+
+        // Expansion: smoke billows outward
+        p.scale += p.growth * dt;
+        p.sprite.scale.set(p.scale, p.scale, 1.0);
+
+        // Smooth non-linear opacity fade
+        p.sprite.material.opacity = p.baseOpacity * Math.max(0.0, (1.0 - t * t));
+      }
+    }
+  }
+
+  clear() {
+    for (const p of this.particles) {
+      this.group.remove(p.sprite);
+      p.sprite.material.dispose();
+    }
+    this.particles = [];
+    this.activeSpinUpEmitters = [];
+  }
+}

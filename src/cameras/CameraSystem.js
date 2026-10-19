@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 
 /**
- * 5-Perspective Camera System (Cockpit, Chase, Wing View, Control Tower, Flyby)
- * Features G-force cockpit head dynamics, stall buffeting vibration, touchdown shock jolt, and smooth exterior damping.
+ * 6-Perspective Camera System (Cockpit, Chase, Wing View, Control Tower, Flyby, Landing Gear Belly Cam)
+ * Features G-force cockpit head dynamics, stall buffeting vibration, touchdown shock jolt,
+ * smooth exterior damping, and automatic temporary cinematic view cuts for takeoff/landing/gear transit.
  */
 export class CameraSystem {
   static MODES = {
@@ -10,7 +11,8 @@ export class CameraSystem {
     CHASE: 1,
     WING: 2,
     TOWER: 3,
-    FLYBY: 4
+    FLYBY: 4,
+    GEAR: 5
   };
 
   constructor(camera, domElement) {
@@ -18,12 +20,21 @@ export class CameraSystem {
     this.domElement = domElement;
     this.mode = CameraSystem.MODES.COCKPIT;
 
+    // Temporary Cinematic View Cut State (e.g. brief gear cam preview during takeoff, landing, gear transit)
+    this.temporaryViewTimer = 0;
+    this.savedMode = null;
+    this.onTemporaryViewComplete = null;
+
     // Cockpit Head Dynamics & Look-Around
     this.cockpitHeadOffset = new THREE.Vector3(-0.48, 0.82, -12.02); // Captain eye
     this.headGForceOffset = new THREE.Vector3();
     this.touchJoltOffset = 0;
     this.lookYaw = 0;
     this.lookPitch = -0.18; // Natural pilot head tilt showing MCP, instruments & runway horizon
+
+    // Landing Gear Belly View Parameters (Oblique angle looking at nose and main gear under fuselage)
+    this.gearCamOffset = new THREE.Vector3(2.4, -2.6, 6.2);
+    this.gearLookTarget = new THREE.Vector3(-0.6, -1.9, -2.0);
 
     // Chase Camera Parameters
     this.chaseDistance = 55.0;
@@ -46,6 +57,7 @@ export class CameraSystem {
   }
 
   initMouseLook() {
+    if (!this.domElement || typeof window === 'undefined') return;
     this.domElement.addEventListener('mousedown', (e) => {
       if (e.button === 0 || e.button === 2) {
         this.isDragging = true;
@@ -94,6 +106,13 @@ export class CameraSystem {
       forwardLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.lookYaw);
       const forwardWorld = forwardLocal.applyQuaternion(aircraftMesh.quaternion);
       this.camera.lookAt(eyeWorld.clone().add(forwardWorld));
+    } else if (this.mode === CameraSystem.MODES.GEAR) {
+      const eyeWorld = this.gearCamOffset.clone().applyMatrix4(aircraftMesh.matrixWorld);
+      const targetWorld = this.gearLookTarget.clone().applyMatrix4(aircraftMesh.matrixWorld);
+      this.camera.position.copy(eyeWorld);
+      const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraftMesh.quaternion);
+      this.camera.up.copy(upWorld);
+      this.camera.lookAt(targetWorld);
     } else {
       this.camera.position.copy(this.chasePos);
       this.camera.up.set(0, 1, 0);
@@ -101,8 +120,32 @@ export class CameraSystem {
     }
   }
 
+  showTemporaryView(m, durationSeconds = 4.5, onComplete = null) {
+    if (this.mode !== m && this.temporaryViewTimer <= 0) {
+      this.savedMode = this.mode;
+    }
+    this.mode = m;
+    this.temporaryViewTimer = durationSeconds;
+    this.onTemporaryViewComplete = onComplete;
+    if (this.mode === CameraSystem.MODES.FLYBY) {
+      this.flybySet = false;
+    }
+  }
+
+  cancelTemporaryView() {
+    if (this.temporaryViewTimer > 0) {
+      this.temporaryViewTimer = 0;
+      if (this.savedMode !== null && this.savedMode !== undefined) {
+        this.mode = this.savedMode;
+        this.savedMode = null;
+      }
+      this.onTemporaryViewComplete = null;
+    }
+  }
+
   cycleMode() {
-    this.mode = (this.mode + 1) % 5;
+    this.cancelTemporaryView();
+    this.mode = (this.mode + 1) % 6;
     if (this.mode === CameraSystem.MODES.FLYBY) {
       this.flybySet = false;
     }
@@ -110,6 +153,7 @@ export class CameraSystem {
   }
 
   setMode(m) {
+    this.cancelTemporaryView();
     this.mode = m;
     if (this.mode === CameraSystem.MODES.FLYBY) {
       this.flybySet = false;
@@ -123,13 +167,39 @@ export class CameraSystem {
       case CameraSystem.MODES.WING: return 'WING VIEW';
       case CameraSystem.MODES.TOWER: return 'AIRPORT TOWER';
       case CameraSystem.MODES.FLYBY: return 'CINEMATIC FLYBY';
+      case CameraSystem.MODES.GEAR: return 'GEAR CAM (BELLY)';
       default: return 'CAMERA';
     }
   }
 
   update(dt, aircraftMesh, flightState) {
+    // 1. Process temporary cinematic view timer (auto-cut during takeoff, landing, gear transit)
+    if (this.temporaryViewTimer > 0) {
+      this.temporaryViewTimer -= dt;
+      if (this.temporaryViewTimer <= 0) {
+        this.temporaryViewTimer = 0;
+        if (this.savedMode !== null && this.savedMode !== undefined) {
+          this.mode = this.savedMode;
+          this.savedMode = null;
+          if (this.onTemporaryViewComplete) {
+            const cb = this.onTemporaryViewComplete;
+            this.onTemporaryViewComplete = null;
+            cb();
+          }
+        }
+      }
+    }
+
     const planePos = aircraftMesh.position;
     const planeQuat = aircraftMesh.quaternion;
+
+    // Smooth Touchdown Jolt with exponential decay (affects cockpit and exterior suspension reaction)
+    this.touchJoltOffset = (this.touchJoltOffset || 0) * Math.max(0.0, 1.0 - dt * 6.0);
+    if (flightState.touchdown) {
+      const vsi = Math.abs(flightState.vsiFpm || 400);
+      const severity = Math.min(1.2, Math.max(0.4, vsi / 450.0));
+      this.touchJoltOffset = -0.045 * severity;
+    }
 
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: {
@@ -139,12 +209,6 @@ export class CameraSystem {
         const gForce = flightState.onGround ? 1.0 : (flightState.gForce || 1.0);
         const targetGOffset = Math.max(-0.02, Math.min(0.02, -(gForce - 1.0) * 0.015));
         this.headGForceOffset.y += (targetGOffset - this.headGForceOffset.y) * Math.min(1.0, dt * 4.0);
-
-        // Smooth Touchdown Jolt with exponential decay
-        this.touchJoltOffset = (this.touchJoltOffset || 0) * Math.max(0.0, 1.0 - dt * 6.0);
-        if (flightState.touchdown) {
-          this.touchJoltOffset = -0.025;
-        }
 
         // Stall Buffeting Shake (airborne only, restrained amplitude)
         let buffetX = 0, buffetY = 0;
@@ -233,6 +297,26 @@ export class CameraSystem {
         if (this.camera.position.distanceTo(planePos) > 650) {
           this.flybySet = false;
         }
+        break;
+      }
+
+      case CameraSystem.MODES.GEAR: {
+        // Fuselage Lower Oblique Belly Cam looking at Landing Gear & Runway
+        const eyeLocal = this.gearCamOffset.clone();
+        const eyeWorld = eyeLocal.applyMatrix4(aircraftMesh.matrixWorld);
+
+        const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
+        this.camera.up.copy(upWorld);
+
+        // Dynamic touchdown shock jolt on belly camera
+        if (Math.abs(this.touchJoltOffset) > 0.0005) {
+          eyeWorld.addScaledVector(upWorld, this.touchJoltOffset * 1.6);
+        }
+
+        this.camera.position.copy(eyeWorld);
+
+        const targetWorld = this.gearLookTarget.clone().applyMatrix4(aircraftMesh.matrixWorld);
+        this.camera.lookAt(targetWorld);
         break;
       }
     }
