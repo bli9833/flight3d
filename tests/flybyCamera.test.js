@@ -111,6 +111,71 @@ describe('FLYBY (Front View / Cinematic Flyby) Ground Safety & Framing', () => {
     assert.ok(camera.position.x > aircraft.position.x + 80.0, 'Camera should be well ahead of rolling aircraft');
   });
 
+  it('should use groundSpeedKnots telemetry property to select between parked and rollout regimes', () => {
+    const camera = new THREE.PerspectiveCamera();
+    const camSystem = new CameraSystem(camera, mockDom);
+    camSystem.setTerrain(mockTerrainHeight);
+
+    const aircraft = new THREE.Object3D();
+    aircraft.position.set(0, 14.15, 0);
+    aircraft.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.5); // Facing East (+X)
+    aircraft.updateMatrixWorld(true);
+
+    camSystem.setMode(CameraSystem.MODES.FLYBY);
+
+    // Parked with strong 35 knot headwind (iasKnots: 35, groundSpeedKnots: 0)
+    // Production telemetry provides groundSpeedKnots; simulator should treat this as parked!
+    camSystem.update(0.016, aircraft, { onGround: true, groundSpeedKnots: 0, iasKnots: 35 });
+    assert.strictEqual(camSystem.flybyRegime, 'parked', 'Should select parked regime when groundSpeedKnots is 0 despite headwind IAS');
+    const distParked = camera.position.distanceTo(aircraft.position);
+    assert.ok(distParked < 60.0, 'Camera should be in close showcase framing (< 60m)');
+
+    // Active rollout with groundSpeedKnots = 40
+    camSystem.update(0.016, aircraft, { onGround: true, groundSpeedKnots: 40, iasKnots: 40 });
+    assert.strictEqual(camSystem.flybyRegime, 'rollout', 'Should transition to rollout regime when groundSpeedKnots >= 23.3 kts (12 m/s)');
+    assert.ok(camera.position.x > aircraft.position.x + 80.0, 'Camera should be spotter camera well ahead of aircraft (> 80m)');
+  });
+
+  it('should reinitialize camera position when flight regime transitions between parked, rollout, and airborne', () => {
+    const camera = new THREE.PerspectiveCamera();
+    const camSystem = new CameraSystem(camera, mockDom);
+    camSystem.setTerrain(mockTerrainHeight);
+
+    const aircraft = new THREE.Object3D();
+    aircraft.position.set(0, 14.15, 0);
+    aircraft.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.5); // Facing East (+X)
+    aircraft.updateMatrixWorld(true);
+
+    camSystem.setMode(CameraSystem.MODES.FLYBY);
+
+    // 1. Initial Parked State: Showcase view ~45m ahead
+    camSystem.update(0.016, aircraft, { onGround: true, groundSpeedKnots: 0, iasKnots: 0 });
+    assert.strictEqual(camSystem.flybyRegime, 'parked');
+    assert.ok(camera.position.distanceTo(aircraft.position) < 60.0);
+
+    // 2. Accelerate for Takeoff: Rollout State (>= 12 m/s / ~23.3 kts)
+    // flybySet MUST be cleared and camera reinitialized to runway edge ~120m ahead
+    camSystem.update(0.016, aircraft, { onGround: true, groundSpeedKnots: 30, iasKnots: 30 });
+    assert.strictEqual(camSystem.flybyRegime, 'rollout');
+    assert.ok(camera.position.x > aircraft.position.x + 80.0, 'Camera must reinitialize ahead for rollout');
+    assert.ok(Math.abs(camera.position.z) > 15.0, 'Camera must be at runway edge offset');
+
+    // 3. Liftoff: Airborne State (onGround: false)
+    aircraft.position.set(500, 200, 0);
+    aircraft.updateMatrixWorld(true);
+    camSystem.update(0.016, aircraft, { onGround: false, groundSpeedKnots: 150, iasKnots: 150 });
+    assert.strictEqual(camSystem.flybyRegime, 'airborne');
+    assert.ok(camera.position.x > aircraft.position.x + 200.0, 'Camera must reinitialize 260m ahead along airborne flight path');
+
+    // 4. Touchdown & Deceleration back to parked:
+    aircraft.position.set(1200, 14.15, 0);
+    aircraft.updateMatrixWorld(true);
+    camSystem.update(0.016, aircraft, { onGround: true, groundSpeedKnots: 5, iasKnots: 5 });
+    assert.strictEqual(camSystem.flybyRegime, 'parked');
+    const landedDist = camera.position.distanceTo(aircraft.position);
+    assert.ok(landedDist >= 35.0 && landedDist <= 60.0, 'Camera must return to parked showcase framing after landing stop');
+  });
+
   it('should correctly snapToTarget in FLYBY mode', () => {
     const camera = new THREE.PerspectiveCamera();
     const camSystem = new CameraSystem(camera, mockDom);

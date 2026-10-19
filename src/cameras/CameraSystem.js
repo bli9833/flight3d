@@ -58,6 +58,7 @@ export class CameraSystem {
     // Flyby Camera State
     this.flybyPos = new THREE.Vector3();
     this.flybySet = false;
+    this.flybyRegime = null;
     this.getTerrainHeight = null;
 
     // Mouse drag look
@@ -187,6 +188,7 @@ export class CameraSystem {
       this.camera.up.set(0, 1, 0);
       this.camera.lookAt(planePos.clone().add(new THREE.Vector3(0, 1.2, 0)));
       this.flybySet = true;
+      this.flybyRegime = 'parked';
     } else {
       this.camera.position.copy(this.chasePos);
       this.camera.up.set(0, 1, 0);
@@ -203,6 +205,7 @@ export class CameraSystem {
     this.onTemporaryViewComplete = onComplete;
     if (this.mode === CameraSystem.MODES.FLYBY) {
       this.flybySet = false;
+      this.flybyRegime = null;
     }
   }
 
@@ -222,6 +225,7 @@ export class CameraSystem {
     this.mode = (this.mode + 1) % 7;
     if (this.mode === CameraSystem.MODES.FLYBY) {
       this.flybySet = false;
+      this.flybyRegime = null;
     }
     if (this.mode === CameraSystem.MODES.DRONE) {
       this.droneInitialized = false;
@@ -234,6 +238,7 @@ export class CameraSystem {
     this.mode = m;
     if (this.mode === CameraSystem.MODES.FLYBY) {
       this.flybySet = false;
+      this.flybyRegime = null;
     }
     if (this.mode === CameraSystem.MODES.DRONE) {
       this.droneInitialized = false;
@@ -370,8 +375,29 @@ export class CameraSystem {
         const groundSpeed = flightState
           ? (flightState.groundSpeed !== undefined
               ? flightState.groundSpeed
-              : (flightState.iasKnots ? flightState.iasKnots * 0.514444 : 0))
+              : (flightState.groundSpeedKnots !== undefined
+                  ? flightState.groundSpeedKnots * 0.514444
+                  : (flightState.iasKnots ? flightState.iasKnots * 0.514444 : 0)))
           : 0;
+
+        // Determine current flight regime:
+        // 'parked': on ground & low speed (< 12 m/s / ~23 kts) -> 45m front 3/4 showcase
+        // 'rollout': on ground & high speed (>= 12 m/s) -> 120m runway-edge spotter
+        // 'airborne': in flight -> 260m flyby along flight path
+        let currentRegime = 'airborne';
+        if (onGround) {
+          if (this.flybyRegime === 'rollout') {
+            currentRegime = groundSpeed < 9.0 ? 'parked' : 'rollout';
+          } else {
+            currentRegime = groundSpeed >= 12.0 ? 'rollout' : 'parked';
+          }
+        }
+
+        // Reinitialize flyby shot when flight regime changes
+        if (this.flybyRegime !== currentRegime) {
+          this.flybyRegime = currentRegime;
+          this.flybySet = false;
+        }
 
         // Aircraft forward vector projected onto horizontal plane
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(planeQuat);
@@ -384,7 +410,7 @@ export class CameraSystem {
         // Lateral right vector orthogonal to forward on horizontal plane
         const right = new THREE.Vector3(-forward.z, 0, forward.x);
 
-        if (onGround && groundSpeed < 12.0) {
+        if (currentRegime === 'parked') {
           // Case 1: Landed, parked, or slow taxiing on runway / apron
           // Position camera 45m ahead of nose, 9m to side for an impressive front 3/4 showcase view
           const targetX = planePos.x + forward.x * 45.0 + right.x * 9.0;
@@ -400,7 +426,7 @@ export class CameraSystem {
             // Smoothly track in front of aircraft if taxiing or turning
             this.flybyPos.lerp(targetPos, Math.min(1.0, dt * 6.0));
           }
-        } else if (onGround) {
+        } else if (currentRegime === 'rollout') {
           // Case 2: Active takeoff roll or landing rollout at high speed (>= 12 m/s / ~23 kts)
           // Runway-side spotter camera positioned ~120m ahead and 20m off centerline at runway edge
           if (!this.flybySet) {
