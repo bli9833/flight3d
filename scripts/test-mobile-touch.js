@@ -36,15 +36,16 @@ class MobileTouchTestRunner {
     this.log('Launching Mobile & Touchscreen Flight Controls Verification...', '🚀');
 
     // 1. Launch Headless Chrome
-    const profileDir = `/tmp/chrome-mobile-touch-${Date.now()}`;
+    const profileDir = path.resolve(process.cwd(), '.chrome-profile/mobile');
+    fs.mkdirSync(profileDir, { recursive: true });
     const args = [
       '--headless=new',
       `--user-data-dir=${profileDir}`,
       `--remote-debugging-port=${CDP_PORT}`,
       '--window-size=926,428',
-      '--use-gl=angle',
-      '--use-angle=swiftshader',
       '--enable-unsafe-swiftshader',
+      '--disable-dev-shm-usage',
+      '--no-sandbox',
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-background-networking',
@@ -58,20 +59,23 @@ class MobileTouchTestRunner {
       '--disable-sync',
       '--disable-translate',
       '--metrics-recording-only',
-      '--no-sandbox',
       '--disable-gpu-sandbox',
       SIM_URL
     ];
 
-    this.chromeProcess = spawn('/usr/bin/google-chrome', args, { stdio: 'ignore' });
+    this.chromeProcess = spawn('google-chrome-stable', args, { stdio: 'ignore' });
 
-    // Wait for CDP port
-    await new Promise(r => setTimeout(r, 2000));
-
-    // Connect to CDP target
-    const versionRes = await fetch(`http://localhost:${CDP_PORT}/json/list`);
-    const targets = await versionRes.json();
-    const pageTarget = targets.find(t => t.type === 'page');
+    // Wait for CDP port with retry loop
+    let pageTarget = null;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await new Promise(r => setTimeout(r, 300));
+      try {
+        const versionRes = await fetch(`http://localhost:${CDP_PORT}/json/list`);
+        const targets = await versionRes.json();
+        pageTarget = targets.find(t => t.type === 'page');
+        if (pageTarget && pageTarget.webSocketDebuggerUrl) break;
+      } catch (e) {}
+    }
     if (!pageTarget || !pageTarget.webSocketDebuggerUrl) {
       throw new Error('No page target found on CDP port');
     }

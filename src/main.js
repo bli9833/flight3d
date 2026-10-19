@@ -825,7 +825,15 @@ class FlightSimulator {
   }
 }
 
-// Start Simulator when DOM is ready
-window.addEventListener('DOMContentLoaded', () => {
-  window.simulator = new FlightSimulator();
-});
+// Start Simulator when DOM is ready (guaranteed across all browser lifecycle states)
+function initFlightSimulator() {
+  if (!window.simulator) {
+    window.simulator = new FlightSimulator();
+  }
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', initFlightSimulator);
+} else {
+  initFlightSimulator();
+}
