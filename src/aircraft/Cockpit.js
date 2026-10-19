@@ -2,12 +2,27 @@ import * as THREE from 'three';
 import { MCPCanvas } from './MCPCanvas.js';
 import { ISFDCanvas } from './ISFDCanvas.js';
 import { CDUCanvas } from './CDUCanvas.js';
+import { CockpitChecklistCanvas } from './CockpitChecklistCanvas.js';
 
 /**
- * 3D Virtual Cockpit for Boeing Airliner
- * Features fully animated dual control yokes, throttle quadrant, flap handle, spoiler lever,
- * trim wheels, rudder pedals, windshield frame, landing gear lever & lights, flap gauge,
- * dual FMC/CDU screens, standby ISFD, and integrated high-res digital flight displays (PFD, ND, EICAS, MCP).
+ * Helper to safely load textures in both Browser and Node.js environments
+ */
+function loadTextureSafe(url) {
+  if (typeof window === 'undefined') {
+    return new THREE.Texture();
+  }
+  const loader = new THREE.TextureLoader();
+  const tex = loader.load(url);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * 3D Virtual Cockpit for Boeing Airliner (Photorealistic PBR Enhanced)
+ * Features high-resolution photo-based PBR textures, display unit bezels with rotary brightness knobs,
+ * dual animated control yokes with approach chart clipboards, molded Boeing throttle quadrant with reverse latches,
+ * speedbrake & gated flap selector, dual striped trim wheels, 3-green landing gear unit, flap dial,
+ * authentic forward overhead panel with night illumination, windshield wipers, and warm Boeing amber floodlighting.
  */
 export class Cockpit {
   constructor(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas = null, isfdCanvas = null, cduCanvas = null) {
@@ -18,6 +33,7 @@ export class Cockpit {
     this.mcpCanvas = mcpCanvas || new MCPCanvas(1024, 128);
     this.isfdCanvas = isfdCanvas || new ISFDCanvas(256, 256);
     this.cduCanvas = cduCanvas || new CDUCanvas(512, 512);
+    this.checklistCanvas = new CockpitChecklistCanvas(512, 768);
 
     // Cockpit eye viewpoint (Captain's seat eye position in local aircraft space)
     this.captainEyePos = new THREE.Vector3(-0.48, 0.94, -12.08);
@@ -25,70 +41,113 @@ export class Cockpit {
     // Dynamic instruments references
     this.gearLever = null;
     this.gearLights = [];
+    this.gearLightMats = null;
     this.flapGaugeNeedle = null;
+
+    // Control surfaces references
+    this.captainYoke = null;
+    this.foYoke = null;
+    this.pedalLeft = null;
+    this.pedalRight = null;
+    this.throttle1 = null;
+    this.throttle2 = null;
+    this.flapLever = null;
+    this.spoilerLever = null;
+    this.trimWheelL = null;
+    this.trimWheelR = null;
 
     this.initCockpit();
   }
 
   initCockpit() {
-    // Materials
+    // 1. High-Resolution Photorealistic PBR Textures
+    this.overheadTex = loadTextureSafe('/textures/cockpit/b737_overhead.jpg');
+    this.mipTex = loadTextureSafe('/textures/cockpit/b737_mip.jpg');
+    this.pedestalTex = loadTextureSafe('/textures/cockpit/b737_pedestal.jpg');
+    this.yokeTex = loadTextureSafe('/textures/cockpit/b737_yoke.jpg');
+    this.mcpTex = loadTextureSafe('/textures/cockpit/b737_mcp.jpg');
+
+    // 2. High-Fidelity PBR Materials
     const darkInteriorMat = new THREE.MeshStandardMaterial({
-      color: 0x181e26,
-      roughness: 0.85,
+      color: 0x161b22,
+      roughness: 0.88,
       metalness: 0.15
     });
 
-    const boeingGreyMat = new THREE.MeshStandardMaterial({
-      color: 0x3d4852,
-      roughness: 0.65,
-      metalness: 0.25
-    });
-
-    const metalMat = new THREE.MeshStandardMaterial({
-      color: 0x8a9ba8,
-      roughness: 0.35,
-      metalness: 0.8
-    });
-
-    const leatherMat = new THREE.MeshStandardMaterial({
-      color: 0x181c20,
-      roughness: 0.9,
+    const glareshieldMat = new THREE.MeshStandardMaterial({
+      color: 0x12151a,
+      roughness: 0.95,
       metalness: 0.05
     });
 
-    // Glass windshield material (clean non-refractive transparent material, eliminating transmission pass buffer flickering)
+    const boeingGreyMat = new THREE.MeshStandardMaterial({
+      color: 0x36404c,
+      roughness: 0.55,
+      metalness: 0.35
+    });
+
+    const metalMat = new THREE.MeshStandardMaterial({
+      color: 0x82919e,
+      roughness: 0.35,
+      metalness: 0.85
+    });
+
+    const chromeMat = new THREE.MeshStandardMaterial({
+      color: 0xf1f5f9,
+      roughness: 0.12,
+      metalness: 0.95
+    });
+
+    const leatherMat = new THREE.MeshStandardMaterial({
+      color: 0x181c22,
+      roughness: 0.90,
+      metalness: 0.05
+    });
+
+    const bezelMat = new THREE.MeshStandardMaterial({
+      color: 0x22272f,
+      roughness: 0.45,
+      metalness: 0.65
+    });
+
+    const knobMat = new THREE.MeshStandardMaterial({
+      color: 0x2d3540,
+      roughness: 0.35,
+      metalness: 0.75
+    });
+
+    // Glass windshield material (clean non-refractive transparent material)
     const glassMat = new THREE.MeshStandardMaterial({
       color: 0x90b8d0,
       transparent: true,
-      opacity: 0.12,
-      roughness: 0.08,
+      opacity: 0.10,
+      roughness: 0.06,
       metalness: 0.25,
       depthWrite: false
     });
 
-
-    // 1. Cockpit Floor
+    // 3. Cockpit Floor
     const floorGeo = new THREE.BoxGeometry(2.4, 0.08, 2.6);
     const floor = new THREE.Mesh(floorGeo, darkInteriorMat);
     floor.position.set(0, 0.04, -12.0);
     this.group.add(floor);
 
-    // 2. Rear Bulkhead Wall & Door (behind pilot at z = -10.8)
+    // 4. Rear Bulkhead Wall & Door (behind pilot at z = -10.8)
     const bulkheadGeo = new THREE.BoxGeometry(2.4, 1.9, 0.08);
     const bulkhead = new THREE.Mesh(bulkheadGeo, darkInteriorMat);
     bulkhead.position.set(0, 0.95, -10.75);
     this.group.add(bulkhead);
 
-    // 3. Glare Shield Hood (Slim sun visor brow sloping from base of windshield forward to MCP)
-    const glareGeo = new THREE.BoxGeometry(2.1, 0.025, 0.16);
-    const glareShield = new THREE.Mesh(glareGeo, darkInteriorMat);
-    glareShield.position.set(0, 0.65, -12.63);
+    // 5. Glare Shield Hood (Sculpted sun visor brow sloping from base of windshield forward to MCP)
+    const glareGeo = new THREE.BoxGeometry(2.14, 0.028, 0.22);
+    const glareShield = new THREE.Mesh(glareGeo, glareshieldMat);
+    glareShield.position.set(0, 0.65, -12.62);
     glareShield.rotation.x = 0.12;
     this.group.add(glareShield);
 
-    // Glareshield front lip / brow
-    const browLip = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.035, 0.03), darkInteriorMat);
-    browLip.position.set(0, 0.61, -12.55);
+    // Glareshield front lip / beveled brow
+    const browLip = new THREE.Mesh(new THREE.BoxGeometry(2.14, 0.045, 0.04), glareshieldMat);
+    browLip.position.set(0, 0.61, -12.53);
     this.group.add(browLip);
 
     // MCP (Mode Control Panel) mounted on the front face of the glareshield brow
@@ -105,24 +164,39 @@ export class Cockpit {
     this.mcpMesh.rotation.x = -0.15;
     this.group.add(this.mcpMesh);
 
-    // 4. Main Instrument Panel (MIP)
-    const mipGeo = new THREE.BoxGeometry(2.1, 0.38, 0.04);
+    // 6. Main Instrument Panel (MIP)
+    const mipGeo = new THREE.BoxGeometry(2.12, 0.40, 0.04);
     const mipMesh = new THREE.Mesh(mipGeo, boeingGreyMat);
     mipMesh.position.set(0, 0.30, -12.60);
     mipMesh.rotation.x = -0.10;
     this.group.add(mipMesh);
 
-    // Windshield Pillars & Glass
-    this.buildWindshield(glassMat, darkInteriorMat);
+    // Photorealistic MIP Texture Faceplate Overlay (with subtle warm backlight)
+    const mipPlateGeo = new THREE.PlaneGeometry(2.10, 0.395);
+    const mipPlateMat = new THREE.MeshStandardMaterial({
+      map: this.mipTex,
+      roughness: 0.50,
+      metalness: 0.30,
+      emissive: 0xffffff,
+      emissiveMap: this.mipTex,
+      emissiveIntensity: 0.08
+    });
+    const mipPlate = new THREE.Mesh(mipPlateGeo, mipPlateMat);
+    mipPlate.position.set(0, 0.30, -12.578);
+    mipPlate.rotation.x = -0.10;
+    this.group.add(mipPlate);
 
-    // Flight Displays: Captain PFD, Captain ND, ISFD, Upper EICAS, FO ND, FO PFD, Gear Lever & Flap Dial
-    this.buildFlightDisplays(boeingGreyMat, metalMat);
+    // Windshield Pillars, Compass & Wipers
+    this.buildWindshield(glassMat, darkInteriorMat, metalMat);
 
-    // Center Console, CDUs & Throttle Pedestal
-    this.buildPedestal(boeingGreyMat, metalMat);
+    // Flight Displays with High-Detail Bezel Frames & Knobs
+    this.buildFlightDisplays(boeingGreyMat, bezelMat, knobMat, metalMat, chromeMat);
 
-    // Dual Boeing Control Yokes (Captain & First Officer)
-    this.buildYokes(boeingGreyMat, metalMat);
+    // Center Console, CDUs & High-Detail Throttle Pedestal
+    this.buildPedestal(boeingGreyMat, metalMat, chromeMat);
+
+    // Dual Boeing Control Yokes (Captain & First Officer with Approach Chart Clipboards)
+    this.buildYokes(boeingGreyMat, metalMat, chromeMat);
 
     // Rudder Pedals
     this.buildRudderPedals(metalMat);
@@ -130,34 +204,34 @@ export class Cockpit {
     // Pilot & Copilot Seats
     this.buildSeats(leatherMat, boeingGreyMat);
 
-    // Cockpit Overhead Panel
+    // High-Resolution Forward Overhead Panel (sloping over pilots)
     this.buildOverheadPanel(boeingGreyMat);
 
-    // MSFS 2024 Authentic Boeing Flight Deck Lighting:
-    // 1. Glareshield Underside Amber Integral Floodlight (illuminates main instrument panel with Boeing amber glow)
-    this.glareshieldFlood = new THREE.PointLight(0xffa84c, 2.2, 2.4);
+    // Boeing Authentic Flight Deck Lighting:
+    // 1. Glareshield Underside Amber Integral Floodlight (illuminates MIP with authentic warm amber glow)
+    this.glareshieldFlood = new THREE.PointLight(0xffa84c, 2.5, 2.6);
     this.glareshieldFlood.position.set(0, 0.58, -12.52);
     this.group.add(this.glareshieldFlood);
 
-    // 2. Center Pedestal Floodlight (amber illumination for FMC/CDU and throttle quadrant)
-    this.pedestalFlood = new THREE.PointLight(0xffb55e, 1.4, 2.0);
+    // 2. Center Pedestal Floodlight (amber illumination for CDUs and throttle quadrant)
+    this.pedestalFlood = new THREE.PointLight(0xffb55e, 1.6, 2.2);
     this.pedestalFlood.position.set(0, 0.50, -12.05);
     this.group.add(this.pedestalFlood);
 
-    // 3. Cabin Overhead Fill Light
+    // 3. Cabin Overhead Fill Dome Light
     this.cockpitLight = new THREE.PointLight(0xffeedd, 0.8, 3.5);
     this.cockpitLight.position.set(0, 1.15, -12.1);
     this.group.add(this.cockpitLight);
   }
 
-  buildWindshield(glassMat, frameMat) {
-    // Left Front Windshield
+  buildWindshield(glassMat, frameMat, metalMat) {
+    // Left Front Windshield Glass
     const frontL = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.52), glassMat);
     frontL.position.set(-0.45, 0.95, -12.82);
     frontL.rotation.set(-0.38, 0.20, -0.06);
     this.group.add(frontL);
 
-    // Right Front Windshield
+    // Right Front Windshield Glass
     const frontR = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.52), glassMat);
     frontR.position.set(0.45, 0.95, -12.82);
     frontR.rotation.set(-0.38, -0.20, 0.06);
@@ -168,6 +242,22 @@ export class Cockpit {
     postCenter.position.set(0, 0.95, -12.82);
     postCenter.rotation.x = -0.38;
     this.group.add(postCenter);
+
+    // Standby Magnetic Compass mounted on Center Post
+    const compassGroup = new THREE.Group();
+    compassGroup.position.set(0, 1.05, -12.72);
+    const compassBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.024, 0.024, 0.035, 16),
+      new THREE.MeshStandardMaterial({ color: 0x1e242c, roughness: 0.5 })
+    );
+    compassBody.rotation.x = Math.PI * 0.5;
+    const compassFace = new THREE.Mesh(
+      new THREE.CircleGeometry(0.020, 16),
+      new THREE.MeshBasicMaterial({ color: 0x0f172a })
+    );
+    compassFace.position.z = 0.018;
+    compassGroup.add(compassBody, compassFace);
+    this.group.add(compassGroup);
 
     // Left A-Pillar (angled windshield corner beam)
     const postLeft = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.68, 0.07), frameMat);
@@ -183,7 +273,7 @@ export class Cockpit {
 
     // Top Roof Windshield Header Beam
     const roofHeader = new THREE.Mesh(new THREE.BoxGeometry(1.88, 0.08, 0.12), frameMat);
-    roofHeader.position.set(0, 1.20, -12.68);
+    roofHeader.position.set(0, 1.22, -12.68);
     roofHeader.rotation.x = 0.05;
     this.group.add(roofHeader);
 
@@ -191,6 +281,36 @@ export class Cockpit {
     const sillBeam = new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.06, 0.08), frameMat);
     sillBeam.position.set(0, 0.68, -12.72);
     this.group.add(sillBeam);
+
+    // Windshield Wipers parked neatly along lower windshield sill
+    const buildWiper = (xBase, isLeft) => {
+      const wiperGroup = new THREE.Group();
+      wiperGroup.position.set(xBase, 0.70, -12.70);
+      wiperGroup.rotation.x = -0.38;
+
+      // Motor pivot hub
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.02, 12), metalMat);
+      hub.rotation.x = Math.PI * 0.5;
+
+      // Wiper articulated arm
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.26, 8), frameMat);
+      arm.position.set(isLeft ? -0.12 : 0.12, 0.08, 0.01);
+      arm.rotation.z = isLeft ? 1.15 : -1.15;
+
+      // Rubber wiper blade
+      const blade = new THREE.Mesh(
+        new THREE.BoxGeometry(0.006, 0.32, 0.008),
+        new THREE.MeshStandardMaterial({ color: 0x0a0c10, roughness: 0.9 })
+      );
+      blade.position.set(isLeft ? -0.18 : 0.18, 0.14, 0.015);
+      blade.rotation.z = isLeft ? 1.15 : -1.15;
+
+      wiperGroup.add(hub, arm, blade);
+      return wiperGroup;
+    };
+
+    this.group.add(buildWiper(-0.25, true));
+    this.group.add(buildWiper(0.25, false));
 
     // Left Side Window
     const sideL = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.48), glassMat);
@@ -205,7 +325,60 @@ export class Cockpit {
     this.group.add(sideR);
   }
 
-  buildFlightDisplays(boeingGreyMat, metalMat) {
+  /**
+   * Builds high-detail Collins/Honeywell Display Unit (DU) bezels around flight screens
+   */
+  createDisplayBezel(width, height, bezelMat, knobMat, chromeMat) {
+    const bezelGroup = new THREE.Group();
+    const frameThick = 0.014;
+    const depth = 0.012;
+
+    // Top bezel bar
+    const topBar = new THREE.Mesh(new THREE.BoxGeometry(width + frameThick * 2, frameThick, depth), bezelMat);
+    topBar.position.y = height * 0.5 + frameThick * 0.5;
+
+    // Bottom bezel bar
+    const botBar = new THREE.Mesh(new THREE.BoxGeometry(width + frameThick * 2, frameThick, depth), bezelMat);
+    botBar.position.y = -(height * 0.5 + frameThick * 0.5);
+
+    // Left bezel bar
+    const leftBar = new THREE.Mesh(new THREE.BoxGeometry(frameThick, height, depth), bezelMat);
+    leftBar.position.x = -(width * 0.5 + frameThick * 0.5);
+
+    // Right bezel bar
+    const rightBar = new THREE.Mesh(new THREE.BoxGeometry(frameThick, height, depth), bezelMat);
+    rightBar.position.x = width * 0.5 + frameThick * 0.5;
+
+    bezelGroup.add(topBar, botBar, leftBar, rightBar);
+
+    // Corner mounting screws (4 chrome hex screws)
+    const screwGeo = new THREE.CylinderGeometry(0.0028, 0.0028, 0.004, 8);
+    screwGeo.rotateX(Math.PI * 0.5);
+    const corners = [
+      [-width * 0.5 - 0.004, height * 0.5 + 0.004],
+      [width * 0.5 + 0.004, height * 0.5 + 0.004],
+      [-width * 0.5 - 0.004, -height * 0.5 - 0.004],
+      [width * 0.5 + 0.004, -height * 0.5 - 0.004]
+    ];
+    for (const [cx, cy] of corners) {
+      const screw = new THREE.Mesh(screwGeo, chromeMat);
+      screw.position.set(cx, cy, depth * 0.5 + 0.001);
+      bezelGroup.add(screw);
+    }
+
+    // Rotary brightness knobs at bottom corners
+    const knobGeo = new THREE.CylinderGeometry(0.0055, 0.0055, 0.008, 12);
+    knobGeo.rotateX(Math.PI * 0.5);
+    const knobL = new THREE.Mesh(knobGeo, knobMat);
+    knobL.position.set(-width * 0.5 + 0.02, -height * 0.5 - frameThick * 0.5, depth * 0.5 + 0.003);
+    const knobR = new THREE.Mesh(knobGeo, knobMat);
+    knobR.position.set(width * 0.5 - 0.02, -height * 0.5 - frameThick * 0.5, depth * 0.5 + 0.003);
+    bezelGroup.add(knobL, knobR);
+
+    return bezelGroup;
+  }
+
+  buildFlightDisplays(boeingGreyMat, bezelMat, knobMat, metalMat, chromeMat) {
     const pfdMat = new THREE.MeshBasicMaterial({ map: this.pfdCanvas.texture });
     const ndMat = new THREE.MeshBasicMaterial({ map: this.ndCanvas.texture });
     const eicasMat = new THREE.MeshBasicMaterial({ map: this.eicasCanvas.texture });
@@ -213,40 +386,48 @@ export class Cockpit {
 
     const screenGeo = new THREE.PlaneGeometry(0.20, 0.20);
     const mipRotX = -0.10;
-    const dispZ = -12.575;
+    const dispZ = -12.570;
+
+    // Helper to add a screen along with its modeled 3D DU bezel
+    const addDisplayWithBezel = (x, y, mat) => {
+      const screenMesh = new THREE.Mesh(screenGeo, mat);
+      screenMesh.position.set(x, y, dispZ);
+      screenMesh.rotation.x = mipRotX;
+
+      const bezel = this.createDisplayBezel(0.20, 0.20, bezelMat, knobMat, chromeMat);
+      bezel.position.set(x, y, dispZ + 0.004);
+      bezel.rotation.x = mipRotX;
+
+      this.group.add(screenMesh, bezel);
+      return screenMesh;
+    };
 
     // 1. Captain PFD (Outboard left)
-    this.pfdScreen = new THREE.Mesh(screenGeo, pfdMat);
-    this.pfdScreen.position.set(-0.48, 0.32, dispZ);
-    this.pfdScreen.rotation.x = mipRotX;
-    this.group.add(this.pfdScreen);
+    this.pfdScreen = addDisplayWithBezel(-0.48, 0.32, pfdMat);
 
     // 2. Captain ND (Inboard left)
-    this.ndScreen = new THREE.Mesh(screenGeo, ndMat);
-    this.ndScreen.position.set(-0.24, 0.32, dispZ);
-    this.ndScreen.rotation.x = mipRotX;
-    this.group.add(this.ndScreen);
+    this.ndScreen = addDisplayWithBezel(-0.24, 0.32, ndMat);
 
     // 3. Standby ISFD (Integrated Standby Flight Display, center-left)
     const isfdGeo = new THREE.PlaneGeometry(0.10, 0.10);
     this.isfdScreen = new THREE.Mesh(isfdGeo, isfdMat);
     this.isfdScreen.position.set(-0.06, 0.36, dispZ);
     this.isfdScreen.rotation.x = mipRotX;
-    this.group.add(this.isfdScreen);
+    const isfdBezel = this.createDisplayBezel(0.10, 0.10, bezelMat, knobMat, chromeMat);
+    isfdBezel.position.set(-0.06, 0.36, dispZ + 0.004);
+    isfdBezel.rotation.x = mipRotX;
+    this.group.add(this.isfdScreen, isfdBezel);
 
     // 4. Center Upper EICAS
-    this.eicasScreen = new THREE.Mesh(screenGeo, eicasMat);
-    this.eicasScreen.position.set(0.11, 0.32, dispZ);
-    this.eicasScreen.rotation.x = mipRotX;
-    this.group.add(this.eicasScreen);
+    this.eicasScreen = addDisplayWithBezel(0.11, 0.32, eicasMat);
 
-    // 5. Landing Gear Lever & 3-Green Annunciators on Center MIP (x = 0.26)
+    // 5. Landing Gear Lever & 3-Green Annunciators on Center MIP (x = 0.27)
     const gearModuleGroup = new THREE.Group();
-    gearModuleGroup.position.set(0.26, 0.37, dispZ + 0.005);
+    gearModuleGroup.position.set(0.27, 0.37, dispZ + 0.006);
     gearModuleGroup.rotation.x = mipRotX;
 
     // Gear lever base plate
-    const gearPlate = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.10, 0.01), boeingGreyMat);
+    const gearPlate = new THREE.Mesh(new THREE.BoxGeometry(0.068, 0.11, 0.012), boeingGreyMat);
     gearModuleGroup.add(gearPlate);
 
     // 3 Gear indicator lights (Nose, Left, Right)
@@ -255,39 +436,47 @@ export class Cockpit {
     const lightMatOff = new THREE.MeshBasicMaterial({ color: 0x1e293b });
     this.gearLightMats = { green: lightMatGreen, amber: lightMatAmber, off: lightMatOff };
 
-    const noseLight = new THREE.Mesh(new THREE.CircleGeometry(0.006, 12), lightMatGreen);
-    noseLight.position.set(0, 0.032, 0.006);
-    const leftLight = new THREE.Mesh(new THREE.CircleGeometry(0.006, 12), lightMatGreen);
-    leftLight.position.set(-0.016, 0.018, 0.006);
-    const rightLight = new THREE.Mesh(new THREE.CircleGeometry(0.006, 12), lightMatGreen);
-    rightLight.position.set(0.016, 0.018, 0.006);
+    const noseLight = new THREE.Mesh(new THREE.CircleGeometry(0.0065, 12), lightMatGreen);
+    noseLight.position.set(0, 0.034, 0.007);
+    const leftLight = new THREE.Mesh(new THREE.CircleGeometry(0.0065, 12), lightMatGreen);
+    leftLight.position.set(-0.018, 0.018, 0.007);
+    const rightLight = new THREE.Mesh(new THREE.CircleGeometry(0.0065, 12), lightMatGreen);
+    rightLight.position.set(0.018, 0.018, 0.007);
     gearModuleGroup.add(noseLight, leftLight, rightLight);
     this.gearLights = [noseLight, leftLight, rightLight];
 
-    // Landing Gear Handle
+    // Landing Gear Handle (Translucent Wheel Knob on Chrome Rod)
     this.gearLever = new THREE.Group();
-    this.gearLever.position.set(0, -0.012, 0.01);
-    const leverRod = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.04, 8), metalMat);
+    this.gearLever.position.set(0, -0.012, 0.012);
+    const leverRod = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.045, 8), chromeMat);
     leverRod.position.y = -0.018;
     const leverWheelKnob = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.012, 0.012, 0.010, 16),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, transparent: true, opacity: 0.85 })
+      new THREE.CylinderGeometry(0.013, 0.013, 0.011, 16),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.15, transparent: true, opacity: 0.88 })
     );
     leverWheelKnob.rotation.z = Math.PI * 0.5;
-    leverWheelKnob.position.y = -0.038;
+    leverWheelKnob.position.y = -0.040;
     this.gearLever.add(leverRod, leverWheelKnob);
     gearModuleGroup.add(this.gearLever);
     this.group.add(gearModuleGroup);
 
-    // 6. Flap Position Indicator Gauge (below gear lever at x = 0.26, y = 0.27)
+    // 6. Flap Position Indicator Gauge (below gear lever at x = 0.27, y = 0.265)
     const flapGaugeGroup = new THREE.Group();
-    flapGaugeGroup.position.set(0.26, 0.27, dispZ + 0.005);
+    flapGaugeGroup.position.set(0.27, 0.265, dispZ + 0.006);
     flapGaugeGroup.rotation.x = mipRotX;
+
+    const flapDialBezel = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.033, 0.033, 0.008, 24),
+      bezelMat
+    );
+    flapDialBezel.rotation.x = Math.PI * 0.5;
 
     const flapDial = new THREE.Mesh(
       new THREE.CircleGeometry(0.030, 24),
-      new THREE.MeshBasicMaterial({ color: 0x0f172a })
+      new THREE.MeshBasicMaterial({ color: 0x090d14 })
     );
+    flapDial.position.z = 0.005;
+
     const flapNeedle = new THREE.Mesh(
       new THREE.PlaneGeometry(0.003, 0.024),
       new THREE.MeshBasicMaterial({ color: 0xffffff })
@@ -295,24 +484,30 @@ export class Cockpit {
     flapNeedle.position.y = 0.010;
     this.flapGaugeNeedle = new THREE.Group();
     this.flapGaugeNeedle.add(flapNeedle);
-    this.flapGaugeNeedle.position.z = 0.002;
-    flapGaugeGroup.add(flapDial, this.flapGaugeNeedle);
+    this.flapGaugeNeedle.position.z = 0.007;
+
+    flapGaugeGroup.add(flapDialBezel, flapDial, this.flapGaugeNeedle);
     this.group.add(flapGaugeGroup);
 
-    // 7. First Officer ND (Inboard right)
-    const foNdScreen = new THREE.Mesh(screenGeo, ndMat);
-    foNdScreen.position.set(0.42, 0.32, dispZ);
-    foNdScreen.rotation.x = mipRotX;
-    this.group.add(foNdScreen);
+    // 7. Autobrake Rotary Switch Module (to the left of gear unit at x = 0.19)
+    const autobrakeGroup = new THREE.Group();
+    autobrakeGroup.position.set(0.19, 0.35, dispZ + 0.006);
+    autobrakeGroup.rotation.x = mipRotX;
+    const abPlate = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.07, 0.008), boeingGreyMat);
+    const abKnob = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.016, 12), knobMat);
+    abKnob.rotation.x = Math.PI * 0.5;
+    abKnob.position.z = 0.008;
+    autobrakeGroup.add(abPlate, abKnob);
+    this.group.add(autobrakeGroup);
 
-    // 8. First Officer PFD (Outboard right)
-    const foPfdScreen = new THREE.Mesh(screenGeo, pfdMat);
-    foPfdScreen.position.set(0.66, 0.32, dispZ);
-    foPfdScreen.rotation.x = mipRotX;
-    this.group.add(foPfdScreen);
+    // 8. First Officer ND (Inboard right)
+    this.foNdScreen = addDisplayWithBezel(0.42, 0.32, ndMat);
+
+    // 9. First Officer PFD (Outboard right)
+    this.foPfdScreen = addDisplayWithBezel(0.66, 0.32, pfdMat);
   }
 
-  buildPedestal(pedMat, metalMat) {
+  buildPedestal(pedMat, metalMat, chromeMat) {
     this.pedestalGroup = new THREE.Group();
     this.pedestalGroup.position.set(0, 0.16, -12.22);
 
@@ -321,6 +516,28 @@ export class Cockpit {
     const baseMesh = new THREE.Mesh(baseGeo, pedMat);
     this.pedestalGroup.add(baseMesh);
 
+    // Photorealistic Pedestal Top Plate
+    const topPlateGeo = new THREE.PlaneGeometry(0.46, 0.50);
+    const topPlateMat = new THREE.MeshStandardMaterial({
+      map: this.pedestalTex,
+      roughness: 0.50,
+      metalness: 0.30,
+      emissive: 0xffd59e,
+      emissiveMap: this.pedestalTex,
+      emissiveIntensity: 0.09
+    });
+    const topPlate = new THREE.Mesh(topPlateGeo, topPlateMat);
+    topPlate.position.set(0, 0.191, -0.04);
+    topPlate.rotation.x = -Math.PI * 0.5;
+    this.pedestalGroup.add(topPlate);
+
+    // Aft Radio Control Panels Plate
+    const radioPlateGeo = new THREE.PlaneGeometry(0.44, 0.36);
+    const radioPlate = new THREE.Mesh(radioPlateGeo, topPlateMat);
+    radioPlate.position.set(0, 0.191, 0.28);
+    radioPlate.rotation.x = -Math.PI * 0.5;
+    this.pedestalGroup.add(radioPlate);
+
     // 2. Slanted FMC / CDU Mounting Bay (Transition between MIP and pedestal)
     const cduMountGeo = new THREE.BoxGeometry(0.48, 0.26, 0.04);
     const cduMountMesh = new THREE.Mesh(cduMountGeo, pedMat);
@@ -328,7 +545,7 @@ export class Cockpit {
     cduMountMesh.rotation.x = -0.65; // Slanted 37 degrees toward pilots
     this.pedestalGroup.add(cduMountMesh);
 
-    // Dual FMC / CDU Screens
+    // Dual FMC / CDU Screens with Bezel Mountings
     const cduMat = new THREE.MeshBasicMaterial({ map: this.cduCanvas.texture });
     const cduGeo = new THREE.PlaneGeometry(0.20, 0.20);
 
@@ -346,154 +563,155 @@ export class Cockpit {
 
     // 3. Throttle Quadrant Housing
     const tqGeo = new THREE.BoxGeometry(0.38, 0.18, 0.40);
-    const tqMesh = new THREE.Mesh(tqGeo, new THREE.MeshStandardMaterial({ color: 0x1b2028 }));
+    const tqMesh = new THREE.Mesh(tqGeo, new THREE.MeshStandardMaterial({ color: 0x1b2028, roughness: 0.7 }));
     tqMesh.position.set(0, 0.22, 0.02);
     this.pedestalGroup.add(tqMesh);
 
-    // Twin Throttle Levers
+    // Molded Boeing White Throttle Lever Handles with Reverser Latches
     this.throttleLevers = new THREE.Group();
     this.throttleLevers.position.set(0, 0.28, 0.02);
 
-    const leverGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.18, 8);
-    const knobGeo = new THREE.BoxGeometry(0.045, 0.06, 0.08);
+    const leverRodGeo = new THREE.CylinderGeometry(0.010, 0.010, 0.18, 12);
+    const whiteKnobMat = new THREE.MeshStandardMaterial({ color: 0xf4f7fa, roughness: 0.3, metalness: 0.1 });
+    const revLatchMat = new THREE.MeshStandardMaterial({ color: 0x22262d, roughness: 0.4, metalness: 0.6 });
 
-    // Left Engine Throttle
-    this.throttle1 = new THREE.Group();
-    const lRod = new THREE.Mesh(leverGeo, metalMat);
-    lRod.position.y = 0.09;
-    const lKnob = new THREE.Mesh(knobGeo, new THREE.MeshStandardMaterial({ color: 0x222222 }));
-    lKnob.position.set(0, 0.18, 0);
-    // Reverse piggyback lever
-    const lRev = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.03), metalMat);
-    lRev.position.set(0, 0.19, -0.045);
-    this.throttle1.add(lRod, lKnob, lRev);
-    this.throttle1.position.x = -0.045;
-    this.throttleLevers.add(this.throttle1);
+    // Helper to create molded Boeing thrust lever head
+    const createThrustLever = (xPos) => {
+      const leverGroup = new THREE.Group();
+      leverGroup.position.x = xPos;
 
-    // Right Engine Throttle
-    this.throttle2 = new THREE.Group();
-    const rRod = new THREE.Mesh(leverGeo, metalMat);
-    rRod.position.y = 0.09;
-    const rKnob = new THREE.Mesh(knobGeo, new THREE.MeshStandardMaterial({ color: 0x222222 }));
-    rKnob.position.set(0, 0.18, 0);
-    const rRev = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.03), metalMat);
-    rRev.position.set(0, 0.19, -0.045);
-    this.throttle2.add(rRod, rKnob, rRev);
-    this.throttle2.position.x = 0.045;
-    this.throttleLevers.add(this.throttle2);
+      // Chrome lever rod
+      const rod = new THREE.Mesh(leverRodGeo, chromeMat);
+      rod.position.y = 0.09;
 
+      // Ergonomic cylindrical handle head
+      const head = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.055, 16), whiteKnobMat);
+      head.rotation.z = Math.PI * 0.5;
+      head.position.set(0, 0.18, 0);
+
+      // Reverse thrust piggyback latch handle in front
+      const revLatch = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.05, 0.024), revLatchMat);
+      revLatch.position.set(0, 0.19, -0.038);
+
+      leverGroup.add(rod, head, revLatch);
+      return leverGroup;
+    };
+
+    this.throttle1 = createThrustLever(-0.045);
+    this.throttle2 = createThrustLever(0.045);
+    this.throttleLevers.add(this.throttle1, this.throttle2);
     this.pedestalGroup.add(this.throttleLevers);
 
-    // Flap Handle (to the right of throttles)
+    // Flap Handle (to the right of throttles at x = 0.12)
     this.flapLever = new THREE.Group();
     this.flapLever.position.set(0.12, 0.28, 0.08);
-    const flapRod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.14, 8), metalMat);
+    const flapRod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.14, 8), chromeMat);
     flapRod.position.y = 0.07;
-    const flapKnob = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.035, 12), new THREE.MeshStandardMaterial({ color: 0xeeeeee }));
+    const flapKnob = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.024, 0.024, 0.035, 16),
+      whiteKnobMat
+    );
     flapKnob.rotation.z = Math.PI * 0.5;
     flapKnob.position.y = 0.14;
     this.flapLever.add(flapRod, flapKnob);
     this.pedestalGroup.add(this.flapLever);
 
-    // Speedbrake / Spoiler Lever (to the left of throttles)
+    // Speedbrake / Spoiler Lever (to the left of throttles at x = -0.12)
     this.spoilerLever = new THREE.Group();
     this.spoilerLever.position.set(-0.12, 0.28, 0.04);
-    const spRod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.14, 8), metalMat);
+    const spRod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.14, 8), chromeMat);
     spRod.position.y = 0.07;
-    const spKnob = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.04, 0.05), new THREE.MeshStandardMaterial({ color: 0x33b5e5 }));
+    const spKnob = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.016, 0.016, 0.045, 12),
+      new THREE.MeshStandardMaterial({ color: 0x181a1f, roughness: 0.4 })
+    );
+    spKnob.rotation.z = Math.PI * 0.5;
     spKnob.position.y = 0.14;
-    this.spoilerLever.add(spRod, spKnob);
+    // White ARM band on speedbrake handle
+    const spBand = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.0165, 0.0165, 0.010, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    spBand.rotation.z = Math.PI * 0.5;
+    spBand.position.y = 0.14;
+    this.spoilerLever.add(spRod, spKnob, spBand);
     this.pedestalGroup.add(this.spoilerLever);
 
-    // Prominent Dual Boeing Trim Wheels with White Stripes
-    const trimRadius = 0.12;
-    const trimThickness = 0.035;
-    const trimGroupL = new THREE.Group();
-    const trimGroupR = new THREE.Group();
+    // High-Contrast Dual Boeing Trim Wheels with Black & White Striped Spiral Rim
+    const trimRadius = 0.125;
+    const trimThickness = 0.038;
+    const buildTrimWheel = (xPos) => {
+      const trimGroup = new THREE.Group();
+      trimGroup.position.set(xPos, 0.20, 0.02);
 
-    // Wheel rim
-    const rimGeo = new THREE.CylinderGeometry(trimRadius, trimRadius, trimThickness, 24);
-    rimGeo.rotateZ(Math.PI * 0.5);
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1f242b, roughness: 0.6 });
+      const rimGeo = new THREE.CylinderGeometry(trimRadius, trimRadius, trimThickness, 32);
+      rimGeo.rotateZ(Math.PI * 0.5);
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x181b20, roughness: 0.55 });
+      const rim = new THREE.Mesh(rimGeo, wheelMat);
+      trimGroup.add(rim);
 
-    const rimL = new THREE.Mesh(rimGeo, wheelMat);
-    const rimR = new THREE.Mesh(rimGeo, wheelMat);
-    trimGroupL.add(rimL);
-    trimGroupR.add(rimR);
+      // High-visibility alternating white spiral stripes (4 dual segments)
+      const stripeGeo = new THREE.BoxGeometry(trimThickness + 0.002, 0.018, trimRadius * 2 + 0.004);
+      const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      for (let a = 0; a < 4; a++) {
+        const str = new THREE.Mesh(stripeGeo, stripeMat);
+        str.rotation.x = (Math.PI / 4) * a;
+        trimGroup.add(str);
+      }
+      return trimGroup;
+    };
 
-    // High-visibility white indicator stripes on trim wheels
-    const stripeGeo = new THREE.BoxGeometry(trimThickness + 0.002, 0.015, trimRadius * 2 + 0.004);
-    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const stripe1L = new THREE.Mesh(stripeGeo, stripeMat);
-    const stripe2L = new THREE.Mesh(stripeGeo, stripeMat);
-    stripe2L.rotation.x = Math.PI * 0.5;
-    trimGroupL.add(stripe1L, stripe2L);
-
-    const stripe1R = new THREE.Mesh(stripeGeo, stripeMat);
-    const stripe2R = new THREE.Mesh(stripeGeo, stripeMat);
-    stripe2R.rotation.x = Math.PI * 0.5;
-    trimGroupR.add(stripe1R, stripe2R);
-
-    this.trimWheelL = trimGroupL;
-    this.trimWheelR = trimGroupR;
-    this.trimWheelL.position.set(-0.25, 0.20, 0.02);
-    this.trimWheelR.position.set(0.25, 0.20, 0.02);
+    this.trimWheelL = buildTrimWheel(-0.25);
+    this.trimWheelR = buildTrimWheel(0.25);
     this.pedestalGroup.add(this.trimWheelL, this.trimWheelR);
 
-    // 4. Aft Pedestal Radio & Transponder Modules
-    const radioGeo = new THREE.BoxGeometry(0.44, 0.04, 0.38);
-    const radioMesh = new THREE.Mesh(radioGeo, new THREE.MeshStandardMaterial({ color: 0x161c24 }));
-    radioMesh.position.set(0, 0.20, 0.36);
-    this.pedestalGroup.add(radioMesh);
+    // Dual Engine Fuel Cutoff Levers (below throttles)
+    const fuelCutoffGroup = new THREE.Group();
+    fuelCutoffGroup.position.set(0, 0.22, 0.16);
+    const fcLeverGeo = new THREE.CylinderGeometry(0.005, 0.005, 0.035, 8);
+    const fcL = new THREE.Mesh(fcLeverGeo, chromeMat);
+    fcL.position.x = -0.035;
+    const fcR = new THREE.Mesh(fcLeverGeo, chromeMat);
+    fcR.position.x = 0.035;
+    fuelCutoffGroup.add(fcL, fcR);
+    this.pedestalGroup.add(fuelCutoffGroup);
 
-    // Illuminated Radio Digital displays (COMM 1 & 2, NAV 1 & 2, XPNDR)
-    const radioScreenGeo = new THREE.PlaneGeometry(0.38, 0.12);
-    const radioCanvas = document.createElement('canvas');
-    radioCanvas.width = 512;
-    radioCanvas.height = 160;
-    const rctx = radioCanvas.getContext('2d');
-    rctx.fillStyle = '#0a0e14';
-    rctx.fillRect(0, 0, 512, 160);
-    rctx.fillStyle = '#ff9f1c'; // Amber frequency text
-    rctx.font = 'bold 20px monospace';
-    rctx.fillText('COMM 1: 118.700 [ACTIVE]   121.900 [STBY]', 20, 40);
-    rctx.fillText('NAV 1:  109.500 [ILS 09L]  113.800 [VOR]', 20, 80);
-    rctx.fillStyle = '#22c55e'; // Green TCAS XPNDR
-    rctx.fillText('XPNDR:  2200  TA/RA  ALT RPTG ON', 20, 120);
-
-    const radioTexture = new THREE.CanvasTexture(radioCanvas);
-    const radioScreen = new THREE.Mesh(radioScreenGeo, new THREE.MeshBasicMaterial({ map: radioTexture }));
-    radioScreen.position.set(0, 0.225, 0.36);
-    radioScreen.rotation.x = -Math.PI * 0.5;
-    this.pedestalGroup.add(radioScreen);
-
-    // Parking Brake Handle
-    const pbGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.08, 12);
-    this.parkBrakeHandle = new THREE.Mesh(pbGeo, new THREE.MeshStandardMaterial({ color: 0xdd2222 }));
-    this.parkBrakeHandle.position.set(0, 0.24, 0.18);
+    // Parking Brake Handle (Red pull handle with chrome latch)
+    const pbGeo = new THREE.CylinderGeometry(0.014, 0.014, 0.08, 12);
+    this.parkBrakeHandle = new THREE.Mesh(pbGeo, new THREE.MeshStandardMaterial({ color: 0xd92d20, roughness: 0.3 }));
+    this.parkBrakeHandle.rotation.x = Math.PI * 0.25;
+    this.parkBrakeHandle.position.set(0, 0.23, 0.24);
     this.pedestalGroup.add(this.parkBrakeHandle);
 
     this.group.add(this.pedestalGroup);
   }
 
-  buildYokes(boeingGreyMat, metalMat) {
-    this.captainYoke = this.createBoeingYoke(boeingGreyMat, metalMat);
+  buildYokes(boeingGreyMat, metalMat, chromeMat) {
+    this.captainYoke = this.createBoeingYoke(boeingGreyMat, metalMat, chromeMat);
     this.captainYoke.root.position.set(-0.48, 0.08, -12.35);
     this.group.add(this.captainYoke.root);
 
-    this.foYoke = this.createBoeingYoke(boeingGreyMat, metalMat);
+    this.foYoke = this.createBoeingYoke(boeingGreyMat, metalMat, chromeMat);
     this.foYoke.root.position.set(0.48, 0.08, -12.35);
     this.group.add(this.foYoke.root);
   }
 
-  createBoeingYoke(yokeMat, metalMat) {
+  createBoeingYoke(yokeMat, metalMat, chromeMat) {
     const root = new THREE.Group();
 
-    // Control Column (Floor mounting tube)
-    const columnGeo = new THREE.CylinderGeometry(0.028, 0.035, 0.50, 12);
+    // Control Column (Floor mounting tube with rubber pivot boot)
+    const columnGeo = new THREE.CylinderGeometry(0.030, 0.038, 0.50, 16);
     const columnMesh = new THREE.Mesh(columnGeo, metalMat);
     columnMesh.position.y = 0.25;
     root.add(columnMesh);
+
+    // Rubber gaiter / boot at floor
+    const boot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.055, 0.075, 0.08, 16),
+      new THREE.MeshStandardMaterial({ color: 0x14181e, roughness: 0.95 })
+    );
+    boot.position.y = 0.04;
+    root.add(boot);
 
     // Pitch Pivot Group (moves forward & aft with elevator pitch)
     const pitchGroup = new THREE.Group();
@@ -502,44 +720,52 @@ export class Cockpit {
     // Roll Handlebar Group (rotates with aileron roll)
     const handleGroup = new THREE.Group();
 
-    // Boeing W-shaped handlebar center block
-    const centerBlock = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.06), yokeMat);
+    // Boeing W-shaped handlebar center bridge
+    const centerBlock = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.085, 0.06), yokeMat);
     handleGroup.add(centerBlock);
 
-    // Left and Right Grips
-    const gripGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.18, 12);
+    // Ergonomic Left and Right Grips (Sculpted with finger contouring)
+    const gripGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.18, 16);
+    const gripMat = new THREE.MeshStandardMaterial({ color: 0x1a2028, roughness: 0.85, metalness: 0.1 });
 
-    const leftGrip = new THREE.Mesh(gripGeo, yokeMat);
-    leftGrip.position.set(-0.16, 0.06, 0);
+    const leftGrip = new THREE.Mesh(gripGeo, gripMat);
+    leftGrip.position.set(-0.165, 0.06, 0);
     leftGrip.rotation.z = -0.35;
 
-    const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.12, 10), metalMat);
-    leftArm.position.set(-0.08, 0.02, 0);
+    const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.12, 12), metalMat);
+    leftArm.position.set(-0.085, 0.02, 0);
     leftArm.rotation.z = Math.PI * 0.45;
 
-    const rightGrip = new THREE.Mesh(gripGeo, yokeMat);
-    rightGrip.position.set(0.16, 0.06, 0);
+    const rightGrip = new THREE.Mesh(gripGeo, gripMat);
+    rightGrip.position.set(0.165, 0.06, 0);
     rightGrip.rotation.z = 0.35;
 
-    const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.12, 10), metalMat);
-    rightArm.position.set(0.08, 0.02, 0);
+    const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.12, 12), metalMat);
+    rightArm.position.set(0.085, 0.02, 0);
     rightArm.rotation.z = -Math.PI * 0.45;
 
     // Pitch trim dual thumb-switches on left horn
-    const trimSwitch = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.02, 0.02), new THREE.MeshStandardMaterial({ color: 0x222222 }));
-    trimSwitch.position.set(-0.17, 0.13, 0.02);
+    const trimSwitch = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.022, 0.02), new THREE.MeshStandardMaterial({ color: 0x242830 }));
+    trimSwitch.position.set(-0.175, 0.13, 0.02);
 
-    // Autopilot Disconnect push-button (Red button on left horn)
-    const apDiscBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.01, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+    // Autopilot Disconnect push-button (Prominent Red button on left horn)
+    const apDiscBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.0075, 0.0075, 0.012, 12), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
     apDiscBtn.rotation.x = Math.PI * 0.5;
-    apDiscBtn.position.set(-0.14, 0.11, 0.02);
+    apDiscBtn.position.set(-0.145, 0.11, 0.02);
 
-    // Captain's Checklist / Approach Plate Clipboard on center
-    const clipGeo = new THREE.BoxGeometry(0.09, 0.11, 0.01);
-    const clipMesh = new THREE.Mesh(clipGeo, new THREE.MeshStandardMaterial({ color: 0xdde3ea }));
-    clipMesh.position.set(0, 0.02, 0.032);
+    // Captain's Clipboard with High-Res Approach Plate & Checklist
+    const clipBoardGeo = new THREE.PlaneGeometry(0.095, 0.138);
+    const clipBoardMat = new THREE.MeshBasicMaterial({
+      map: this.checklistCanvas.texture
+    });
+    const clipBoardMesh = new THREE.Mesh(clipBoardGeo, clipBoardMat);
+    clipBoardMesh.position.set(0, 0.025, 0.033);
 
-    handleGroup.add(leftGrip, leftArm, rightGrip, rightArm, trimSwitch, apDiscBtn, clipMesh);
+    // Top metal clamp clip
+    const clampMesh = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.015, 0.01), chromeMat);
+    clampMesh.position.set(0, 0.09, 0.035);
+
+    handleGroup.add(leftGrip, leftArm, rightGrip, rightArm, trimSwitch, apDiscBtn, clipBoardMesh, clampMesh);
     pitchGroup.add(handleGroup);
     root.add(pitchGroup);
 
@@ -602,48 +828,24 @@ export class Cockpit {
   }
 
   buildOverheadPanel(boeingGreyMat) {
-    const overheadGeo = new THREE.BoxGeometry(1.2, 0.08, 1.1);
+    // Forward Overhead Panel sloping directly above cockpit windshield
+    const overheadGeo = new THREE.BoxGeometry(1.05, 0.06, 1.15);
     const overhead = new THREE.Mesh(overheadGeo, boeingGreyMat);
-    overhead.position.set(0, 1.75, -12.2);
-    overhead.rotation.x = 0.2;
+    overhead.position.set(0, 1.48, -12.15);
+    overhead.rotation.x = 0.36; // Slanted forward toward windshield header
 
-    // Overhead illuminated switch panels
-    const subGeo = new THREE.PlaneGeometry(1.1, 1.0);
-    const oCanvas = document.createElement('canvas');
-    oCanvas.width = 512;
-    oCanvas.height = 512;
-    const octx = oCanvas.getContext('2d');
-    octx.fillStyle = '#1e242c';
-    octx.fillRect(0, 0, 512, 512);
-
-    // Draw system panel outlines & text (FLT CONTROL, FUEL PUMPS, ELEC, APU, LIGHTS)
-    const drawSysBox = (x, y, w, h, title) => {
-      octx.strokeStyle = '#384252';
-      octx.lineWidth = 2;
-      octx.strokeRect(x, y, w, h);
-      octx.fillStyle = '#94a3b8';
-      octx.font = 'bold 12px sans-serif';
-      octx.textAlign = 'center';
-      octx.fillText(title, x + w * 0.5, y + 16);
-      // Indicator lights
-      octx.fillStyle = '#22c55e';
-      octx.beginPath();
-      octx.arc(x + w * 0.5 - 12, y + 36, 4, 0, Math.PI * 2);
-      octx.arc(x + w * 0.5 + 12, y + 36, 4, 0, Math.PI * 2);
-      octx.fill();
-    };
-
-    drawSysBox(20, 20, 220, 100, 'FLIGHT CONTROLS');
-    drawSysBox(260, 20, 230, 100, 'NAVIGATION & DISPLAYS');
-    drawSysBox(20, 140, 220, 120, 'FUEL PUMPS & CROSSFEED');
-    drawSysBox(260, 140, 230, 120, 'ELECTRICAL (GEN 1 & 2 / APU)');
-    drawSysBox(20, 280, 220, 100, 'APU & ENGINE START');
-    drawSysBox(260, 280, 230, 100, 'HYDRAULICS (SYS A & B)');
-    drawSysBox(20, 400, 470, 90, 'EXTERIOR LIGHTING (LANDING / RUNWAY TURNOFF / STROBE)');
-
-    const oTexture = new THREE.CanvasTexture(oCanvas);
-    const oScreen = new THREE.Mesh(subGeo, new THREE.MeshBasicMaterial({ map: oTexture }));
-    oScreen.position.y = -0.041;
+    // High-Resolution Photorealistic Boeing 737 Forward Overhead Faceplate
+    const subGeo = new THREE.PlaneGeometry(1.02, 1.12);
+    const oMat = new THREE.MeshStandardMaterial({
+      map: this.overheadTex,
+      roughness: 0.55,
+      metalness: 0.25,
+      emissive: 0xffe2b8,
+      emissiveMap: this.overheadTex,
+      emissiveIntensity: 0.15
+    });
+    const oScreen = new THREE.Mesh(subGeo, oMat);
+    oScreen.position.y = -0.031;
     oScreen.rotation.x = Math.PI * 0.5;
     overhead.add(oScreen);
 
@@ -656,26 +858,36 @@ export class Cockpit {
   updateControls(flightState) {
     // 1. Dual Control Yokes
     const pitchDeflect = (flightState.elevator || 0) * 0.18;
-    this.captainYoke.pitchGroup.rotation.x = pitchDeflect;
-    this.foYoke.pitchGroup.rotation.x = pitchDeflect;
+    if (this.captainYoke && this.captainYoke.pitchGroup) {
+      this.captainYoke.pitchGroup.rotation.x = pitchDeflect;
+    }
+    if (this.foYoke && this.foYoke.pitchGroup) {
+      this.foYoke.pitchGroup.rotation.x = pitchDeflect;
+    }
 
     const rollDeflect = -(flightState.aileron || 0) * (Math.PI / 3.0);
-    this.captainYoke.handleGroup.rotation.z = rollDeflect;
-    this.foYoke.handleGroup.rotation.z = rollDeflect;
+    if (this.captainYoke && this.captainYoke.handleGroup) {
+      this.captainYoke.handleGroup.rotation.z = rollDeflect;
+    }
+    if (this.foYoke && this.foYoke.handleGroup) {
+      this.foYoke.handleGroup.rotation.z = rollDeflect;
+    }
 
     // 2. Rudder Pedals
     const rudderDeflect = (flightState.rudder || 0) * 0.05;
-    this.pedalLeft.position.z = -rudderDeflect;
-    this.pedalRight.position.z = rudderDeflect;
+    if (this.pedalLeft) this.pedalLeft.position.z = -rudderDeflect;
+    if (this.pedalRight) this.pedalRight.position.z = rudderDeflect;
 
     // 3. Throttle Levers
     const throttleAngle = -0.35 + (flightState.throttle || 0) * 0.70;
-    this.throttle1.rotation.x = throttleAngle;
-    this.throttle2.rotation.x = throttleAngle;
+    if (this.throttle1) this.throttle1.rotation.x = throttleAngle;
+    if (this.throttle2) this.throttle2.rotation.x = throttleAngle;
 
     // 4. Flap Selector Lever & MIP Flap Dial Needle
     const flapFraction = (flightState.flapIndex || 0) / 6.0;
-    this.flapLever.rotation.x = 0.25 - flapFraction * 0.65;
+    if (this.flapLever) {
+      this.flapLever.rotation.x = 0.25 - flapFraction * 0.65;
+    }
     if (this.flapGaugeNeedle) {
       // Rotate needle from 0 deg (UP) to 220 deg (Flaps 40)
       this.flapGaugeNeedle.rotation.z = -flapFraction * 3.8;
@@ -687,7 +899,7 @@ export class Cockpit {
       // Lever tilted down when gear down, tilted up when gear up
       this.gearLever.rotation.x = gearState > 0.5 ? 0.35 : -0.35;
     }
-    if (this.gearLights && this.gearLights.length === 3) {
+    if (this.gearLights && this.gearLights.length === 3 && this.gearLightMats) {
       let targetMat = this.gearLightMats.off;
       if (gearState > 0.95) {
         targetMat = this.gearLightMats.green;
@@ -701,12 +913,14 @@ export class Cockpit {
 
     // 6. Speedbrake / Spoiler Lever
     const spoilerVal = flightState.spoilers || 0;
-    this.spoilerLever.rotation.x = -0.3 + spoilerVal * 0.6;
+    if (this.spoilerLever) {
+      this.spoilerLever.rotation.x = -0.3 + spoilerVal * 0.6;
+    }
 
     // 7. Pitch Trim Wheels
     if (flightState.pitchTrimRate) {
-      this.trimWheelL.rotation.x += flightState.pitchTrimRate * 0.1;
-      this.trimWheelR.rotation.x += flightState.pitchTrimRate * 0.1;
+      if (this.trimWheelL) this.trimWheelL.rotation.x += flightState.pitchTrimRate * 0.1;
+      if (this.trimWheelR) this.trimWheelR.rotation.x += flightState.pitchTrimRate * 0.1;
     }
   }
 }
