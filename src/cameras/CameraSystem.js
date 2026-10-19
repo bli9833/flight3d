@@ -12,7 +12,8 @@ export class CameraSystem {
     WING: 2,
     TOWER: 3,
     FLYBY: 4,
-    GEAR: 5
+    GEAR: 5,
+    DRONE: 6
   };
 
   constructor(camera, domElement) {
@@ -42,12 +43,22 @@ export class CameraSystem {
     this.chasePos = new THREE.Vector3();
     this.chaseTarget = new THREE.Vector3();
 
+    // Drone Orbit Camera Parameters (Circumnavigating aircraft from slightly above)
+    this.droneOrbitAngle = 1.8;
+    this.droneOrbitSpeed = 0.28; // rad/s (~22.4s per full 360° circle)
+    this.droneDistance = 38.0;   // Distance in meters (fits entire 39m B737 frame)
+    this.droneHeight = 11.5;     // Elevated vantage point looking down (~17° downward pitch)
+    this.droneLookOffset = new THREE.Vector3(0, 1.8, 0);
+    this.dronePos = new THREE.Vector3();
+    this.droneInitialized = false;
+
     // Tower Camera Location (Inside Control Tower Cab at 66m height)
     this.towerPos = new THREE.Vector3(120, 78, 280);
 
     // Flyby Camera State
     this.flybyPos = new THREE.Vector3();
     this.flybySet = false;
+    this.getTerrainHeight = null;
 
     // Mouse drag look
     this.isDragging = false;
@@ -81,15 +92,50 @@ export class CameraSystem {
           this.lookYaw -= dx * 0.0035;
           this.lookPitch -= dy * 0.0035;
           this.lookPitch = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, this.lookPitch));
+        } else if (this.mode === CameraSystem.MODES.DRONE) {
+          this.droneOrbitAngle -= dx * 0.005;
+          this.droneHeight = Math.max(4.0, Math.min(32.0, this.droneHeight + dy * 0.05));
         }
       }
     });
 
-    // Reset cockpit view on double click
+    // Mouse wheel zoom for drone distance
+    this.domElement.addEventListener('wheel', (e) => {
+      if (this.mode === CameraSystem.MODES.DRONE) {
+        this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance + e.deltaY * 0.04));
+      }
+    }, { passive: true });
+
+    // Reset view on double click
     this.domElement.addEventListener('dblclick', () => {
       this.lookYaw = 0;
       this.lookPitch = -0.18;
+      this.droneDistance = 38.0;
+      this.droneHeight = 11.5;
     });
+  }
+
+  resetDroneOrbit(angle = 1.8) {
+    this.droneOrbitAngle = angle;
+    this.droneInitialized = false;
+  }
+
+  setTerrain(terrain) {
+    if (typeof terrain === 'function') {
+      this.getTerrainHeight = terrain;
+    } else if (terrain && typeof terrain.getHeight === 'function') {
+      this.getTerrainHeight = (x, z) => terrain.getHeight(x, z);
+    }
+  }
+
+  queryGroundHeight(x, z) {
+    if (this.getTerrainHeight) {
+      try {
+        const h = this.getTerrainHeight(x, z);
+        if (typeof h === 'number' && !Number.isNaN(h)) return h;
+      } catch (e) {}
+    }
+    return 12.0; // RKSS airport elevation default fallback
   }
 
   snapToTarget(aircraftMesh) {
@@ -113,6 +159,34 @@ export class CameraSystem {
       const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraftMesh.quaternion);
       this.camera.up.copy(upWorld);
       this.camera.lookAt(targetWorld);
+    } else if (this.mode === CameraSystem.MODES.DRONE) {
+      const px = aircraftMesh.position.x + Math.sin(this.droneOrbitAngle) * this.droneDistance;
+      const py = Math.max(aircraftMesh.position.y + 1.5, aircraftMesh.position.y + this.droneHeight);
+      const pz = aircraftMesh.position.z + Math.cos(this.droneOrbitAngle) * this.droneDistance;
+      this.dronePos.set(px, py, pz);
+      this.droneInitialized = true;
+      this.camera.position.copy(this.dronePos);
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(aircraftMesh.position.clone().add(this.droneLookOffset));
+    } else if (this.mode === CameraSystem.MODES.FLYBY) {
+      const planePos = aircraftMesh.position;
+      const planeQuat = aircraftMesh.quaternion;
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(planeQuat);
+      forward.y = 0;
+      if (forward.lengthSq() > 0.0001) forward.normalize();
+      else forward.set(1, 0, 0);
+      const right = new THREE.Vector3(-forward.z, 0, forward.x);
+
+      const targetX = planePos.x + forward.x * 45.0 + right.x * 9.0;
+      const targetZ = planePos.z + forward.z * 45.0 + right.z * 9.0;
+      const groundH = this.queryGroundHeight(targetX, targetZ);
+      const targetY = Math.max(groundH + 2.4, planePos.y - 0.5);
+
+      this.flybyPos.set(targetX, targetY, targetZ);
+      this.camera.position.copy(this.flybyPos);
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(planePos.clone().add(new THREE.Vector3(0, 1.2, 0)));
+      this.flybySet = true;
     } else {
       this.camera.position.copy(this.chasePos);
       this.camera.up.set(0, 1, 0);
@@ -145,9 +219,12 @@ export class CameraSystem {
 
   cycleMode() {
     this.cancelTemporaryView();
-    this.mode = (this.mode + 1) % 6;
+    this.mode = (this.mode + 1) % 7;
     if (this.mode === CameraSystem.MODES.FLYBY) {
       this.flybySet = false;
+    }
+    if (this.mode === CameraSystem.MODES.DRONE) {
+      this.droneInitialized = false;
     }
     return this.getModeName();
   }
@@ -157,6 +234,9 @@ export class CameraSystem {
     this.mode = m;
     if (this.mode === CameraSystem.MODES.FLYBY) {
       this.flybySet = false;
+    }
+    if (this.mode === CameraSystem.MODES.DRONE) {
+      this.droneInitialized = false;
     }
   }
 
@@ -168,11 +248,15 @@ export class CameraSystem {
       case CameraSystem.MODES.TOWER: return 'AIRPORT TOWER';
       case CameraSystem.MODES.FLYBY: return 'CINEMATIC FLYBY';
       case CameraSystem.MODES.GEAR: return 'GEAR CAM (BELLY)';
+      case CameraSystem.MODES.DRONE: return 'DRONE (ORBIT VIEW)';
       default: return 'CAMERA';
     }
   }
 
-  update(dt, aircraftMesh, flightState) {
+  update(dt, aircraftMesh, flightState = {}, getTerrainHeight = null) {
+    if (getTerrainHeight) {
+      this.setTerrain(getTerrainHeight);
+    }
     // 1. Process temporary cinematic view timer (auto-cut during takeoff, landing, gear transit)
     if (this.temporaryViewTimer > 0) {
       this.temporaryViewTimer -= dt;
@@ -282,21 +366,88 @@ export class CameraSystem {
       }
 
       case CameraSystem.MODES.FLYBY: {
-        // Position camera 350m ahead of aircraft on first enter
-        if (!this.flybySet) {
-          const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(planeQuat);
-          this.flybyPos.copy(planePos).add(forward.multiplyScalar(280)).add(new THREE.Vector3(25, -15, 0));
-          this.flybySet = true;
+        const onGround = !!(flightState && flightState.onGround);
+        const groundSpeed = flightState
+          ? (flightState.groundSpeed !== undefined
+              ? flightState.groundSpeed
+              : (flightState.iasKnots ? flightState.iasKnots * 0.514444 : 0))
+          : 0;
+
+        // Aircraft forward vector projected onto horizontal plane
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(planeQuat);
+        forward.y = 0;
+        if (forward.lengthSq() > 0.0001) {
+          forward.normalize();
+        } else {
+          forward.set(1, 0, 0);
+        }
+        // Lateral right vector orthogonal to forward on horizontal plane
+        const right = new THREE.Vector3(-forward.z, 0, forward.x);
+
+        if (onGround && groundSpeed < 12.0) {
+          // Case 1: Landed, parked, or slow taxiing on runway / apron
+          // Position camera 45m ahead of nose, 9m to side for an impressive front 3/4 showcase view
+          const targetX = planePos.x + forward.x * 45.0 + right.x * 9.0;
+          const targetZ = planePos.z + forward.z * 45.0 + right.z * 9.0;
+          const groundH = this.queryGroundHeight(targetX, targetZ);
+          const targetY = Math.max(groundH + 2.4, planePos.y - 0.5);
+
+          const targetPos = new THREE.Vector3(targetX, targetY, targetZ);
+          if (!this.flybySet || this.flybyPos.distanceTo(targetPos) > 75.0) {
+            this.flybyPos.copy(targetPos);
+            this.flybySet = true;
+          } else {
+            // Smoothly track in front of aircraft if taxiing or turning
+            this.flybyPos.lerp(targetPos, Math.min(1.0, dt * 6.0));
+          }
+        } else if (onGround) {
+          // Case 2: Active takeoff roll or landing rollout at high speed (>= 12 m/s / ~23 kts)
+          // Runway-side spotter camera positioned ~120m ahead and 20m off centerline at runway edge
+          if (!this.flybySet) {
+            const targetX = planePos.x + forward.x * 120.0 + right.x * 20.0;
+            const targetZ = planePos.z + forward.z * 120.0 + right.z * 20.0;
+            const groundH = this.queryGroundHeight(targetX, targetZ);
+            const targetY = groundH + 1.8; // Eye level at runway edge
+            this.flybyPos.set(targetX, targetY, targetZ);
+            this.flybySet = true;
+          }
+
+          // Reset ahead once aircraft rolls past camera by > 140m
+          const toPlane = planePos.clone().sub(this.flybyPos);
+          if (this.camera.position.distanceTo(planePos) > 180 && forward.dot(toPlane) > 0) {
+            this.flybySet = false;
+          }
+        } else {
+          // Case 3: In flight (airborne)
+          // Position camera ahead along flight path, safely above ground and sea level
+          if (!this.flybySet) {
+            const targetX = planePos.x + forward.x * 260.0 + right.x * 28.0;
+            const targetZ = planePos.z + forward.z * 260.0 + right.z * 28.0;
+            const groundH = this.queryGroundHeight(targetX, targetZ);
+            // Height slightly below flight path, but strictly clamped above terrain and water
+            const targetY = Math.max(groundH + 4.5, 4.5, planePos.y - 8.0);
+            this.flybyPos.set(targetX, targetY, targetZ);
+            this.flybySet = true;
+          }
+
+          // Reset if aircraft passes far beyond
+          if (this.camera.position.distanceTo(planePos) > 600) {
+            this.flybySet = false;
+          }
+        }
+
+        // Final safety clamp: camera Y must NEVER be below terrain height or water surface
+        const currentGroundH = this.queryGroundHeight(this.flybyPos.x, this.flybyPos.z);
+        if (this.flybyPos.y < currentGroundH + 1.5) {
+          this.flybyPos.y = currentGroundH + 1.5;
         }
 
         this.camera.position.copy(this.flybyPos);
-        this.camera.lookAt(planePos);
         this.camera.up.set(0, 1, 0);
 
-        // Reset if aircraft passes far beyond
-        if (this.camera.position.distanceTo(planePos) > 650) {
-          this.flybySet = false;
-        }
+        // Look at aircraft center with slight vertical offset for good framing
+        const lookTarget = planePos.clone().add(new THREE.Vector3(0, 1.2, 0));
+        this.camera.lookAt(lookTarget);
         break;
       }
 
@@ -317,6 +468,32 @@ export class CameraSystem {
 
         const targetWorld = this.gearLookTarget.clone().applyMatrix4(aircraftMesh.matrixWorld);
         this.camera.lookAt(targetWorld);
+        break;
+      }
+
+      case CameraSystem.MODES.DRONE: {
+        // Continuous 360° circular drone orbit around aircraft from slightly above
+        this.droneOrbitAngle += this.droneOrbitSpeed * dt;
+
+        // Subtle organic drone hovering bob motion
+        const hoverBob = Math.sin(this.droneOrbitAngle * 2.2) * 0.55;
+        const currentHeight = Math.max(planePos.y + 2.0, planePos.y + this.droneHeight + hoverBob);
+        const targetX = planePos.x + Math.sin(this.droneOrbitAngle) * this.droneDistance;
+        const targetZ = planePos.z + Math.cos(this.droneOrbitAngle) * this.droneDistance;
+
+        const targetPos = new THREE.Vector3(targetX, currentHeight, targetZ);
+        if (!this.droneInitialized) {
+          this.dronePos.copy(targetPos);
+          this.droneInitialized = true;
+        } else {
+          // Smooth position interpolation to prevent abrupt jumps
+          this.dronePos.lerp(targetPos, Math.min(1.0, dt * 8.5));
+        }
+        this.camera.position.copy(this.dronePos);
+
+        this.camera.up.set(0, 1, 0);
+        const lookTarget = planePos.clone().add(this.droneLookOffset);
+        this.camera.lookAt(lookTarget);
         break;
       }
     }
