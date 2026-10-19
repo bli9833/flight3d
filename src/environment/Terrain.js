@@ -120,9 +120,9 @@ export class Terrain {
         // Flatten extended final approach corridor completely down to airport elevation
         baseH = baseH * (1.0 - smoothZ) + this.airportElevation * smoothZ;
       } else if (x <= -5500 && x > -8500) {
-        // Distant approach: 2.0° clearance slope
-        const distFromThreshold = -1600 - x;
-        const maxClearanceH = this.airportElevation + distFromThreshold * 0.020;
+        // Distant approach: 2.0° clearance slope smoothly rising from corridor boundary (-5500m)
+        const distFromBoundary = -5500 - x;
+        const maxClearanceH = this.airportElevation + distFromBoundary * 0.020;
         if (baseH > maxClearanceH) {
           baseH = baseH * (1.0 - smoothZ) + maxClearanceH * smoothZ;
         }
