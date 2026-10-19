@@ -206,6 +206,7 @@ class FlightTestAgent {
             gearDown: tel.gearState > 0.9,
             onGround: tel.onGround,
             touchdown: tel.touchdown,
+            isCrashed: sim.isCrashed,
             engineN1: tel.engine1 ? tel.engine1.n1 : 0
           };
         })()
@@ -439,8 +440,8 @@ class FlightTestAgent {
         `);
       }
 
-      // Detect touchdown (radioAlt on ground is ~7 ft due to CG height)
-      if (!touchdownConfirmed && (state.onGround || state.touchdown || (flareInitiated && state.radioAltFt <= 8.5))) {
+      // Confirm touchdown from wheel contact; CG radio altitude alone is not contact.
+      if (!touchdownConfirmed && (state.onGround || state.touchdown)) {
         touchdownConfirmed = true;
         this.log(`TOUCHDOWN CONFIRMED! Radio Alt: ${Math.round(state.radioAltFt)} FT, G-Load: ${state.gForce.toFixed(2)} G`, '🎯');
         this.log(`Deploying Spoilers, Maximum Brakes, and Reverse Thrust...`, '🛑');
@@ -470,14 +471,16 @@ class FlightTestAgent {
 
     await this.captureScreenshot('test_landing_result.png');
 
-    const passed = touchdownConfirmed && stoppedOnRunway;
+    const passed = touchdownConfirmed && stoppedOnRunway && history.length > 0 && history.every(s => !s.isCrashed);
     const result = {
       scenario: 'Approach, Touchdown & Braking',
       passed,
       metrics: {
         touchdownConfirmed,
         stoppedOnRunway,
-        maxTouchdownG: Math.max(...history.filter(s => s.onGround || s.radioAltFt <= 8.5).map(s => s.gForce)).toFixed(2),
+        maxTouchdownG: history.some(s => s.onGround || s.touchdown)
+          ? Math.max(...history.filter(s => s.onGround || s.touchdown).map(s => s.gForce)).toFixed(2)
+          : null,
         finalStopSpeedKt: Math.round(history[history.length - 1].iasKnots)
       }
     };

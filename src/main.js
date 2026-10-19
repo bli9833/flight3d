@@ -271,8 +271,8 @@ class FlightSimulator {
 
     if (type === 'runway') {
       // Aligned on Runway 09L Threshold (Heading 090° East)
-      // West threshold is at x = -1350m, y = airport elevation (12.0m) + gear height (2.1m)
-      this.position.set(-1350, 14.15, 0);
+      // West threshold is at x = -1350m, y = airport elevation (12.0m) + gear height (3.45m)
+      this.position.set(-1350, 15.45, 0);
       this.linearVelocity.set(0, 0, 0);
       this.angularVelocity.set(0, 0, 0);
       this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.5); // Face East (+X)
@@ -346,8 +346,8 @@ class FlightSimulator {
       this.angularVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 3.5));
       this.position.addScaledVector(this.linearVelocity, dt);
       const groundH = this.terrain ? this.terrain.getHeight(this.position.x, this.position.z) : 0.0;
-      if (this.position.y < groundH + 0.8) {
-        this.position.y = groundH + 0.8;
+      if (this.position.y < groundH + 1.88) {
+        this.position.y = groundH + 1.88;
       }
       this.aircraft.group.position.copy(this.position);
       return;
@@ -383,6 +383,10 @@ class FlightSimulator {
     // 3. Terrain Height & Ground Clearance
     const groundHeight = this.terrain.getHeight(this.position.x, this.position.z);
     const heightAboveGround = Math.max(0, this.position.y - groundHeight);
+
+    // Physics may run several substeps before rendering. Refresh the root world
+    // matrix so gear contacts use this substep's pose rather than the last frame.
+    this.aircraft.group.updateWorldMatrix(true, false);
 
     // 4. Landing Gear Forces & Ground Friction
     const gearResult = this.gear.update(
@@ -429,8 +433,8 @@ class FlightSimulator {
 
     this.position.addScaledVector(this.linearVelocity, dt);
 
-    // Crash terrain penetration prevention (allow dynamic suspension stroke of up to 0.55m)
-    const minSafeY = groundHeight + (gearResult.gearState > 0.5 ? 1.55 : 0.8);
+    // Crash terrain penetration prevention (allow dynamic suspension stroke of up to 0.65m)
+    const minSafeY = groundHeight + (gearResult.gearState > 0.5 ? 2.80 : 1.80);
     if (this.position.y < minSafeY) {
       this.position.y = minSafeY;
       if (this.linearVelocity.y < 0) this.linearVelocity.y = 0;

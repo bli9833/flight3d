@@ -19,8 +19,9 @@ export class LandingGear {
     this.contacts = [
       {
         id: 'nose',
-        localPos: new THREE.Vector3(0.0, -2.1, -12.5), // Front steerable
-        restLength: 1.2,
+        localPos: new THREE.Vector3(0.0, -3.27, -12.5), // Front steerable
+        wheelRadius: 0.38,
+        restLength: 0.9,
         kSpring: 420000, // N/m
         cDamper: 48000,  // N/(m/s)
         isSteerable: true,
@@ -32,10 +33,11 @@ export class LandingGear {
       },
       {
         id: 'mainLeft',
-        localPos: new THREE.Vector3(-3.2, -2.2, 1.8), // Left main
-        restLength: 1.1,
-        kSpring: 650000,
-        cDamper: 62000,
+        localPos: new THREE.Vector3(-3.2, -3.30, 1.8), // Left main
+        wheelRadius: 0.48,
+        restLength: 0.9,
+        kSpring: 850000,
+        cDamper: 72000,
         isSteerable: false,
         compression: 0,
         isGrounded: false,
@@ -45,10 +47,11 @@ export class LandingGear {
       },
       {
         id: 'mainRight',
-        localPos: new THREE.Vector3(3.2, -2.2, 1.8),  // Right main
-        restLength: 1.1,
-        kSpring: 650000,
-        cDamper: 62000,
+        localPos: new THREE.Vector3(3.2, -3.30, 1.8),  // Right main
+        wheelRadius: 0.48,
+        restLength: 0.9,
+        kSpring: 850000,
+        cDamper: 72000,
         isSteerable: false,
         compression: 0,
         isGrounded: false,
@@ -119,11 +122,11 @@ export class LandingGear {
     const gearDeploy = this.gearState;
     if (gearDeploy < 0.1) {
       // Belly contact check
-      const bellyWorld = new THREE.Vector3(0, -1.2, 0).applyMatrix4(aircraftMesh.matrixWorld);
+      const bellyWorld = new THREE.Vector3(0, -1.88, 0).applyMatrix4(aircraftMesh.matrixWorld);
       const groundY = getTerrainHeight(bellyWorld.x, bellyWorld.z);
-      if (bellyWorld.y < groundY + 0.3) {
+      if (bellyWorld.y < groundY + 0.15) {
         // High friction crash scrape
-        const depth = Math.max(0.1, groundY + 0.3 - bellyWorld.y);
+        const depth = Math.max(0.05, groundY + 0.15 - bellyWorld.y);
         netForceWorld.y += 2500000 * depth;
         // Heavy drag
         netForceWorld.x -= linearVelocity.x * 20000;
@@ -153,7 +156,7 @@ export class LandingGear {
       // Calculate world position of wheel hub
       const hubWorld = deployedLocal.clone().applyMatrix4(aircraftMesh.matrixWorld);
       const groundH = getTerrainHeight(hubWorld.x, hubWorld.z);
-      const wheelRadius = 0.5;
+      const wheelRadius = c.wheelRadius !== undefined ? c.wheelRadius : 0.48;
       const contactY = groundH + wheelRadius;
 
       c.worldPos.copy(hubWorld);

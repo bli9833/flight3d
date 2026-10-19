@@ -498,7 +498,7 @@ export class DemoFlightDirector {
         }
 
         // Detect touchdown strictly over paved runway tarmac
-        if (isOverRunway && (tel.onGround || (this.approachFlarInitiated && tel.radioAltFt <= 8.5))) {
+        if (isOverRunway && (tel.onGround || tel.touchdown)) {
           this.setStage(DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT);
         }
         break;

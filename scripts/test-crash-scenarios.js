@@ -180,9 +180,23 @@ async function main() {
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
-        // High mountain ridge (elevation > 120m, no trees along runway extended centerline z = 0)
-        const peakGroundH = sim.terrain.getHeight(2650, 0);
-        sim.position.set(2580, peakGroundH - 25, 0);
+        // Find an actual rising mountainside outside the carved departure corridor.
+        // Keep the CG clear of terrain while the forward nose probes hit the slope.
+        let site = null;
+        for (let z = -6000; z <= -1500 && !site; z += 100) {
+          for (let x = -7000; x <= 7000; x += 100) {
+            const groundH = sim.terrain.getHeight(x, z);
+            const aheadH = sim.terrain.getHeight(x + 17.5, z);
+            if (groundH > 120 && aheadH > groundH + 8 &&
+                !sim.foliage.treeData.some(tree => Math.hypot(tree.x - x, tree.z - z) < 60) &&
+                !sim.foliage.buildingData.some(building => Math.hypot(building.x - x, building.z - z) < 100)) {
+              site = { x, z, y: groundH + 4 };
+              break;
+            }
+          }
+        }
+        if (!site) throw new Error('No unobstructed mountain collision fixture found');
+        sim.position.set(site.x, site.y, site.z);
         sim.linearVelocity.set(90, 0, 0);
         sim.quaternion.setFromAxisAngle(new window.THREE.Vector3(0, 1, 0), -Math.PI * 0.5);
         sim.aircraft.group.position.copy(sim.position);
@@ -277,6 +291,9 @@ async function main() {
     `);
     console.log(`   Restart Cleanliness: ${restartOk ? 'PASS ✅' : 'FAIL ❌'}`);
 
+    if (![towerCrashed, waterCrashed, terrainCrashed, bldgCrashed, treeCrashed, restartOk].every(Boolean)) {
+      throw new Error('One or more collision/restart checks failed');
+    }
     console.log('\n🎉 ALL COLLISION & EXPLOSION TESTS COMPLETED SUCCESSFULLY!');
     ws.close();
   } finally {
