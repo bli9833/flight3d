@@ -27,6 +27,7 @@ export class CameraSystem {
     this.onTemporaryViewComplete = null;
 
     // Cockpit Head Dynamics & Look-Around
+    this.photoCockpit = true; // Default to 100% photorealistic Boeing 737 photo panel overlay
     this.cockpitHeadOffset = new THREE.Vector3(-0.48, 0.82, -12.02); // Captain eye
     this.headGForceOffset = new THREE.Vector3();
     this.touchJoltOffset = 0;
@@ -249,6 +250,19 @@ export class CameraSystem {
     }
   }
 
+  toggleCockpitPhoto() {
+    this.photoCockpit = !this.photoCockpit;
+    return this.photoCockpit;
+  }
+
+  setCockpitPhoto(enabled) {
+    this.photoCockpit = !!enabled;
+  }
+
+  getCockpitSubmodeName() {
+    return this.photoCockpit ? 'PHOTO 2D' : '3D VIRTUAL';
+  }
+
   getModeName() {
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: return 'COCKPIT (CAPTAIN)';
@@ -316,6 +330,9 @@ export class CameraSystem {
         }
 
         const eyeLocal = this.cockpitHeadOffset.clone();
+        if (this.photoCockpit) {
+          eyeLocal.set(-0.48, 0.88, -12.02);
+        }
         eyeLocal.y += this.headGForceOffset.y + buffetY + this.touchJoltOffset;
         eyeLocal.x += buffetX;
 
@@ -329,8 +346,9 @@ export class CameraSystem {
 
         // Compute forward look target with head rotation
         const forwardLocal = new THREE.Vector3(0, 0, -100);
-        // Apply pilot pan/tilt
-        forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.lookPitch);
+        // Apply pilot pan/tilt (in photo cockpit mode, -0.04 rad downward pitch frames runway and horizon through windshield)
+        const pitchAngle = this.photoCockpit ? (this.lookPitch * 0.2 - 0.04) : this.lookPitch;
+        forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), pitchAngle);
         forwardLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.lookYaw);
         const forwardWorld = forwardLocal.applyQuaternion(planeQuat);
 

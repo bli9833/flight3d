@@ -710,7 +710,7 @@ export class Boeing737 {
     }
   }
 
-  setCockpitMode(isCockpit) {
+  setCockpitMode(isCockpit, showInterior = true) {
     this.isCockpit = isCockpit;
     if (this.useGltf && this.gltfGroup) {
       this.gltfGroup.visible = !isCockpit;
@@ -721,7 +721,9 @@ export class Boeing737 {
       if (this.empennageGroup) this.empennageGroup.visible = !isCockpit;
       if (this.enginesGroup) this.enginesGroup.visible = !isCockpit;
     }
-    if (this.cockpit && this.cockpit.group) this.cockpit.group.visible = isCockpit;
+    if (this.cockpit && this.cockpit.group) {
+      this.cockpit.group.visible = isCockpit && showInterior;
+    }
   }
 
   triggerCrashVisuals(collisionType) {
