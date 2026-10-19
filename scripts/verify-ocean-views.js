@@ -129,21 +129,34 @@ async function main() {
   await new Promise(r => setTimeout(r, 600));
 
   function assertOceanAnchored(posCheck, scenarioName) {
-    if (!posCheck) {
-      throw new Error(`Ocean anchoring check failed for ${scenarioName}: received null or undefined position data`);
+    if (!posCheck || typeof posCheck !== 'object') {
+      throw new Error(`Ocean anchoring check failed for ${scenarioName}: received null, undefined, or invalid position data`);
     }
     const { waterMeshX, waterMeshZ, camX, camZ, snapStep } = posCheck;
-    const step = snapStep || 200;
-    const halfCellTolerance = step * 0.5 + 0.01;
 
+    for (const [key, val] of Object.entries({ waterMeshX, waterMeshZ, camX, camZ })) {
+      if (!Number.isFinite(val)) {
+        throw new Error(
+          `Ocean anchoring assertion failed for ${scenarioName}: coordinate '${key}' is non-finite or invalid (got ${val})`
+        );
+      }
+    }
+
+    if (!Number.isFinite(snapStep) || snapStep <= 0) {
+      throw new Error(
+        `Ocean anchoring assertion failed for ${scenarioName}: snapStep is non-finite or non-positive (got ${snapStep})`
+      );
+    }
+
+    const halfCellTolerance = snapStep * 0.5 + 0.01;
     const diffX = Math.abs(waterMeshX - camX);
     const diffZ = Math.abs(waterMeshZ - camZ);
 
-    if (diffX > halfCellTolerance || diffZ > halfCellTolerance) {
+    if (!Number.isFinite(diffX) || !Number.isFinite(diffZ) || diffX > halfCellTolerance || diffZ > halfCellTolerance) {
       throw new Error(
         `Ocean anchoring assertion failed for ${scenarioName}: mesh position (${waterMeshX}, ${waterMeshZ}) ` +
         `deviates from camera position (${camX.toFixed(2)}, ${camZ.toFixed(2)}) by (${diffX.toFixed(2)}, ${diffZ.toFixed(2)}), ` +
-        `which exceeds half-cell tolerance (${halfCellTolerance}m for snapStep ${step}m).`
+        `which exceeds half-cell tolerance (${halfCellTolerance}m for snapStep ${snapStep}m).`
       );
     }
     console.log(`✅ Ocean mesh position verified at ${scenarioName}: mesh=(${waterMeshX}, ${waterMeshZ}), cam=(${camX.toFixed(1)}, ${camZ.toFixed(1)}), maxDiff=${Math.max(diffX, diffZ).toFixed(1)}m <= ${halfCellTolerance}m`);
