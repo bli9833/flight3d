@@ -61,23 +61,6 @@ export class Boeing737 {
     this.mainTruckR = null;
     this.gearDoors = [];
     this.gearScissors = [];
-    this.gltfGear = null;
-    this.landingGearLoaded = false;
-
-    // GLTF Articulated Control Surfaces
-    this.gltfAileronL = null;
-    this.gltfAileronR = null;
-    this.gltfFlapL = null;
-    this.gltfFlapR = null;
-    this.gltfSpoilersL = null;
-    this.gltfSpoilersR = null;
-    this.gltfElevatorL = null;
-    this.gltfElevatorR = null;
-    this.gltfRudder = null;
-    this.gltfFlapLInitY = 0;
-    this.gltfFlapLInitZ = 0;
-    this.gltfFlapRInitY = 0;
-    this.gltfFlapRInitZ = 0;
 
     // Lighting
     this.strobeLights = [];
@@ -180,7 +163,6 @@ export class Boeing737 {
 
     // 7. Asynchronous High-Detail GLTF PBR Model Loading with Procedural Fallback
     this.loadGltfModel('/models/b737-800.glb');
-    this.loadLandingGearModel('/models/b737-landing-gear.glb');
   }
 
   buildFuselage(whiteMat, blueMat, winMat) {
@@ -696,8 +678,6 @@ export class Boeing737 {
     const aileronVal = flightState.aileron || 0;
     if (this.aileronL) this.aileronL.rotation.x = aileronVal * 0.35;
     if (this.aileronR) this.aileronR.rotation.x = -aileronVal * 0.35;
-    if (this.gltfAileronL) this.gltfAileronL.rotation.x = aileronVal * 0.35;
-    if (this.gltfAileronR) this.gltfAileronR.rotation.x = -aileronVal * 0.35;
 
     // Flaps (Fractions 0° to 40°)
     const flapAngleRad = THREE.MathUtils.degToRad(flightState.flapDegree || 0);
@@ -711,36 +691,21 @@ export class Boeing737 {
       this.flapR.position.y = 0.35 - Math.sin(flapAngleRad) * 0.4;
       this.flapR.position.z = 2.5 + Math.cos(flapAngleRad) * 0.3;
     }
-    if (this.gltfFlapL) {
-      this.gltfFlapL.rotation.x = flapAngleRad;
-      this.gltfFlapL.position.y = this.gltfFlapLInitY - Math.sin(flapAngleRad) * 0.35;
-      this.gltfFlapL.position.z = this.gltfFlapLInitZ + (1.0 - Math.cos(flapAngleRad)) * 0.35;
-    }
-    if (this.gltfFlapR) {
-      this.gltfFlapR.rotation.x = flapAngleRad;
-      this.gltfFlapR.position.y = this.gltfFlapRInitY - Math.sin(flapAngleRad) * 0.35;
-      this.gltfFlapR.position.z = this.gltfFlapRInitZ + (1.0 - Math.cos(flapAngleRad)) * 0.35;
-    }
 
     // Spoilers (Pop up on upper wing)
     const spoilerVal = flightState.spoilers || 0;
     const spAngle = spoilerVal * THREE.MathUtils.degToRad(-50.0);
     this.spoilersL.forEach(sp => { sp.rotation.x = spAngle; });
     this.spoilersR.forEach(sp => { sp.rotation.x = spAngle; });
-    if (this.gltfSpoilersL) this.gltfSpoilersL.rotation.x = spAngle;
-    if (this.gltfSpoilersR) this.gltfSpoilersR.rotation.x = spAngle;
 
     // Elevators (Pitch)
     const elevVal = flightState.elevator || 0;
     if (this.elevatorL) this.elevatorL.rotation.x = elevVal * 0.45;
     if (this.elevatorR) this.elevatorR.rotation.x = elevVal * 0.45;
-    if (this.gltfElevatorL) this.gltfElevatorL.rotation.x = elevVal * 0.45;
-    if (this.gltfElevatorR) this.gltfElevatorR.rotation.x = elevVal * 0.45;
 
     // Rudder (Yaw)
     const rudderVal = flightState.rudder || 0;
     if (this.rudder) this.rudder.rotation.y = rudderVal * 0.45;
-    if (this.gltfRudder) this.gltfRudder.rotation.y = rudderVal * 0.45;
 
     // 3. Landing Gear Retraction & Dynamic Suspension Compression Animation
     const gearState = flightState.gearState !== undefined ? flightState.gearState : 1.0;
@@ -846,10 +811,8 @@ export class Boeing737 {
           this.loadingGltf = false;
           this.gltfModel = gltf.scene;
 
-          // If the model is an articulated B737_Aircraft (already -Z aligned), keep rotation.y = 0.
-          // Otherwise, if legacy amvlab model, rotate 90° clockwise around Y so nose faces -Z.
-          const isArticulated = Boolean(this.gltfModel.getObjectByName('ControlSurfacesGroup') || this.gltfModel.getObjectByName('B737_Aircraft'));
-          this.gltfModel.rotation.y = isArticulated ? 0 : Math.PI * 0.5;
+          // Rotate 90° clockwise around Y so nose (-X in raw asset) faces -Z (simulator flight direction)
+          this.gltfModel.rotation.y = Math.PI * 0.5;
           this.gltfModel.position.set(0, 0, 0);
 
           // PBR enhancements: cast/receive shadow and tune roughness/metalness
@@ -858,8 +821,8 @@ export class Boeing737 {
               child.castShadow = true;
               child.receiveShadow = true;
               if (child.material) {
-                child.material.roughness = Math.min(child.material.roughness, 0.38);
-                child.material.metalness = Math.max(child.material.metalness, 0.15);
+                child.material.roughness = Math.min(child.material.roughness, 0.35);
+                child.material.metalness = Math.max(child.material.metalness, 0.3);
                 child.material.envMapIntensity = 1.35;
                 child.material.needsUpdate = true;
               }
@@ -872,31 +835,6 @@ export class Boeing737 {
           const fan2 = this.gltfModel.getObjectByName('turbs');
           if (fan1) this.gltfFans.push(fan1);
           if (fan2) this.gltfFans.push(fan2);
-
-          // Articulated Control Surfaces
-          this.gltfAileronL = this.gltfModel.getObjectByName('Aileron_L');
-          this.gltfAileronR = this.gltfModel.getObjectByName('Aileron_R');
-          this.gltfFlapL = this.gltfModel.getObjectByName('Flap_L');
-          this.gltfFlapR = this.gltfModel.getObjectByName('Flap_R');
-          this.gltfSpoilersL = this.gltfModel.getObjectByName('Spoilers_L');
-          this.gltfSpoilersR = this.gltfModel.getObjectByName('Spoilers_R');
-          this.gltfElevatorL = this.gltfModel.getObjectByName('Elevator_L');
-          this.gltfElevatorR = this.gltfModel.getObjectByName('Elevator_R');
-          this.gltfRudder = this.gltfModel.getObjectByName('Rudder');
-
-          if (this.gltfFlapL) {
-            this.gltfFlapLInitY = this.gltfFlapL.position.y;
-            this.gltfFlapLInitZ = this.gltfFlapL.position.z;
-          }
-          if (this.gltfFlapR) {
-            this.gltfFlapRInitY = this.gltfFlapR.position.y;
-            this.gltfFlapRInitZ = this.gltfFlapR.position.z;
-          }
-
-          // If the model includes integrated landing gear, bind it!
-          if (this.gltfModel.getObjectByName('B737_LandingGear')) {
-            this.bindGltfLandingGear(this.gltfModel);
-          }
 
           this.gltfGroup.add(this.gltfModel);
           this.gltfGroup.visible = !this.isCockpit;
@@ -953,119 +891,6 @@ export class Boeing737 {
       if (this.empennageGroup) this.empennageGroup.visible = !this.isCockpit;
       if (this.enginesGroup) this.enginesGroup.visible = !this.isCockpit;
     }
-  }
-
-  loadLandingGearModel(url = '/models/b737-landing-gear.glb') {
-    if (typeof window === 'undefined') return;
-    try {
-      const loader = new GLTFLoader();
-      loader.load(
-        url,
-        (gltf) => {
-          this.bindGltfLandingGear(gltf.scene);
-        },
-        undefined,
-        (err) => {
-          console.warn('GLTF Landing gear failed to load, retaining procedural gear:', err);
-        }
-      );
-    } catch (e) {
-      console.warn('GLTF Landing gear exception:', e);
-    }
-  }
-
-  bindGltfLandingGear(scene) {
-    if (!scene) return;
-    this.gltfGear = scene;
-    this.gltfGear.traverse((child) => {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-        if (child.material) {
-          child.material.envMapIntensity = 1.35;
-          child.material.needsUpdate = true;
-        }
-      }
-    });
-
-    const gltfNose = scene.getObjectByName('NoseGear');
-    const gltfMainL = scene.getObjectByName('MainGearL');
-    const gltfMainR = scene.getObjectByName('MainGearR');
-
-    if (!gltfNose || !gltfMainL || !gltfMainR) return;
-
-    // Helper to wrap wheel group in THREE.Group so truck.children.find(c => c.isGroup) is preserved
-    const wrapWheelGroup = (truck, groupName, posY) => {
-      const orig = truck.getObjectByName(groupName);
-      if (!orig) return;
-      const g = new THREE.Group();
-      g.name = groupName;
-      g.position.set(0, posY, 0);
-      while (orig.children.length > 0) {
-        g.add(orig.children[0]);
-      }
-      truck.remove(orig);
-      truck.add(g);
-    };
-
-    // Swap procedural geometry with high-detail GLTF geometry inside root groups
-    if (this.noseGearGroup) {
-      this.noseGearGroup.clear();
-      while (gltfNose.children.length > 0) {
-        this.noseGearGroup.add(gltfNose.children[0]);
-      }
-      this.noseTruck = this.noseGearGroup.getObjectByName('NoseTruck') || this.noseTruck;
-      if (this.noseTruck) wrapWheelGroup(this.noseTruck, 'NoseWheelGroup', -2.42);
-    }
-
-    if (this.mainGearLGroup) {
-      this.mainGearLGroup.clear();
-      while (gltfMainL.children.length > 0) {
-        this.mainGearLGroup.add(gltfMainL.children[0]);
-      }
-      this.mainTruckL = this.mainGearLGroup.getObjectByName('MainTruckL') || this.mainTruckL;
-      if (this.mainTruckL) wrapWheelGroup(this.mainTruckL, 'MainWheelGroupL', -2.40);
-    }
-
-    if (this.mainGearRGroup) {
-      this.mainGearRGroup.clear();
-      while (gltfMainR.children.length > 0) {
-        this.mainGearRGroup.add(gltfMainR.children[0]);
-      }
-      this.mainTruckR = this.mainGearRGroup.getObjectByName('MainTruckR') || this.mainTruckR;
-      if (this.mainTruckR) wrapWheelGroup(this.mainTruckR, 'MainWheelGroupR', -2.40);
-    }
-
-    // Bind doors and scissors
-    this.gearDoors = [];
-    const nDoorL = this.noseGearGroup?.getObjectByName('NoseDoorL');
-    const nDoorR = this.noseGearGroup?.getObjectByName('NoseDoorR');
-    const mDoorL = this.mainGearLGroup?.getObjectByName('MainDoorL');
-    const mDoorR = this.mainGearRGroup?.getObjectByName('MainDoorR');
-
-    if (nDoorL) this.gearDoors.push({ obj: nDoorL, axis: 'z', side: -1, maxAngle: Math.PI * 0.45 });
-    if (nDoorR) this.gearDoors.push({ obj: nDoorR, axis: 'z', side: 1, maxAngle: Math.PI * 0.45 });
-    if (mDoorL) this.gearDoors.push({ obj: mDoorL, axis: 'z', side: 1, maxAngle: Math.PI * 0.42 });
-    if (mDoorR) this.gearDoors.push({ obj: mDoorR, axis: 'z', side: -1, maxAngle: Math.PI * 0.42 });
-
-    this.gearScissors = [];
-    if (this.noseTruck) {
-      const up = this.noseTruck.getObjectByName('NoseScissorsUpper');
-      const low = this.noseTruck.getObjectByName('NoseScissorsLower');
-      if (up && low) this.gearScissors.push({ truck: this.noseTruck, upper: up, lower: low });
-    }
-    if (this.mainTruckL) {
-      const up = this.mainTruckL.getObjectByName('MainScissorsUpperL');
-      const low = this.mainTruckL.getObjectByName('MainScissorsLowerL');
-      if (up && low) this.gearScissors.push({ truck: this.mainTruckL, upper: up, lower: low });
-    }
-    if (this.mainTruckR) {
-      const up = this.mainTruckR.getObjectByName('MainScissorsUpperR');
-      const low = this.mainTruckR.getObjectByName('MainScissorsLowerR');
-      if (up && low) this.gearScissors.push({ truck: this.mainTruckR, upper: up, lower: low });
-    }
-
-    this.landingGearLoaded = true;
   }
 
   setCockpitMode(isCockpit, showInterior = true) {
