@@ -4,9 +4,9 @@ Flight3d incorporates optimized open-source 3D models, atmospheric environment m
 
 ## Aircraft 3D Models
 - **Boeing 737-800 (`public/models/b737-800.glb`)**:
-  - **Author**: [amvlab/aircraft-models](https://github.com/amvlab/aircraft-models)
-  - **License**: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
-  - **Description**: Real-world scale (~35.8m wingspan, ~37.9m length) Boeing 737 airliner featuring swept wings, blended winglets, dual turbofan engines, and spinning turbine fan animations.
+  - **Author**: FlightGear Boeing 737-800 Project ([soitanen/737-800](https://github.com/soitanen/737-800)), based on aircraft models and dimensional specifications from [amvlab/aircraft-models](https://github.com/amvlab/aircraft-models)
+  - **License**: [GNU General Public License v2 (GPL-2.0)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html) / [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+  - **Description**: Real-world scale (~35.8m wingspan, ~37.9m length) articulated Boeing 737 airliner featuring swept wings, blended winglets, dual turbofan engines with spinning turbine fan animations, separated and articulated control surfaces (roll ailerons, Fowler flaps, flight spoilers, pitch elevators, and yaw rudder), and fully integrated tricycle landing gear with shock oleo suspension and bay doors.
 
 - **Boeing 737-800 Landing Gear System (`public/models/b737-landing-gear.glb`)**:
   - **Author**: FlightGear Boeing 737-800 Project ([soitanen/737-800](https://github.com/soitanen/737-800))
