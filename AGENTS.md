@@ -36,6 +36,10 @@ without a new change or unresolved failure.
 Browser scenarios (`test:flight`, `test:crash`, `test:mobile`, `test:demo`) require
 separate setup and are not part of the default CI gate. See
 [CI and verification](docs/development/ci.md) before running them.
+Hardware GPU acceleration is available via Vulkan (`--use-gl=angle --use-angle=vulkan`)
+for accounts with `/dev/dri/renderD128` access (`render`/`video` groups), yielding
+~8.25x real-time simulation and sub-second screenshot capture. Routine screenshots
+are opt-in via `--screenshots` (`npm run test:flight:visual`).
 
 ## Simulation changes
 

@@ -8,9 +8,11 @@
     "preview": "vite preview",
     "test": "node --test tests/**/*.test.js",
     "test:flight": "node scripts/test-flight-agent.js",
+    "test:flight:visual": "node scripts/test-flight-agent.js --screenshots",
     "test:crash": "node scripts/test-crash-scenarios.js",
     "test:mobile": "node scripts/test-mobile-touch.js",
     "test:demo": "node scripts/test-demo-stepping.js",
+    "test:lukla": "node scripts/test-lukla-demo-benchmark.mjs",
     "check": "node scripts/check-syntax.mjs && node scripts/check-workflow-actions.mjs"
   },
   "dependencies": {

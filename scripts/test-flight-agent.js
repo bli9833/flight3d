@@ -11,6 +11,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5173;
 const CDP_PORT = process.env.CDP_PORT ? parseInt(process.env.CDP_PORT, 10) : 9446;
@@ -27,6 +28,13 @@ class FlightTestAgent {
     this.browserExceptions = [];
     this.anomalies = [];
     this.testResults = [];
+    this.suiteStartTime = null;
+    this.suiteEndTime = null;
+    this.activeRenderer = 'Unknown';
+    this.isHardwareGpu = false;
+    this.captureScreenshots = process.argv.includes('--screenshots') ||
+                              process.argv.includes('--screenshot') ||
+                              process.env.CAPTURE_SCREENSHOTS === '1';
   }
 
   log(msg, emoji = '🛫') {
@@ -35,24 +43,39 @@ class FlightTestAgent {
   }
 
   async start() {
+    this.suiteStartTime = performance.now();
     this.log('Starting Autonomous Flight Test Agent...', '🤖');
 
     // 1. Launch Headless Chrome with CDP
     const profileDir = `/tmp/chrome-flight-test-${Date.now()}`;
+    const forceSwiftShader = process.argv.includes('--swiftshader') || process.env.FORCE_SWIFTSHADER === '1';
+    const forceGpu = process.argv.includes('--gpu') || process.env.FORCE_GPU === '1';
+
     const args = [
       '--headless=new',
       `--user-data-dir=${profileDir}`,
       `--remote-debugging-port=${CDP_PORT}`,
       '--window-size=1280,720',
-      '--use-gl=angle',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
       '--no-first-run',
-      '--no-default-browser-check',
-      SIM_URL
+      '--no-default-browser-check'
     ];
 
-    this.chromeProcess = spawn('google-chrome-stable', args, { stdio: 'ignore' });
+    if (forceGpu) {
+      this.log('Launching Headless Chrome with hardware GPU acceleration (Vulkan)...', '🚀');
+      args.push('--use-gl=angle', '--use-angle=vulkan');
+    } else {
+      this.log('Launching Headless Chrome with SwiftShader rendering...', '⚡');
+      args.push('--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader');
+    }
+    args.push(SIM_URL);
+
+    this.chromeProcess = spawn('google-chrome-stable', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    this.chromeProcess.stderr?.on('data', (d) => {
+      const s = d.toString();
+      if (s.includes('FATAL') || s.includes('Crash') || s.includes('ERROR:content')) {
+        this.log(`[Chrome Stderr] ${s.trim()}`, '⚠️');
+      }
+    });
     this.log(`Headless Chrome spawned with PID ${this.chromeProcess.pid} on CDP port ${CDP_PORT}`);
 
     // Wait for CDP to become ready
@@ -83,14 +106,28 @@ class FlightTestAgent {
 
     // Wait for simulation to load
     this.log('Waiting for simulator to initialize in browser DOM...', '⏳');
-    await new Promise(r => setTimeout(r, 2500));
-
-    // Verify window.simulator
-    const simCheck = await this.eval('Boolean(window.simulator && window.simulator.aircraft)');
-    if (!simCheck) {
-      throw new Error('window.simulator not found in page scope!');
-    }
+    await this.ensureSimulatorReady(15000);
     this.log('Simulator confirmed ready in browser context!', '✅');
+
+    // Detect active WebGL rendering engine
+    const rendererInfo = await this.eval(`
+      (() => {
+        const gl = window.simulator?.renderer?.getContext();
+        if (!gl) return 'Unknown';
+        const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+        return dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      })()
+    `);
+    this.activeRenderer = rendererInfo || 'Unknown';
+    this.isHardwareGpu = Boolean(this.activeRenderer && !this.activeRenderer.includes('SwiftShader') && !this.activeRenderer.includes('llvmpipe'));
+    this.log(`Active WebGL Engine: ${this.activeRenderer} (${this.isHardwareGpu ? 'Hardware GPU Accelerated 🚀' : 'Software SwiftShader 🐢'})`, '🎨');
+
+    if (!this.captureScreenshots) {
+      this.log('Screenshot capture: OPT-IN (skipping routine screenshots for speed; pass --screenshots to enable)', '⚡');
+    } else {
+      this.log('Screenshot capture: ENABLED (--screenshots)', '📸');
+    }
+
     // Ensure demo director is stopped and coastal airport is selected so standalone scenario tests run cleanly
     await this.eval(`
       if (window.simulator) {
@@ -98,6 +135,20 @@ class FlightTestAgent {
         if (typeof window.simulator.setAirport === 'function') window.simulator.setAirport('coastal');
       }
     `);
+  }
+
+  async ensureSimulatorReady(timeoutMs = 15000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const ready = await this.eval('Boolean(window.simulator && window.simulator.aircraft && window.simulator.controls)');
+        if (ready) return true;
+      } catch (e) {
+        // Retry if context is still evaluating
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    throw new Error('Timed out waiting for window.simulator to be ready');
   }
 
   connectWebSocket(url) {
@@ -154,7 +205,11 @@ class FlightTestAgent {
     return res.result?.value;
   }
 
-  async captureScreenshot(filename) {
+  async captureScreenshot(filename, force = false) {
+    if (!this.captureScreenshots && !force) {
+      return { path: null, durationMs: 0, sizeBytes: 0, skipped: true };
+    }
+    const startShot = performance.now();
     const shot = await this.send('Page.captureScreenshot', { format: 'png' });
     const buffer = Buffer.from(shot.data, 'base64');
     const localPath = path.resolve(process.cwd(), filename);
@@ -170,8 +225,9 @@ class FlightTestAgent {
       // Artifact copy optional
     }
 
-    this.log(`Screenshot captured: ${filename} (${(buffer.length / 1024).toFixed(1)} KB)`, '📸');
-    return localPath;
+    const durationMs = performance.now() - startShot;
+    this.log(`Screenshot captured: ${filename} (${(buffer.length / 1024).toFixed(1)} KB in ${(durationMs / 1000).toFixed(2)}s)`, '📸');
+    return { path: localPath, durationMs, sizeBytes: buffer.length, skipped: false };
   }
 
   /**
@@ -180,6 +236,7 @@ class FlightTestAgent {
    * @param {Function} stepCallback Optional callback per tick (dt)
    */
   async recordFlight(durationSeconds, stepCallback = null) {
+    const recordStartTime = performance.now();
     const sliceDt = 0.25; // 250ms of simulation time per step (30 physics substeps at 120Hz)
     const numSlices = Math.round(durationSeconds / sliceDt);
     const telemetryHistory = [];
@@ -245,6 +302,15 @@ class FlightTestAgent {
       }
     }
 
+    const recordDurationMs = performance.now() - recordStartTime;
+    telemetryHistory.performance = {
+      simulatedDurationSec: durationSeconds,
+      steppingTimeMs: recordDurationMs,
+      steps: numSlices,
+      avgStepMs: numSlices > 0 ? (recordDurationMs / numSlices) : 0,
+      speedRatio: (recordDurationMs > 0) ? (durationSeconds / (recordDurationMs / 1000)) : 0
+    };
+
     return telemetryHistory;
   }
 
@@ -252,9 +318,12 @@ class FlightTestAgent {
   // SCENARIO 1: Automated Takeoff & Initial Climb
   // ==========================================
   async testTakeoffScenario() {
+    const scenarioStart = performance.now();
     this.log('=============================================', '🛫');
     this.log('SCENARIO 1: Takeoff Roll, Rotation & Climb', '🛫');
     this.log('=============================================', '🛫');
+
+    await this.ensureSimulatorReady();
 
     // 1. Reset to runway preset
     await this.eval(`
@@ -278,6 +347,7 @@ class FlightTestAgent {
     let liftoffDetected = false;
     let rotationIas = 0;
 
+    const initialAnomalies = this.anomalies.length;
     // Full Boeing 737-800 takeoff roll to Vr takes ~22 seconds at 66,000 kg,
     // followed by smooth 4-5s rotation at 2.2°/s and positive rate climb-out.
     const history = await this.recordFlight(36, async (state, elapsedSec) => {
@@ -305,11 +375,24 @@ class FlightTestAgent {
     const finalState = history[history.length - 1];
     const passed = liftoffDetected && finalState.altitudeFt > 40 && finalState.iasKnots > 130;
 
-    await this.captureScreenshot('test_takeoff_result.png');
+    const forceScreenshot = !passed || (this.anomalies.length > initialAnomalies);
+    const shot = await this.captureScreenshot('test_takeoff_result.png', forceScreenshot);
+    const scenarioDurationMs = performance.now() - scenarioStart;
+
+    const perf = {
+      realDurationSec: parseFloat((scenarioDurationMs / 1000).toFixed(2)),
+      simulatedDurationSec: 36.0,
+      speedRatio: parseFloat((36.0 / (scenarioDurationMs / 1000)).toFixed(2)),
+      steppingTimeSec: parseFloat(((history.performance?.steppingTimeMs || 0) / 1000).toFixed(2)),
+      screenshotTimeSec: parseFloat((shot.durationMs / 1000).toFixed(2)),
+      steps: history.performance?.steps || 0,
+      avgStepMs: parseFloat((history.performance?.avgStepMs || 0).toFixed(1))
+    };
 
     const result = {
       scenario: 'Takeoff & Initial Climb',
       passed,
+      performance: perf,
       metrics: {
         rotationIas: Math.round(rotationIas),
         liftoffDetected,
@@ -320,7 +403,7 @@ class FlightTestAgent {
       }
     };
     this.testResults.push(result);
-    this.log(`Scenario 1 Result: ${passed ? 'PASSED ✅' : 'FAILED ❌'}`, passed ? '🎉' : '❌');
+    this.log(`Scenario 1 Result: ${passed ? 'PASSED ✅' : 'FAILED ❌'} (${perf.realDurationSec}s real, ${perf.simulatedDurationSec}s sim, ${perf.speedRatio}x)`, passed ? '🎉' : '❌');
     return result;
   }
 
@@ -328,9 +411,12 @@ class FlightTestAgent {
   // SCENARIO 2: Aerodynamic Stall & Recovery
   // ==========================================
   async testStallRecoveryScenario() {
+    const scenarioStart = performance.now();
     this.log('=============================================', '⚠️');
     this.log('SCENARIO 2: High-Altitude Stall & Nose-Down Recovery', '⚠️');
     this.log('=============================================', '⚠️');
+
+    await this.ensureSimulatorReady();
 
     // Setup high altitude clean flight
     await this.eval(`
@@ -357,6 +443,7 @@ class FlightTestAgent {
     let stallTriggered = false;
     let recovered = false;
 
+    const initialAnomalies = this.anomalies.length;
     const history = await this.recordFlight(16, async (state, elapsedSec) => {
       if (!stallTriggered && state.isStalled) {
         stallTriggered = true;
@@ -379,12 +466,24 @@ class FlightTestAgent {
       }
     });
 
-    await this.captureScreenshot('test_stall_recovery_result.png');
-
     const passed = stallTriggered && recovered;
+    const forceScreenshot = !passed || (this.anomalies.length > initialAnomalies);
+    const shot = await this.captureScreenshot('test_stall_recovery_result.png', forceScreenshot);
+    const scenarioDurationMs = performance.now() - scenarioStart;
+    const perf = {
+      realDurationSec: parseFloat((scenarioDurationMs / 1000).toFixed(2)),
+      simulatedDurationSec: 16.0,
+      speedRatio: parseFloat((16.0 / (scenarioDurationMs / 1000)).toFixed(2)),
+      steppingTimeSec: parseFloat(((history.performance?.steppingTimeMs || 0) / 1000).toFixed(2)),
+      screenshotTimeSec: parseFloat((shot.durationMs / 1000).toFixed(2)),
+      steps: history.performance?.steps || 0,
+      avgStepMs: parseFloat((history.performance?.avgStepMs || 0).toFixed(1))
+    };
+
     const result = {
       scenario: 'Stall Warning & Recovery',
       passed,
+      performance: perf,
       metrics: {
         stallTriggered,
         recovered,
@@ -394,7 +493,7 @@ class FlightTestAgent {
       }
     };
     this.testResults.push(result);
-    this.log(`Scenario 2 Result: ${passed ? 'PASSED ✅' : 'FAILED ❌'}`, passed ? '🎉' : '❌');
+    this.log(`Scenario 2 Result: ${passed ? 'PASSED ✅' : 'FAILED ❌'} (${perf.realDurationSec}s real, ${perf.simulatedDurationSec}s sim, ${perf.speedRatio}x)`, passed ? '🎉' : '❌');
     return result;
   }
 
@@ -402,9 +501,12 @@ class FlightTestAgent {
   // SCENARIO 3: Final Approach, Touchdown & Reverser Braking
   // ==========================================
   async testApproachAndLandingScenario() {
+    const scenarioStart = performance.now();
     this.log('=============================================', '🛬');
     this.log('SCENARIO 3: Final Approach, Touchdown & Braking Rollout', '🛬');
     this.log('=============================================', '🛬');
+
+    await this.ensureSimulatorReady();
 
     // Preset short final: 0.3 NM out (x = -1900m, alt = 42m / 138ft)
     await this.eval(`
@@ -433,6 +535,7 @@ class FlightTestAgent {
     let touchdownConfirmed = false;
     let stoppedOnRunway = false;
 
+    const initialAnomalies = this.anomalies.length;
     const history = await this.recordFlight(44, async (state, elapsedSec) => {
       // Flare at 25 ft AGL
       if (!flareInitiated && state.radioAltFt <= 25 && state.radioAltFt > 0) {
@@ -474,12 +577,24 @@ class FlightTestAgent {
       }
     });
 
-    await this.captureScreenshot('test_landing_result.png');
-
     const passed = touchdownConfirmed && stoppedOnRunway && history.length > 0 && history.every(s => !s.isCrashed);
+    const forceScreenshot = !passed || (this.anomalies.length > initialAnomalies);
+    const shot = await this.captureScreenshot('test_landing_result.png', forceScreenshot);
+    const scenarioDurationMs = performance.now() - scenarioStart;
+    const perf = {
+      realDurationSec: parseFloat((scenarioDurationMs / 1000).toFixed(2)),
+      simulatedDurationSec: 44.0,
+      speedRatio: parseFloat((44.0 / (scenarioDurationMs / 1000)).toFixed(2)),
+      steppingTimeSec: parseFloat(((history.performance?.steppingTimeMs || 0) / 1000).toFixed(2)),
+      screenshotTimeSec: parseFloat((shot.durationMs / 1000).toFixed(2)),
+      steps: history.performance?.steps || 0,
+      avgStepMs: parseFloat((history.performance?.avgStepMs || 0).toFixed(1))
+    };
+
     const result = {
       scenario: 'Approach, Touchdown & Braking',
       passed,
+      performance: perf,
       metrics: {
         touchdownConfirmed,
         stoppedOnRunway,
@@ -490,7 +605,7 @@ class FlightTestAgent {
       }
     };
     this.testResults.push(result);
-    this.log(`Scenario 3 Result: ${passed ? 'PASSED ✅' : 'FAILED ❌'}`, passed ? '🎉' : '❌');
+    this.log(`Scenario 3 Result: ${passed ? 'PASSED ✅' : 'FAILED ❌'} (${perf.realDurationSec}s real, ${perf.simulatedDurationSec}s sim, ${perf.speedRatio}x)`, passed ? '🎉' : '❌');
     return result;
   }
 
@@ -498,9 +613,12 @@ class FlightTestAgent {
   // SCENARIO 4: Rapid Preset & Camera Cycling
   // ==========================================
   async testPresetAndCameraStress() {
+    const scenarioStart = performance.now();
     this.log('=============================================', '🎛️');
     this.log('SCENARIO 4: Presets & Camera Switching Stress Test', '🎛️');
     this.log('=============================================', '🎛️');
+
+    await this.ensureSimulatorReady();
 
     const presets = ['runway', 'approach', 'cruise', 'runway'];
     let cameraMode = 0;
@@ -533,17 +651,29 @@ class FlightTestAgent {
 
     this.log(`Scenario 4 Diagnostics: pos=(${state.posX}, ${state.posY}, ${state.posZ}), quatW=${state.quatW}, validPos=${state.validPosition}, validQuat=${state.validQuat}, cam=${state.camMode}`, '🔍');
 
+    const scenarioDurationMs = performance.now() - scenarioStart;
     const passed = Boolean(state.validPosition && state.validQuat && this.browserExceptions.length === 0);
+    const perf = {
+      realDurationSec: parseFloat((scenarioDurationMs / 1000).toFixed(2)),
+      simulatedDurationSec: 0.0,
+      speedRatio: 0.0,
+      steppingTimeSec: 0.0,
+      screenshotTimeSec: 0.0,
+      steps: presets.length,
+      avgStepMs: parseFloat((scenarioDurationMs / presets.length).toFixed(1))
+    };
+
     const result = {
       scenario: 'Preset & Multi-Camera Stress',
       passed,
+      performance: perf,
       metrics: {
         validState: state.validPosition && state.validQuat,
         uncaughtExceptions: this.browserExceptions.length
       }
     };
     this.testResults.push(result);
-    this.log(`Scenario 4 Result: ${passed ? 'PASSED ✅' : 'FAILED ❌'}`, passed ? '🎉' : '❌');
+    this.log(`Scenario 4 Result: ${passed ? 'PASSED ✅' : 'FAILED ❌'} (${perf.realDurationSec}s real)`, passed ? '🎉' : '❌');
     return result;
   }
 
@@ -551,9 +681,12 @@ class FlightTestAgent {
   // SCENARIO 5: Autonomous Demo Flight Director
   // ==========================================
   async testDemoFlightDirectorScenario() {
+    const scenarioStart = performance.now();
     this.log('=============================================', '🎬');
     this.log('SCENARIO 5: Autonomous Demo Flight Director & Handover', '🎬');
     this.log('=============================================', '🎬');
+
+    await this.ensureSimulatorReady();
 
     // 1. Start Demo Director
     await this.eval(`window.simulator.demoDirector.start();`);
@@ -566,14 +699,23 @@ class FlightTestAgent {
 
     // 2. Let demo run and confirm active stage progression
     let stageAdvanced = false;
+    let simulatedSec = 0;
+    let steppingTimeMs = 0;
+    let stepCount = 0;
+
     for (let s = 0; s < 60; s++) {
       await new Promise(r => setTimeout(r, 50));
+      const t0 = performance.now();
       const currentStage = await this.eval(`
         (() => {
           window.simulator.stepSimulation(0.5);
           return window.simulator.demoDirector.currentStage;
         })()
       `);
+      steppingTimeMs += (performance.now() - t0);
+      simulatedSec += 0.5;
+      stepCount++;
+
       if (currentStage >= 1) {
         stageAdvanced = true;
         this.log(`Demo flight stage successfully advanced to stage ${currentStage}!`, '✨');
@@ -589,10 +731,22 @@ class FlightTestAgent {
     const bannerHidden = await this.eval(`document.getElementById('demo-banner').style.display === 'none'`);
     this.log(`Demo stopped cleanly: inactive=${stoppedCheck}, bannerHidden=${bannerHidden}`, '🎯');
 
+    const scenarioDurationMs = performance.now() - scenarioStart;
     const passed = Boolean(activeCheck && bannerDisplay && stageAdvanced && stoppedCheck && bannerHidden);
+    const perf = {
+      realDurationSec: parseFloat((scenarioDurationMs / 1000).toFixed(2)),
+      simulatedDurationSec: parseFloat(simulatedSec.toFixed(1)),
+      speedRatio: scenarioDurationMs > 0 ? parseFloat((simulatedSec / (scenarioDurationMs / 1000)).toFixed(2)) : 0,
+      steppingTimeSec: parseFloat((steppingTimeMs / 1000).toFixed(2)),
+      screenshotTimeSec: 0.0,
+      steps: stepCount,
+      avgStepMs: stepCount > 0 ? parseFloat((steppingTimeMs / stepCount).toFixed(1)) : 0
+    };
+
     const result = {
       scenario: 'Autonomous Demo Director & User Handover',
       passed,
+      performance: perf,
       metrics: {
         activeCheck,
         bannerDisplay,
@@ -602,12 +756,63 @@ class FlightTestAgent {
       }
     };
     this.testResults.push(result);
-    this.log(`Scenario 5 Result: ${passed ? 'PASSED ✅' : 'FAILED ❌'}`, passed ? '🎉' : '❌');
+    this.log(`Scenario 5 Result: ${passed ? 'PASSED ✅' : 'FAILED ❌'} (${perf.realDurationSec}s real, ${perf.simulatedDurationSec}s sim, ${perf.speedRatio}x)`, passed ? '🎉' : '❌');
     return result;
   }
 
   async finish() {
-    this.log('Generating Final Flight Test Report...', '📊');
+    this.suiteEndTime = performance.now();
+    const totalSuiteRealDurationSec = (this.suiteEndTime - this.suiteStartTime) / 1000;
+    this.log('Generating Final Flight Test & Performance Report...', '📊');
+
+    const totalSimulatedSec = this.testResults.reduce((acc, r) => acc + (r.performance?.simulatedDurationSec || 0), 0);
+    const totalSteps = this.testResults.reduce((acc, r) => acc + (r.performance?.steps || 0), 0);
+    const totalSteppingSec = this.testResults.reduce((acc, r) => acc + (r.performance?.steppingTimeSec || 0), 0);
+    const totalScreenshotSec = this.testResults.reduce((acc, r) => acc + (r.performance?.screenshotTimeSec || 0), 0);
+    const overallSpeedRatio = totalSuiteRealDurationSec > 0 ? (totalSimulatedSec / totalSuiteRealDurationSec) : 0;
+
+    const performanceReport = {
+      timestamp: new Date().toISOString(),
+      platform: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        webglRenderer: this.activeRenderer,
+        isHardwareGpu: this.isHardwareGpu
+      },
+      summary: {
+        totalRealDurationSec: parseFloat(totalSuiteRealDurationSec.toFixed(2)),
+        totalSimulatedFlightSec: parseFloat(totalSimulatedSec.toFixed(2)),
+        overallSpeedRatio: parseFloat(overallSpeedRatio.toFixed(2)),
+        totalSteps,
+        totalSteppingTimeSec: parseFloat(totalSteppingSec.toFixed(2)),
+        totalScreenshotTimeSec: parseFloat(totalScreenshotSec.toFixed(2)),
+        screenshotsEnabled: this.captureScreenshots,
+        scenariosCount: this.testResults.length,
+        passedCount: this.testResults.filter(r => r.passed).length,
+        failedCount: this.testResults.filter(r => !r.passed).length
+      },
+      scenarios: this.testResults.map(r => ({
+        scenario: r.scenario,
+        passed: r.passed,
+        performance: r.performance,
+        metrics: r.metrics
+      })),
+      anomalies: this.anomalies,
+      consoleErrors: this.browserExceptions
+    };
+
+    // Save performance report to JSON
+    const perfFileName = 'flight-test-performance.json';
+    const localPerfPath = path.resolve(process.cwd(), perfFileName);
+    fs.writeFileSync(localPerfPath, JSON.stringify(performanceReport, null, 2));
+    try {
+      if (fs.existsSync(ARTIFACT_DIR)) {
+        fs.writeFileSync(path.join(ARTIFACT_DIR, perfFileName), JSON.stringify(performanceReport, null, 2));
+      }
+    } catch (e) {
+      // Optional artifact copy
+    }
 
     console.log('\n=============================================================');
     console.log('            AUTONOMOUS FLIGHT TEST REPORT');
@@ -615,9 +820,25 @@ class FlightTestAgent {
     let allPassed = true;
     for (const r of this.testResults) {
       console.log(`[${r.passed ? 'PASS' : 'FAIL'}] ${r.scenario}`);
-      console.log(`       Metrics: ${JSON.stringify(r.metrics)}`);
+      console.log(`       Flight Metrics: ${JSON.stringify(r.metrics)}`);
+      if (r.performance) {
+        const shotInfo = r.performance.screenshotTimeSec > 0
+          ? `Screenshot: ${r.performance.screenshotTimeSec}s`
+          : 'Screenshot: skipped';
+        console.log(`       Performance: ${r.performance.realDurationSec}s real | ${r.performance.simulatedDurationSec}s sim | Speed: ${r.performance.speedRatio}x | Stepping: ${r.performance.steppingTimeSec}s (${r.performance.avgStepMs}ms/step) | ${shotInfo}`);
+      }
       if (!r.passed) allPassed = false;
     }
+    console.log('-------------------------------------------------------------');
+    console.log('FLIGHT PERFORMANCE & DURATION SUMMARY:');
+    console.log(`  Active WebGL Engine:        ${this.activeRenderer}`);
+    console.log(`  Hardware GPU Accelerated:   ${this.isHardwareGpu ? 'YES 🚀' : 'NO (SwiftShader Software) 🐢'}`);
+    console.log(`  Total Real Duration:        ${totalSuiteRealDurationSec.toFixed(2)}s`);
+    console.log(`  Total Flight Simulated:     ${totalSimulatedSec.toFixed(2)}s`);
+    console.log(`  Overall Simulation Speed:   ${overallSpeedRatio.toFixed(2)}x real-time`);
+    console.log(`  Total Physics Steps:        ${totalSteps} slices (${totalSteppingSec.toFixed(2)}s total stepping)`);
+    console.log(`  Screenshot Overhead:        ${totalScreenshotSec.toFixed(2)}s ${this.captureScreenshots ? '(enabled)' : '(opt-in skipped)'}`);
+    console.log(`  Saved Profile:              ${localPerfPath}`);
     console.log('-------------------------------------------------------------');
     console.log(`Total Scenarios: ${this.testResults.length}`);
     console.log(`Passed: ${this.testResults.filter(r => r.passed).length}`);
