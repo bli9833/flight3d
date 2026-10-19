@@ -8,11 +8,6 @@ Flight3d incorporates optimized open-source 3D models, atmospheric environment m
   - **License**: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
   - **Description**: Real-world scale (~35.8m wingspan, ~37.9m length) Boeing 737 airliner featuring swept wings, blended winglets, dual turbofan engines, and spinning turbine fan animations.
 
-- **Boeing 737-800 Landing Gear System (`public/models/b737-landing-gear.glb`)**:
-  - **Author**: FlightGear Boeing 737-800 Project ([soitanen/737-800](https://github.com/soitanen/737-800))
-  - **License**: [GNU General Public License v2 (GPL-2.0)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
-  - **Description**: Tricycle landing gear assembly featuring articulated steerable nose gear with sliding oleo piston and bay doors, dual main bogie shock struts with side stays and keel fairing doors, multi-disc carbon brake calipers, and authentic Boeing 737-800 wheel track and wheelbase dimensions.
-
 ## Environment Maps & Textures
 - **Kloofendal Partly Cloudy Sky HDR (`public/textures/environment/sky_1k.hdr`)**:
   - **Author**: Greg Zaal ([Poly Haven](https://polyhaven.com/a/kloofendal_48d_partly_cloudy))
