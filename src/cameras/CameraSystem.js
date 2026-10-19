@@ -441,6 +441,9 @@ export class CameraSystem {
     if (this.mode === CameraSystem.MODES.DRONE) {
       this.droneInitialized = false;
     }
+    if (this.onCycleMode) {
+      this.onCycleMode(this.mode);
+    }
     return this.getModeName();
   }
 
