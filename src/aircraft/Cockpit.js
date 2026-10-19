@@ -967,9 +967,9 @@ export class Cockpit {
 
           // Calibrated alignment transform:
           // Raw model coordinates: Forward +Z, Captain -X. Eye at (-0.44, 2.25, 0.65).
-          // Flight3D local space: Forward -Z, Captain -X. Eye at (-0.48, 0.94, -12.08).
+          // Flight3D local space: Forward -Z, Captain -X. Eye at (-0.45, 0.85, -12.44).
           model.rotation.y = Math.PI;
-          model.scale.set(-1, 1, 1);
+          model.scale.set(1, 1, 1);
           model.position.set(0, -1.31, -11.43);
 
           model.traverse((child) => {
