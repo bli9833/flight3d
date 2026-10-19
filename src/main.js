@@ -368,7 +368,8 @@ class FlightSimulator {
         this.gear.gearState = 1.0;
         this.aero.setFlapPosition(2); // Flaps 5
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 4.0;
+        this.aero.pitchTrim = 5.5;
+        this.controls.pitchTrim = 5.5;
 
         this.showToast('Preset: 루클라 24번 활주로 절벽 가속 이륙 (11.7% 내리막 질주)');
       } else if (type === 'cruise') {
@@ -890,7 +891,8 @@ class FlightSimulator {
       this.totalSimTime += this.physicsDt;
     }
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
-    const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit;
+    const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
+    const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.enabled = isPhotoCockpit;
@@ -965,7 +967,8 @@ class FlightSimulator {
 
     // 4. Update Cockpit Visibility & Audio
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
-    const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit;
+    const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
+    const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.enabled = isPhotoCockpit;
@@ -1059,6 +1062,10 @@ class FlightSimulator {
     document.getElementById('btn-spoilers')?.addEventListener('click', () => this.controls.onToggleSpoilers());
     document.getElementById('btn-reverser')?.addEventListener('click', () => this.controls.onToggleReverser());
     document.getElementById('btn-cam')?.addEventListener('click', () => this.controls.onCycleCamera());
+    document.getElementById('btn-cam-reset')?.addEventListener('click', () => {
+      this.cameraSystem.resetLook();
+      this.showToast('카메라 시선 정면 초기화');
+    });
     document.getElementById('btn-time')?.addEventListener('click', () => this.controls.onCycleTimeOfDay(3.0));
     document.getElementById('btn-sound')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-diag')?.addEventListener('click', () => this.diagnostics.toggle());
@@ -1106,6 +1113,10 @@ class FlightSimulator {
           const isPhoto = this.cameraSystem.toggleCockpitPhoto();
           this.showToast(isPhoto ? '실사 포토 콕핏 (Photo Panel)' : '3D 가상 콕핏 (3D Virtual)');
         }
+      }
+      if (e.code === 'KeyO') {
+        this.cameraSystem.resetLook();
+        this.showToast('카메라 시선 정면 초기화');
       }
     });
   }

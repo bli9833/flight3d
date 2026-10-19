@@ -37,12 +37,20 @@ export class CameraSystem {
     // Landing Gear Belly View Parameters (Oblique angle looking at nose and main gear under fuselage)
     this.gearCamOffset = new THREE.Vector3(2.2, -2.6, 6.2);
     this.gearLookTarget = new THREE.Vector3(-0.5, -1.9, -2.5);
+    this.gearLookYaw = 0;
+    this.gearLookPitch = 0;
 
-    // Chase Camera Parameters
+    // Chase Camera Parameters (360° Mouse Orbit & Look)
     this.chaseDistance = 55.0;
     this.chaseHeight = 10.5;
+    this.chaseYaw = 0;
+    this.chasePitch = 0;
     this.chasePos = new THREE.Vector3();
     this.chaseTarget = new THREE.Vector3();
+
+    // Wing View Parameters
+    this.wingLookYaw = 0;
+    this.wingLookPitch = 0;
 
     // Drone Orbit Camera Parameters (Circumnavigating aircraft from slightly above)
     this.droneOrbitAngle = 1.8;
@@ -53,6 +61,13 @@ export class CameraSystem {
     this.dronePos = new THREE.Vector3();
     this.droneInitialized = false;
 
+    // Real-time cursor tracking (subtle gaze shift with mouse movement)
+    this.cursorNormX = 0;
+    this.cursorNormY = 0;
+    this.targetCursorNormX = 0;
+    this.targetCursorNormY = 0;
+    this.enableCursorTrack = true;
+
     // Tower Camera Location (Inside Control Tower Cab at 66m height)
     this.towerPos = new THREE.Vector3(120, 78, 280);
 
@@ -62,8 +77,9 @@ export class CameraSystem {
     this.flybyRegime = null;
     this.getTerrainHeight = null;
 
-    // Mouse drag look
+    // Mouse drag & pointer look state
     this.isDragging = false;
+    this.pointerLocked = false;
     this.prevMouse = { x: 0, y: 0 };
 
     this.initMouseLook();
@@ -71,50 +87,169 @@ export class CameraSystem {
 
   initMouseLook() {
     if (!this.domElement || typeof window === 'undefined') return;
-    this.domElement.addEventListener('mousedown', (e) => {
+
+    if (this.domElement.style) {
+      this.domElement.style.cursor = 'grab';
+    }
+
+    const onMouseDown = (e) => {
+      // Ignore clicks on UI buttons/cards
+      if (e.target && e.target.closest && e.target.closest('button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .hud-strip, #demo-banner, .toast, .stall-banner, .crash-overlay')) {
+        return;
+      }
       if (e.button === 0 || e.button === 2) {
         this.isDragging = true;
         this.prevMouse.x = e.clientX;
         this.prevMouse.y = e.clientY;
-      }
-    });
-
-    window.addEventListener('mouseup', () => {
-      this.isDragging = false;
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      if (this.isDragging) {
-        const dx = e.clientX - this.prevMouse.x;
-        const dy = e.clientY - this.prevMouse.y;
-        this.prevMouse.x = e.clientX;
-        this.prevMouse.y = e.clientY;
-
-        if (this.mode === CameraSystem.MODES.COCKPIT) {
-          this.lookYaw -= dx * 0.0035;
-          this.lookPitch -= dy * 0.0035;
-          this.lookPitch = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, this.lookPitch));
-        } else if (this.mode === CameraSystem.MODES.DRONE) {
-          this.droneOrbitAngle -= dx * 0.005;
-          this.droneHeight = Math.max(4.0, Math.min(32.0, this.droneHeight + dy * 0.05));
+        if (this.domElement && this.domElement.style) {
+          this.domElement.style.cursor = 'grabbing';
         }
+      } else if (e.button === 1) {
+        // Middle click toggles pointer lock (자유 시선 모드)
+        this.togglePointerLock();
+        if (e.preventDefault) e.preventDefault();
       }
-    });
+    };
 
-    // Mouse wheel zoom for drone distance
-    this.domElement.addEventListener('wheel', (e) => {
-      if (this.mode === CameraSystem.MODES.DRONE) {
-        this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance + e.deltaY * 0.04));
+    if (typeof this.domElement.addEventListener === 'function') {
+      this.domElement.addEventListener('mousedown', onMouseDown);
+      // Mouse wheel zoom
+      this.domElement.addEventListener('wheel', (e) => {
+        if (this.mode === CameraSystem.MODES.CHASE) {
+          this.chaseDistance = Math.max(20.0, Math.min(140.0, this.chaseDistance + e.deltaY * 0.05));
+        } else if (this.mode === CameraSystem.MODES.DRONE) {
+          this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance + e.deltaY * 0.04));
+        }
+      }, { passive: true });
+    }
+
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('mouseup', () => {
+        this.isDragging = false;
+        if (this.domElement && this.domElement.style && !this.pointerLocked) {
+          this.domElement.style.cursor = 'grab';
+        }
+      });
+
+      // Suppress context menu on right-click drag so free look is unhindered
+      window.addEventListener('contextmenu', (e) => {
+        if (e.target === this.domElement || (e.target && e.target.id === 'canvas-container') || (e.target && !e.target.closest('button, a, input, select, .btn, .modal-card'))) {
+          e.preventDefault();
+        }
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        // Real-time cursor tracking (카메라 시선 미세 추종)
+        this.setCursorPosition(e.clientX, e.clientY);
+
+        // Active mouse look during drag or pointer lock
+        if (this.isDragging || this.pointerLocked) {
+          const dx = this.pointerLocked && typeof e.movementX === 'number' ? e.movementX : (e.clientX - this.prevMouse.x);
+          const dy = this.pointerLocked && typeof e.movementY === 'number' ? e.movementY : (e.clientY - this.prevMouse.y);
+          this.prevMouse.x = e.clientX;
+          this.prevMouse.y = e.clientY;
+
+          this.applyMouseDelta(dx, dy);
+        }
+      });
+
+      window.addEventListener('mouseleave', () => {
+        this.targetCursorNormX = 0;
+        this.targetCursorNormY = 0;
+      });
+
+      // Reset view on double click
+      window.addEventListener('dblclick', (e) => {
+        if (e.target && e.target.closest && e.target.closest('button, a, input, select, .btn, .modal-card')) {
+          return;
+        }
+        this.resetLook();
+      });
+    }
+
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      document.addEventListener('pointerlockchange', () => {
+        this.pointerLocked = (document.pointerLockElement === this.domElement);
+        if (this.domElement && this.domElement.style) {
+          this.domElement.style.cursor = this.pointerLocked ? 'none' : 'grab';
+        }
+      });
+    }
+  }
+
+  applyMouseDelta(dx, dy) {
+    switch (this.mode) {
+      case CameraSystem.MODES.COCKPIT: {
+        this.lookYaw -= dx * 0.0035;
+        this.lookPitch -= dy * 0.0035;
+        this.lookPitch = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, this.lookPitch));
+        break;
       }
-    }, { passive: true });
+      case CameraSystem.MODES.CHASE: {
+        this.chaseYaw -= dx * 0.005;
+        this.chasePitch += dy * 0.005; // Drag down = lower camera / look up; drag up = raise camera / look down
+        this.chasePitch = Math.max(-1.1, Math.min(0.28, this.chasePitch));
+        break;
+      }
+      case CameraSystem.MODES.WING: {
+        this.wingLookYaw -= dx * 0.0035;
+        this.wingLookPitch -= dy * 0.0035;
+        this.wingLookPitch = Math.max(-Math.PI * 0.35, Math.min(Math.PI * 0.35, this.wingLookPitch));
+        this.wingLookYaw = Math.max(-Math.PI * 0.55, Math.min(Math.PI * 0.55, this.wingLookYaw));
+        break;
+      }
+      case CameraSystem.MODES.DRONE: {
+        this.droneOrbitAngle -= dx * 0.005;
+        this.droneHeight = Math.max(4.0, Math.min(32.0, this.droneHeight + dy * 0.05));
+        break;
+      }
+      case CameraSystem.MODES.GEAR: {
+        this.gearLookYaw -= dx * 0.0035;
+        this.gearLookPitch -= dy * 0.0035;
+        this.gearLookPitch = Math.max(-0.6, Math.min(0.6, this.gearLookPitch));
+        this.gearLookYaw = Math.max(-0.8, Math.min(0.8, this.gearLookYaw));
+        break;
+      }
+    }
+  }
 
-    // Reset view on double click
-    this.domElement.addEventListener('dblclick', () => {
-      this.lookYaw = 0;
-      this.lookPitch = -0.18;
-      this.droneDistance = 38.0;
-      this.droneHeight = 11.5;
-    });
+  setCursorPosition(clientX, clientY, width = (typeof window !== 'undefined' ? window.innerWidth : 1920), height = (typeof window !== 'undefined' ? window.innerHeight : 1080)) {
+    if (!width || !height) return;
+    const cx = width * 0.5;
+    const cy = height * 0.5;
+    this.targetCursorNormX = Math.max(-1.0, Math.min(1.0, (clientX - cx) / cx));
+    this.targetCursorNormY = Math.max(-1.0, Math.min(1.0, (clientY - cy) / cy));
+  }
+
+  resetLook() {
+    this.lookYaw = 0;
+    this.lookPitch = -0.18;
+    this.chaseYaw = 0;
+    this.chasePitch = 0;
+    this.chaseDistance = 55.0;
+    this.chaseHeight = 10.5;
+    this.wingLookYaw = 0;
+    this.wingLookPitch = 0;
+    this.gearLookYaw = 0;
+    this.gearLookPitch = 0;
+    this.targetCursorNormX = 0;
+    this.targetCursorNormY = 0;
+    this.cursorNormX = 0;
+    this.cursorNormY = 0;
+  }
+
+  togglePointerLock() {
+    if (typeof document === 'undefined' || !this.domElement) return;
+    if (document.pointerLockElement === this.domElement) {
+      if (document.exitPointerLock) document.exitPointerLock();
+    } else {
+      if (this.domElement.requestPointerLock) this.domElement.requestPointerLock();
+    }
+  }
+
+  isLookingAwayFromCenter() {
+    if (this.mode !== CameraSystem.MODES.COCKPIT) return false;
+    return Math.abs(this.lookYaw) > 0.38 || Math.abs(this.lookPitch - (-0.18)) > 0.42;
   }
 
   resetDroneOrbit(angle = 1.8, distance = 38.0, height = 11.5) {
@@ -143,6 +278,8 @@ export class CameraSystem {
   }
   snapToTarget(aircraftMesh) {
     const behindLocal = new THREE.Vector3(0, this.chaseHeight, this.chaseDistance);
+    behindLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.chasePitch);
+    behindLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.chaseYaw);
     this.chasePos.copy(behindLocal.applyMatrix4(aircraftMesh.matrixWorld));
 
     if (this.mode === CameraSystem.MODES.COCKPIT) {
@@ -228,6 +365,7 @@ export class CameraSystem {
   cycleMode() {
     this.cancelTemporaryView();
     this.mode = (this.mode + 1) % 7;
+    this.resetLook();
     if (this.mode === CameraSystem.MODES.FLYBY) {
       this.flybySet = false;
       this.flybyRegime = null;
@@ -241,6 +379,7 @@ export class CameraSystem {
   setMode(m) {
     this.cancelTemporaryView();
     this.mode = m;
+    this.resetLook();
     if (this.mode === CameraSystem.MODES.FLYBY) {
       this.flybySet = false;
       this.flybyRegime = null;
@@ -311,6 +450,10 @@ export class CameraSystem {
       this.touchJoltOffset = -0.045 * severity;
     }
 
+    // Smoothly interpolate cursor tracking offsets (마우스 움직임에 따른 실시간 시선 부드러운 추종)
+    this.cursorNormX += (this.targetCursorNormX - this.cursorNormX) * Math.min(1.0, dt * 7.0);
+    this.cursorNormY += (this.targetCursorNormY - this.cursorNormY) * Math.min(1.0, dt * 7.0);
+
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: {
         // First-Person Cockpit View
@@ -344,12 +487,17 @@ export class CameraSystem {
         const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
         this.camera.up.copy(upWorld);
 
-        // Compute forward look target with head rotation
+        // Compute forward look target with head rotation and subtle cursor tracking
+        const cursorYaw = this.enableCursorTrack ? (-this.cursorNormX * 0.18) : 0;
+        const cursorPitch = this.enableCursorTrack ? (-this.cursorNormY * 0.12) : 0;
+
+        const effectiveYaw = this.lookYaw + cursorYaw;
+        const basePitch = (this.photoCockpit && !this.isLookingAwayFromCenter()) ? (this.lookPitch * 0.2 - 0.04) : this.lookPitch;
+        const effectivePitch = basePitch + cursorPitch;
+
         const forwardLocal = new THREE.Vector3(0, 0, -100);
-        // Apply pilot pan/tilt (in photo cockpit mode, -0.04 rad downward pitch frames runway and horizon through windshield)
-        const pitchAngle = this.photoCockpit ? (this.lookPitch * 0.2 - 0.04) : this.lookPitch;
-        forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), pitchAngle);
-        forwardLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.lookYaw);
+        forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), effectivePitch);
+        forwardLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), effectiveYaw);
         const forwardWorld = forwardLocal.applyQuaternion(planeQuat);
 
         this.camera.lookAt(eyeWorld.clone().add(forwardWorld));
@@ -357,9 +505,24 @@ export class CameraSystem {
       }
 
       case CameraSystem.MODES.CHASE: {
-        // Smooth Third-Person Exterior Chase Camera
+        // Smooth Third-Person Exterior Chase Camera with full 360° mouse look & orbit
+        const cursorChaseYaw = this.enableCursorTrack ? (-this.cursorNormX * 0.18) : 0;
+        const cursorChasePitch = this.enableCursorTrack ? (this.cursorNormY * 0.12) : 0;
+
+        const totalYaw = this.chaseYaw + cursorChaseYaw;
+        const totalPitch = Math.max(-1.1, Math.min(0.28, this.chasePitch + cursorChasePitch));
+
         const behindLocal = new THREE.Vector3(0, this.chaseHeight, this.chaseDistance);
+        behindLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), totalPitch);
+        behindLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), totalYaw);
+
         const targetBehindWorld = behindLocal.applyMatrix4(aircraftMesh.matrixWorld);
+
+        // Ground safety clamp: prevent exterior camera from clipping into terrain or runway
+        const groundH = this.queryGroundHeight(targetBehindWorld.x, targetBehindWorld.z);
+        if (targetBehindWorld.y < groundH + 1.8) {
+          targetBehindWorld.y = groundH + 1.8;
+        }
 
         // Damped interpolation to smooth camera motion
         this.chasePos.lerp(targetBehindWorld, Math.min(1.0, dt * 6.5));
@@ -380,9 +543,17 @@ export class CameraSystem {
         const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
         this.camera.up.copy(upWorld);
 
-        // Look outward towards wingtip and engine
+        const cursorWingYaw = this.enableCursorTrack ? (-this.cursorNormX * 0.16) : 0;
+        const cursorWingPitch = this.enableCursorTrack ? (-this.cursorNormY * 0.12) : 0;
+        const totalWingYaw = this.wingLookYaw + cursorWingYaw;
+        const totalWingPitch = this.wingLookPitch + cursorWingPitch;
+
+        // Look outward towards wingtip and engine with mouse pan/tilt
         const lookLocal = new THREE.Vector3(-15.0, -1.2, -4.0);
-        const lookWorld = lookLocal.applyMatrix4(aircraftMesh.matrixWorld);
+        lookLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), totalWingYaw);
+        lookLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), totalWingPitch);
+
+        const lookWorld = eyeWorld.clone().add(lookLocal.applyQuaternion(planeQuat));
         this.camera.lookAt(lookWorld);
         break;
       }
@@ -517,7 +688,10 @@ export class CameraSystem {
 
         this.camera.position.copy(eyeWorld);
 
-        const targetWorld = this.gearLookTarget.clone().applyMatrix4(aircraftMesh.matrixWorld);
+        const targetLocal = this.gearLookTarget.clone();
+        targetLocal.x += this.gearLookYaw * 3.0;
+        targetLocal.y += this.gearLookPitch * 3.0;
+        const targetWorld = targetLocal.applyMatrix4(aircraftMesh.matrixWorld);
         this.camera.lookAt(targetWorld);
         break;
       }
