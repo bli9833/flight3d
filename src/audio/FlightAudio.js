@@ -183,6 +183,30 @@ export class FlightAudio {
     } catch (e) {}
   }
 
+  playTouchdownThump(sinkRate = 1.5) {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      // Deep resonant oleo strut compression thud: 95 Hz down to 38 Hz ("털썩")
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(95, now);
+      osc.frequency.exponentialRampToValueAtTime(38, now + 0.28);
+
+      const severity = Math.min(1.0, Math.max(0.3, sinkRate / 3.0));
+      gain.gain.setValueAtTime(0.65 * severity, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(now);
+      osc.stop(now + 0.4);
+    } catch (e) {}
+  }
+
   playGpwsCallout(text) {
     if (this.isMuted) return;
     if ('speechSynthesis' in window) {
@@ -234,9 +258,11 @@ export class FlightAudio {
     this.windGain.gain.setTargetAtTime(windVol, now, 0.1);
     this.windFilter.frequency.setTargetAtTime(windCutoff, now, 0.1);
 
-    // 3. Touchdown Screech trigger
+    // 3. Touchdown Screech and Oleo Thump trigger
     if (state.touchdown) {
       this.playTouchdownScreech();
+      const sinkRate = Math.abs(state.vsiFpm || 400) / 196.85; // fpm to m/s
+      this.playTouchdownThump(sinkRate);
     }
 
     // 4. Stall Warning Horn
