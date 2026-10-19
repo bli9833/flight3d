@@ -95,6 +95,32 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     }
   });
 
+  it('should suppress procedural exterior during GLTF load to prevent popping, and restore on failure', (t) => {
+    const aircraft = new Boeing737(new PFDCanvas(256, 256), new NDCanvas(256, 256), new EICASCanvas(256, 256));
+    assert.strictEqual(aircraft.fuselageGroup.visible, true);
+
+    let failLoad;
+    t.mock.method(GLTFLoader.prototype, 'load', (_url, _onLoad, _onProgress, onError) => { failLoad = onError; });
+    const previousWindow = globalThis.window;
+    globalThis.window = {};
+    try {
+      aircraft.loadGltfModel('/missing.glb');
+      assert.strictEqual(aircraft.loadingGltf, true);
+      assert.strictEqual(aircraft.fuselageGroup.visible, false, 'Procedural fuselage must be hidden while loading GLTF');
+      assert.strictEqual(aircraft.tailGroup.visible, false, 'Procedural tail must be hidden while loading GLTF');
+
+      // Trigger error fallback
+      failLoad(new Error('Network error'));
+      assert.strictEqual(aircraft.loadingGltf, false);
+      assert.strictEqual(aircraft.useGltf, false);
+      assert.strictEqual(aircraft.fuselageGroup.visible, true, 'Procedural fuselage must be restored on load failure');
+      assert.strictEqual(aircraft.tailGroup.visible, true, 'Procedural tail must be restored on load failure');
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    }
+  });
+
   it('should articulate crash visuals and restore pristine state', () => {
     const pfd = new PFDCanvas(256, 256);
     const nd = new NDCanvas(256, 256);

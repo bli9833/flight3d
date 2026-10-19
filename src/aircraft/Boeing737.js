@@ -24,6 +24,7 @@ export class Boeing737 {
     this.group.add(this.gltfGroup);
     this.gltfFans = [];
     this.useGltf = false;
+    this.loadingGltf = false;
     this.modelLoaded = false;
     this.isCockpit = false;
 
@@ -655,11 +656,21 @@ export class Boeing737 {
 
   loadGltfModel(url) {
     if (typeof window === 'undefined') return;
+    this.loadingGltf = true;
+
+    // Suppress procedural exterior while primary GLTF asset is loading to prevent flash of old model
+    if (this.fuselageGroup) this.fuselageGroup.visible = false;
+    if (this.wingGroup) this.wingGroup.visible = false;
+    if (this.tailGroup) this.tailGroup.visible = false;
+    if (this.empennageGroup) this.empennageGroup.visible = false;
+    if (this.enginesGroup) this.enginesGroup.visible = false;
+
     try {
       const loader = new GLTFLoader();
       loader.load(
         url,
         (gltf) => {
+          this.loadingGltf = false;
           this.gltfModel = gltf.scene;
           // Rotate 90° clockwise around Y so nose (-X in raw asset) faces -Z (simulator flight direction)
           this.gltfModel.rotation.y = Math.PI * 0.5;
@@ -702,11 +713,23 @@ export class Boeing737 {
         (err) => {
           // Graceful fallback to procedural model
           console.warn('GLTF B737 model failed to load, falling back to procedural:', err);
+          this.loadingGltf = false;
           this.useGltf = false;
+          if (this.fuselageGroup) this.fuselageGroup.visible = !this.isCockpit;
+          if (this.wingGroup) this.wingGroup.visible = !this.isCockpit;
+          if (this.tailGroup) this.tailGroup.visible = !this.isCockpit;
+          if (this.empennageGroup) this.empennageGroup.visible = !this.isCockpit;
+          if (this.enginesGroup) this.enginesGroup.visible = !this.isCockpit;
         }
       );
     } catch (e) {
+      this.loadingGltf = false;
       this.useGltf = false;
+      if (this.fuselageGroup) this.fuselageGroup.visible = !this.isCockpit;
+      if (this.wingGroup) this.wingGroup.visible = !this.isCockpit;
+      if (this.tailGroup) this.tailGroup.visible = !this.isCockpit;
+      if (this.empennageGroup) this.empennageGroup.visible = !this.isCockpit;
+      if (this.enginesGroup) this.enginesGroup.visible = !this.isCockpit;
     }
   }
 
@@ -714,7 +737,7 @@ export class Boeing737 {
     this.isCockpit = isCockpit;
     if (this.useGltf && this.gltfGroup) {
       this.gltfGroup.visible = !isCockpit;
-    } else {
+    } else if (!this.loadingGltf) {
       if (this.fuselageGroup) this.fuselageGroup.visible = !isCockpit;
       if (this.wingGroup) this.wingGroup.visible = !isCockpit;
       if (this.tailGroup) this.tailGroup.visible = !isCockpit;
