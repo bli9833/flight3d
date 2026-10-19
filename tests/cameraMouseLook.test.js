@@ -178,4 +178,148 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     assert.strictEqual(camSys.cursorNormX, 0);
     assert.strictEqual(camSys.targetCursorNormX, 0);
   });
+
+  describe('Continuous Edge Pan (화면 끝 도달 시 시선 지속 회전)', () => {
+    it('should initialize default edge pan properties', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+
+      assert.strictEqual(camSys.enableEdgePan, true);
+      assert.strictEqual(camSys.edgePanMargin, 30);
+      assert.strictEqual(camSys.edgePanSpeedX, 280);
+      assert.strictEqual(camSys.edgePanSpeedY, 220);
+    });
+
+    it('should continuously rotate cockpit view to the right when mouse is held at the right edge during drag', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      camSys.isDragging = true;
+      camSys.prevMouse = { x: 1920, y: 540 }; // Exactly at right edge (1920x1080)
+      const initialYaw = camSys.lookYaw;
+
+      // Update 1 frame at 60 FPS (dt = 0.016s)
+      camSys.updateEdgePan(0.016, 1920, 1080);
+
+      // In cockpit mode, dragging/moving right decreases lookYaw (turns head right)
+      assert.ok(camSys.lookYaw < initialYaw, `lookYaw (${camSys.lookYaw}) should decrease to turn right at right edge`);
+
+      // Multiple frames should continuously advance yaw
+      const prevYaw = camSys.lookYaw;
+      camSys.updateEdgePan(0.016, 1920, 1080);
+      assert.ok(camSys.lookYaw < prevYaw, `lookYaw (${camSys.lookYaw}) should continuously decrease across frames`);
+    });
+
+    it('should continuously rotate cockpit view to the left when mouse is held at the left edge during drag', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      camSys.isDragging = true;
+      camSys.prevMouse = { x: 0, y: 540 }; // Exactly at left edge
+      const initialYaw = camSys.lookYaw;
+
+      camSys.updateEdgePan(0.016, 1920, 1080);
+
+      // Moving left increases lookYaw (turns head left)
+      assert.ok(camSys.lookYaw > initialYaw, `lookYaw (${camSys.lookYaw}) should increase to turn left at left edge`);
+    });
+
+    it('should continuously pitch cockpit view up/down at top/bottom edges and respect pitch limits', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      camSys.isDragging = true;
+      camSys.prevMouse = { x: 960, y: 0 }; // Top edge -> pitch up
+      const initialPitch = camSys.lookPitch;
+
+      camSys.updateEdgePan(0.016, 1920, 1080);
+      assert.ok(camSys.lookPitch > initialPitch, 'lookPitch should increase (tilt up) at top edge');
+
+      // Continuous pitch up should clamp at upper limit (Math.PI * 0.45)
+      for (let i = 0; i < 300; i++) {
+        camSys.updateEdgePan(0.05, 1920, 1080);
+      }
+      assert.ok(camSys.lookPitch <= Math.PI * 0.45 + 0.0001, 'lookPitch should respect upper clamp');
+
+      // Bottom edge -> pitch down
+      camSys.prevMouse = { x: 960, y: 1080 };
+      for (let i = 0; i < 300; i++) {
+        camSys.updateEdgePan(0.05, 1920, 1080);
+      }
+      assert.ok(camSys.lookPitch >= -Math.PI * 0.45 - 0.0001, 'lookPitch should respect lower clamp');
+    });
+
+    it('should continuously orbit chase camera in CHASE mode at screen edge', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.CHASE);
+
+      camSys.isDragging = true;
+      camSys.prevMouse = { x: 1920, y: 540 }; // Right edge
+      const initialChaseYaw = camSys.chaseYaw;
+
+      camSys.updateEdgePan(0.016, 1920, 1080);
+      assert.ok(camSys.chaseYaw < initialChaseYaw, 'chaseYaw should rotate around aircraft at right edge');
+    });
+
+    it('should NOT trigger edge pan when isDragging is false', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      camSys.isDragging = false;
+      camSys.prevMouse = { x: 1920, y: 540 }; // At right edge, but not dragging
+      const initialYaw = camSys.lookYaw;
+
+      camSys.updateEdgePan(0.05, 1920, 1080);
+      assert.strictEqual(camSys.lookYaw, initialYaw, 'lookYaw must not change when isDragging is false');
+    });
+
+    it('should NOT trigger edge pan when pointerLocked is true', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      camSys.isDragging = true;
+      camSys.pointerLocked = true;
+      camSys.prevMouse = { x: 1920, y: 540 };
+      const initialYaw = camSys.lookYaw;
+
+      camSys.updateEdgePan(0.05, 1920, 1080);
+      assert.strictEqual(camSys.lookYaw, initialYaw, 'lookYaw must not change when pointerLocked is true');
+    });
+
+    it('should NOT trigger edge pan when mouse is inside screen away from edge margin', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      camSys.isDragging = true;
+      camSys.prevMouse = { x: 960, y: 540 }; // Center of 1920x1080 screen
+      const initialYaw = camSys.lookYaw;
+
+      camSys.updateEdgePan(0.05, 1920, 1080);
+      assert.strictEqual(camSys.lookYaw, initialYaw, 'lookYaw must not change when cursor is away from edges');
+    });
+
+    it('should integrate edge pan into CameraSystem.update() frame loop', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(0, 50, 0);
+      aircraft.updateMatrixWorld(true);
+
+      camSys.isDragging = true;
+      camSys.prevMouse = { x: 1920, y: 540 };
+      const initialYaw = camSys.lookYaw;
+
+      camSys.update(0.016, aircraft, { onGround: false });
+      assert.ok(camSys.lookYaw < initialYaw, 'update() should execute edge pan when dragging at edge');
+    });
+  });
 });
