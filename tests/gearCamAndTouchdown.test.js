@@ -23,21 +23,23 @@ import { Boeing737 } from '../src/aircraft/Boeing737.js';
 
 describe('Landing Gear View & Touchdown Effects', () => {
   describe('CameraSystem (GEAR View & Temporary Auto-Cut)', () => {
-    it('should include GEAR camera mode in MODES and cycle through 6 views', () => {
+    it('should include GEAR and DRONE camera modes in MODES and cycle through 7 views', () => {
       const camera = new THREE.PerspectiveCamera();
       const mockDom = { addEventListener: () => {} };
       const camSystem = new CameraSystem(camera, mockDom);
 
       assert.strictEqual(CameraSystem.MODES.GEAR, 5, 'GEAR mode index should be 5');
+      assert.strictEqual(CameraSystem.MODES.DRONE, 6, 'DRONE mode index should be 6');
       assert.strictEqual(camSystem.mode, CameraSystem.MODES.COCKPIT);
 
-      // Cycle through all modes: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 0
+      // Cycle through all modes: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 0
       assert.strictEqual(camSystem.cycleMode(), 'CHASE (EXTERIOR)');
       assert.strictEqual(camSystem.cycleMode(), 'WING VIEW');
       assert.strictEqual(camSystem.cycleMode(), 'AIRPORT TOWER');
       assert.strictEqual(camSystem.cycleMode(), 'CINEMATIC FLYBY');
       assert.strictEqual(camSystem.cycleMode(), 'GEAR CAM (BELLY)');
-      assert.strictEqual(camSystem.mode, CameraSystem.MODES.GEAR);
+      assert.strictEqual(camSystem.cycleMode(), 'DRONE (ORBIT VIEW)');
+      assert.strictEqual(camSystem.mode, CameraSystem.MODES.DRONE);
       assert.strictEqual(camSystem.cycleMode(), 'COCKPIT (CAPTAIN)');
     });
 

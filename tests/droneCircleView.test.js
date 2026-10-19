@@ -1,0 +1,228 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+
+if (typeof document === 'undefined') {
+  const noop = () => {};
+  const mockCtx = new Proxy({}, {
+    get: () => () => ({ addColorStop: noop })
+  });
+  globalThis.document = {
+    createElement: () => ({
+      getContext: () => mockCtx,
+      width: 64,
+      height: 64
+    }),
+    getElementById: () => ({
+      style: {},
+      textContent: '',
+      addEventListener: noop,
+      classList: { add: noop, remove: noop, toggle: noop }
+    })
+  };
+  globalThis.window = {
+    addEventListener: noop,
+    innerWidth: 1920,
+    innerHeight: 1080
+  };
+}
+
+import { CameraSystem } from '../src/cameras/CameraSystem.js';
+import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
+
+describe('Drone Orbit View & Demo Pre/Post-Flight Integration', () => {
+  describe('CameraSystem (DRONE Orbit Mode)', () => {
+    it('should position camera slightly above aircraft and look at aircraft center', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const mockDom = { addEventListener: () => {} };
+      const camSystem = new CameraSystem(camera, mockDom);
+
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(0, 14.15, 0); // Runway elevation
+      aircraft.updateMatrixWorld(true);
+
+      camSystem.setMode(CameraSystem.MODES.DRONE);
+      assert.strictEqual(camSystem.mode, CameraSystem.MODES.DRONE);
+      assert.strictEqual(camSystem.getModeName(), 'DRONE (ORBIT VIEW)');
+
+      camSystem.update(0.016, aircraft, { onGround: true });
+
+      // In DRONE mode, camera should be elevated above aircraft (Y > 14.15 + 5.0)
+      assert.ok(camera.position.y > 14.15 + 5.0, `Camera Y (${camera.position.y}) should be well above aircraft`);
+      // Distance in horizontal XZ plane should approximate droneDistance (~38m)
+      const horizontalDist = Math.sqrt(
+        Math.pow(camera.position.x - aircraft.position.x, 2) +
+        Math.pow(camera.position.z - aircraft.position.z, 2)
+      );
+      assert.ok(horizontalDist > 30.0 && horizontalDist < 45.0, `Horizontal distance (${horizontalDist}) should match drone radius`);
+    });
+
+    it('should continuously orbit around aircraft over time', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const mockDom = { addEventListener: () => {} };
+      const camSystem = new CameraSystem(camera, mockDom);
+
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(0, 14.15, 0);
+      aircraft.updateMatrixWorld(true);
+
+      camSystem.setMode(CameraSystem.MODES.DRONE);
+      camSystem.resetDroneOrbit(0);
+      assert.strictEqual(camSystem.droneOrbitAngle, 0);
+
+      // Initial update
+      camSystem.update(0.016, aircraft, { onGround: true });
+      const initialAngle = camSystem.droneOrbitAngle;
+
+      // Step 5 seconds forward
+      camSystem.update(5.0, aircraft, { onGround: true });
+      assert.ok(camSystem.droneOrbitAngle > initialAngle + 1.0, 'Drone orbit angle should increase over time');
+    });
+
+    it('should correctly snapToTarget in DRONE mode', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const mockDom = { addEventListener: () => {} };
+      const camSystem = new CameraSystem(camera, mockDom);
+
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(100, 50, -200);
+      aircraft.updateMatrixWorld(true);
+
+      camSystem.setMode(CameraSystem.MODES.DRONE);
+      camSystem.snapToTarget(aircraft);
+
+      assert.ok(camera.position.y > aircraft.position.y, 'Camera Y should be above aircraft upon snap');
+      const dist = camera.position.distanceTo(aircraft.position);
+      assert.ok(dist > 30.0 && dist < 50.0, 'Camera distance upon snap should be close to drone radius');
+    });
+  });
+
+  describe('DemoFlightDirector (Pre-flight & Post-flight Drone Orbit)', () => {
+    function createMockSimulator() {
+      const camera = new THREE.PerspectiveCamera();
+      const mockDom = { addEventListener: () => {} };
+      const cameraSystem = new CameraSystem(camera, mockDom);
+
+      const controls = {
+        throttle: 0,
+        elevator: 0,
+        aileron: 0,
+        rudder: 0,
+        brakes: 0,
+        virtualInputs: {},
+        setVirtualInput(k, v) { this.virtualInputs[k] = v; },
+        clearVirtualInputs() { this.virtualInputs = {}; }
+      };
+
+      const engines = {
+        throttle: 0,
+        setThrottle(v) { this.throttle = v; },
+        setReverser: () => {}
+      };
+
+      const gear = {
+        brakes: 0,
+        setBrakes(v) { this.brakes = v; },
+        setGearTarget: () => {}
+      };
+
+      const aero = {
+        spoilers: 0,
+        flapsIndex: 0,
+        setFlapPosition(idx) { this.flapsIndex = idx; }
+      };
+
+      const sky = {
+        timeOfDay: 12,
+        setTimeOfDay(t) { this.timeOfDay = t; },
+        getSunDirection: () => new THREE.Vector3(0, 1, 0)
+      };
+
+      const water = {
+        setSunDirection: () => {}
+      };
+
+      return {
+        cameraSystem,
+        controls,
+        engines,
+        gear,
+        aero,
+        sky,
+        water,
+        position: new THREE.Vector3(-1350, 14.15, 0),
+        angularVelocity: new THREE.Vector3(0, 0, 0),
+        telemetry: {
+          iasKnots: 0,
+          altitudeFt: 14,
+          radioAltFt: 0,
+          pitchDeg: 0,
+          rollDeg: 0,
+          headingDeg: 90,
+          onGround: true,
+          gearState: 1.0,
+          isTransit: false
+        },
+        setPreset(preset, isDemo) {},
+        showToast(msg) {}
+      };
+    }
+
+    it('should start demo in PREFLIGHT_ORBIT stage with DRONE camera mode and brakes held', () => {
+      const sim = createMockSimulator();
+      const director = new DemoFlightDirector(sim);
+
+      director.start();
+      assert.strictEqual(director.isActive, true);
+      assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.PREFLIGHT_ORBIT);
+      assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.DRONE);
+      assert.strictEqual(sim.controls.virtualInputs['brakes'], 1.0);
+      assert.strictEqual(sim.controls.virtualInputs['throttle'], 0.0);
+      assert.strictEqual(sim.aero.flapsIndex, 2); // Flaps 5
+    });
+
+    it('should transition from PREFLIGHT_ORBIT to TAKEOFF_ROLL and COCKPIT mode after 6 seconds', () => {
+      const sim = createMockSimulator();
+      const director = new DemoFlightDirector(sim);
+
+      director.start();
+      assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.PREFLIGHT_ORBIT);
+
+      // Step 3 seconds: should stay in PREFLIGHT_ORBIT
+      director.update(3.0);
+      assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.PREFLIGHT_ORBIT);
+
+      // Step another 3.1 seconds (total 6.1s): should transition to TAKEOFF_ROLL
+      director.update(3.1);
+      assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.TAKEOFF_ROLL);
+      assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.COCKPIT);
+      assert.strictEqual(sim.controls.virtualInputs['throttle'], 1.0);
+      assert.strictEqual(sim.controls.virtualInputs['brakes'], 0.0);
+    });
+
+    it('should transition to POSTFLIGHT_ORBIT with DRONE mode upon safe touchdown rollout stop', () => {
+      const sim = createMockSimulator();
+      const director = new DemoFlightDirector(sim);
+
+      director.start();
+      // Fast-forward to TOUCHDOWN_ROLLOUT
+      director.setStage(DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT);
+      assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT);
+      assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.GEAR);
+
+      // Simulate coming to safe stop (speed < 5 knots)
+      sim.telemetry.iasKnots = 2.0;
+      director.update(1.0);
+
+      assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.POSTFLIGHT_ORBIT);
+      assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.DRONE);
+      assert.strictEqual(sim.controls.virtualInputs['brakes'], 1.0);
+      assert.strictEqual(sim.controls.virtualInputs['throttle'], 0.0);
+
+      // After 7 seconds in POSTFLIGHT_ORBIT, should complete and handover control
+      director.update(7.1);
+      assert.strictEqual(director.isActive, false);
+      assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.IDLE);
+    });
+  });
+});
