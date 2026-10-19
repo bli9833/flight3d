@@ -34,6 +34,9 @@ export class Boeing737 {
     this.noseGearGroup = null;
     this.mainGearLGroup = null;
     this.mainGearRGroup = null;
+    this.noseTruck = null;
+    this.mainTruckL = null;
+    this.mainTruckR = null;
     this.gearDoors = [];
 
     // Lighting
@@ -385,6 +388,7 @@ export class Boeing737 {
     this.gearGroup = new THREE.Group();
 
     const strutMat = new THREE.MeshStandardMaterial({ color: 0x88929e, metalness: 0.8, roughness: 0.3 });
+    const chromePistonMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.95, roughness: 0.1 });
     const tireMat = new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.9, metalness: 0.1 });
     const rimMat = new THREE.MeshStandardMaterial({ color: 0xdde3ea, metalness: 0.7, roughness: 0.3 });
 
@@ -406,38 +410,60 @@ export class Boeing737 {
     this.noseGearGroup = new THREE.Group();
     this.noseGearGroup.position.set(0, -0.85, -12.5);
 
-    const nStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.8, 12), strutMat);
-    nStrut.position.y = -0.9;
+    // Outer stationary strut housing cylinder
+    const nStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.2, 12), strutMat);
+    nStrut.position.y = -0.6;
     this.noseGearGroup.add(nStrut);
+
+    // Movable Nose Truck (Sliding oleo chrome piston + dual wheels)
+    this.noseTruck = new THREE.Group();
+    const nPiston = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 1.1, 12), chromePistonMat);
+    nPiston.position.y = -1.15;
+    this.noseTruck.add(nPiston);
 
     // Dual Nose Wheels
     const nWheelL = makeWheel(0.38, 0.22);
     nWheelL.position.set(-0.24, -1.65, 0);
     const nWheelR = makeWheel(0.38, 0.22);
     nWheelR.position.set(0.24, -1.65, 0);
-    this.noseGearGroup.add(nWheelL, nWheelR);
+    this.noseTruck.add(nWheelL, nWheelR);
+
+    this.noseGearGroup.add(this.noseTruck);
 
     // 2. Main Gear Assembly (Left: x=-3.2, Right: x=3.2, z=1.8)
     const makeMainBogie = (xPos) => {
       const mainGear = new THREE.Group();
       mainGear.position.set(xPos, -0.9, 1.8);
 
-      const mStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.9, 12), strutMat);
-      mStrut.position.y = -0.95;
+      // Outer stationary strut housing cylinder
+      const mStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.3, 12), strutMat);
+      mStrut.position.y = -0.65;
       mainGear.add(mStrut);
 
-      // 2-wheel truck
+      // Movable Main Truck (Sliding oleo chrome piston + 2-wheel bogie)
+      const truck = new THREE.Group();
+      const mPiston = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 1.25, 12), chromePistonMat);
+      mPiston.position.y = -1.2;
+      truck.add(mPiston);
+
       const wL = makeWheel(0.48, 0.32);
       wL.position.set(-0.35, -1.75, 0);
       const wR = makeWheel(0.48, 0.32);
       wR.position.set(0.35, -1.75, 0);
-      mainGear.add(wL, wR);
+      truck.add(wL, wR);
 
-      return mainGear;
+      mainGear.add(truck);
+      return { root: mainGear, truck };
     };
 
-    this.mainGearLGroup = makeMainBogie(-3.2);
-    this.mainGearRGroup = makeMainBogie(3.2);
+    const mainL = makeMainBogie(-3.2);
+    const mainR = makeMainBogie(3.2);
+
+    this.mainGearLGroup = mainL.root;
+    this.mainTruckL = mainL.truck;
+
+    this.mainGearRGroup = mainR.root;
+    this.mainTruckR = mainR.truck;
 
     this.gearGroup.add(this.noseGearGroup, this.mainGearLGroup, this.mainGearRGroup);
     this.group.add(this.gearGroup);
@@ -545,7 +571,7 @@ export class Boeing737 {
     const rudderVal = flightState.rudder || 0;
     if (this.rudder) this.rudder.rotation.y = rudderVal * 0.45;
 
-    // 3. Landing Gear Retraction Animation
+    // 3. Landing Gear Retraction & Dynamic Suspension Compression Animation
     const gearState = flightState.gearState !== undefined ? flightState.gearState : 1.0;
     // Scale gear strut vertically & rotate into bays
     if (this.noseGearGroup) {
@@ -559,6 +585,21 @@ export class Boeing737 {
     if (this.mainGearRGroup) {
       this.mainGearRGroup.scale.set(1.0, Math.max(0.01, gearState), 1.0);
       this.mainGearRGroup.rotation.z = (1.0 - gearState) * (Math.PI * 0.5);
+    }
+
+    // Dynamic Oleo Strut Suspension Squat ("털썩" 하중 압축)
+    if (gearState > 0.8 && flightState.compressions) {
+      const compNose = Math.min(0.5, Math.max(0, flightState.compressions.nose || 0));
+      const compL = Math.min(0.55, Math.max(0, flightState.compressions.mainLeft || 0));
+      const compR = Math.min(0.55, Math.max(0, flightState.compressions.mainRight || 0));
+
+      if (this.noseTruck) this.noseTruck.position.y = compNose * 0.75;
+      if (this.mainTruckL) this.mainTruckL.position.y = compL * 0.72;
+      if (this.mainTruckR) this.mainTruckR.position.y = compR * 0.72;
+    } else {
+      if (this.noseTruck) this.noseTruck.position.y = 0;
+      if (this.mainTruckL) this.mainTruckL.position.y = 0;
+      if (this.mainTruckR) this.mainTruckR.position.y = 0;
     }
 
     // 4. Strobe & Beacon Flashing Animation

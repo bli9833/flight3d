@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 
 /**
- * 5-Perspective Camera System (Cockpit, Chase, Wing View, Control Tower, Flyby)
- * Features G-force cockpit head dynamics, stall buffeting vibration, touchdown shock jolt, and smooth exterior damping.
+ * 6-Perspective Camera System (Cockpit, Chase, Wing View, Control Tower, Flyby, Landing Gear Belly Cam)
+ * Features G-force cockpit head dynamics, stall buffeting vibration, touchdown shock jolt,
+ * smooth exterior damping, and automatic temporary cinematic view cuts for takeoff/landing/gear transit.
  */
 export class CameraSystem {
   static MODES = {
@@ -10,7 +11,8 @@ export class CameraSystem {
     CHASE: 1,
     WING: 2,
     TOWER: 3,
-    FLYBY: 4
+    FLYBY: 4,
+    GEAR: 5
   };
 
   constructor(camera, domElement) {
@@ -18,12 +20,21 @@ export class CameraSystem {
     this.domElement = domElement;
     this.mode = CameraSystem.MODES.COCKPIT;
 
+    // Temporary Cinematic View Cut State (e.g. brief gear cam preview during takeoff, landing, gear transit)
+    this.temporaryViewTimer = 0;
+    this.savedMode = null;
+    this.onTemporaryViewComplete = null;
+
     // Cockpit Head Dynamics & Look-Around
     this.cockpitHeadOffset = new THREE.Vector3(-0.48, 0.82, -12.02); // Captain eye
     this.headGForceOffset = new THREE.Vector3();
     this.touchJoltOffset = 0;
     this.lookYaw = 0;
     this.lookPitch = -0.18; // Natural pilot head tilt showing MCP, instruments & runway horizon
+
+    // Landing Gear Belly View Parameters (Oblique angle looking at nose and main gear under fuselage)
+    this.gearCamOffset = new THREE.Vector3(2.4, -2.6, 6.2);
+    this.gearLookTarget = new THREE.Vector3(-0.6, -1.9, -2.0);
 
     // Chase Camera Parameters
     this.chaseDistance = 55.0;

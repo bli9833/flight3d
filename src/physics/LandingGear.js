@@ -143,6 +143,7 @@ export class LandingGear {
     // World transformation matrices
     const worldQuat = aircraftMesh.quaternion;
     const invWorldQuat = worldQuat.clone().invert();
+    const touchdownContacts = [];
 
     for (const c of this.contacts) {
       // Deployed position scaled by gear deployment
@@ -155,6 +156,9 @@ export class LandingGear {
       const wheelRadius = 0.5;
       const contactY = groundH + wheelRadius;
 
+      c.worldPos.copy(hubWorld);
+      c.worldPos.y = groundH; // Bottom of tire touching terrain
+
       const penetration = contactY - hubWorld.y;
 
       if (penetration > 0) {
@@ -164,15 +168,25 @@ export class LandingGear {
         this.onGround = true;
         c.compression = Math.min(c.restLength, penetration);
 
-        if (!wasGrounded && penetration > 0.05) {
-          c.touchdownThisFrame = true;
-          this.touchdownEvent = true;
-        }
-
         // Contact point velocity in world space = linearVel + angularVel x r
         const rWorld = hubWorld.clone().sub(aircraftMesh.position);
         const angVelWorld = angularVelocity.clone().applyQuaternion(worldQuat);
         const contactVel = linearVelocity.clone().add(angVelWorld.clone().cross(rWorld));
+        const groundSpeed = Math.sqrt(linearVelocity.x * linearVelocity.x + linearVelocity.z * linearVelocity.z);
+
+        if (!wasGrounded && penetration > 0.03) {
+          c.touchdownThisFrame = true;
+          this.touchdownEvent = true;
+          touchdownContacts.push({
+            id: c.id,
+            worldPos: c.worldPos.clone(),
+            groundSpeed,
+            sinkRate: Math.max(0.1, -contactVel.y),
+            compression: c.compression
+          });
+        } else {
+          c.touchdownThisFrame = false;
+        }
 
         // Suspension normal force (Hooke's spring + damping)
         const vUp = contactVel.y;
@@ -227,6 +241,7 @@ export class LandingGear {
       } else {
         c.isGrounded = false;
         c.compression = 0;
+        c.touchdownThisFrame = false;
       }
     }
 
@@ -237,7 +252,13 @@ export class LandingGear {
       touchdown: this.touchdownEvent,
       gearState: this.gearState,
       isTransit: this.isTransit,
-      weightOnWheels: this.totalWeightOnWheels
+      weightOnWheels: this.totalWeightOnWheels,
+      touchdownContacts,
+      compressions: {
+        nose: this.contacts[0].compression,
+        mainLeft: this.contacts[1].compression,
+        mainRight: this.contacts[2].compression
+      }
     };
   }
 }
