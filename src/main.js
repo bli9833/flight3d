@@ -284,6 +284,9 @@ class FlightSimulator {
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
     }
+    if (!isDemoInternal && this.cameraSystem) {
+      this.cameraSystem.userLookOverridden = false;
+    }
 
     if (this.tireSmokeSystem) {
       this.tireSmokeSystem.clear();
@@ -789,28 +792,33 @@ class FlightSimulator {
     }
 
     // 12. Cinematic Camera Cuts: Automatic temporary gear view for Takeoff, Touchdown, and Gear Retract/Extend
-    if (this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
-      // Takeoff liftoff
-      this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
-      this.showToast('🎥 랜딩 기어 뷰: 이륙 상승 (Takeoff Climb)');
-    } else if (genuineLandingTouchdown && this.totalSimTime > 2.0) {
-      // Touchdown landing (only on genuine landing touchdown)
-      this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 5.0);
-      this.showToast('🎥 랜딩 기어 뷰: 활주로 접지 & 서스펜션 완충 (Touchdown)');
-    }
-
-    const currentGearTarget = this.gear.targetGearState > 0.5;
-    if (this.lastGearTarget !== currentGearTarget && this.totalSimTime > 1.0) {
-      if (!currentGearTarget) {
-        // Gear retracting
+    if (!this.cameraSystem.userLookOverridden) {
+      if (this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
+        // Takeoff liftoff
         this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
-        this.showToast('🎥 랜딩 기어 뷰: 기어 수납 (Gear Retracting)');
-      } else {
-        // Gear extending
-        this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
-        this.showToast('🎥 랜딩 기어 뷰: 기어 전개 (Gear Extending)');
+        this.showToast('🎥 랜딩 기어 뷰: 이륙 상승 (Takeoff Climb)');
+      } else if (genuineLandingTouchdown && this.totalSimTime > 2.0) {
+        // Touchdown landing (only on genuine landing touchdown)
+        this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 5.0);
+        this.showToast('🎥 랜딩 기어 뷰: 활주로 접지 & 서스펜션 완충 (Touchdown)');
       }
-      this.lastGearTarget = currentGearTarget;
+
+      const currentGearTarget = this.gear.targetGearState > 0.5;
+      if (this.lastGearTarget !== currentGearTarget && this.totalSimTime > 1.0) {
+        if (!currentGearTarget) {
+          // Gear retracting
+          this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
+          this.showToast('🎥 랜딩 기어 뷰: 기어 수납 (Gear Retracting)');
+        } else {
+          // Gear extending
+          this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
+          this.showToast('🎥 랜딩 기어 뷰: 기어 전개 (Gear Extending)');
+        }
+      }
+    }
+    const currentGearTargetState = this.gear.targetGearState > 0.5;
+    if (this.lastGearTarget !== currentGearTargetState && this.totalSimTime > 1.0) {
+      this.lastGearTarget = currentGearTargetState;
     }
     this.lastOnGround = gearResult.onGround;
 

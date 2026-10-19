@@ -342,6 +342,52 @@ class MobileTouchTestRunner {
       throw new Error('Chase camera touch orbit failed');
     }
 
+    // 9. Verify User Manual Look Override Protection against Demo Camera Intervention
+    this.log('Testing User Look Override Protection in running simulator...', '🛡️');
+    const overrideProtectionResult = await this.evaluate(`
+      (() => {
+        const sim = window.simulator;
+        const cam = sim.cameraSystem;
+        cam.setMode(0, true); // COCKPIT mode
+        cam.resetLook();
+
+        const canvas = sim.renderer.domElement;
+        // User drags to look to the side
+        cam.handleTouchStart({ touches: [{ identifier: 995, clientX: 400, clientY: 200, target: canvas }], cancelable: true, preventDefault: () => {} });
+        cam.handleTouchMove({ touches: [{ identifier: 995, clientX: 300, clientY: 200, target: canvas }], cancelable: true, preventDefault: () => {} });
+        cam.handleTouchEnd({ touches: [] });
+
+        const isOverridden = cam.userLookOverridden;
+        const sideLookYaw = cam.lookYaw;
+
+        // Attempt automated camera change from demo / scenario
+        const automatedBlocked = (cam.setMode(1) === false);
+        const modeKeptCockpit = (cam.mode === 0);
+        const yawPreserved = (cam.lookYaw === sideLookYaw);
+
+        // Attempt automated temporary view
+        cam.showTemporaryView(5, 4.5);
+        const tempViewBlocked = (cam.mode === 0 && cam.temporaryViewTimer === 0);
+
+        // Cycle camera mode explicitly (user CAM button)
+        cam.cycleMode();
+        const clearedOnCycle = (!cam.userLookOverridden && cam.mode === 1);
+
+        return {
+          isOverridden,
+          automatedBlocked,
+          modeKeptCockpit,
+          yawPreserved,
+          tempViewBlocked,
+          clearedOnCycle
+        };
+      })()
+    `);
+    this.log(`Override Protection Result: ${JSON.stringify(overrideProtectionResult)}`, '📊');
+    if (!overrideProtectionResult.isOverridden || !overrideProtectionResult.automatedBlocked || !overrideProtectionResult.modeKeptCockpit || !overrideProtectionResult.yawPreserved || !overrideProtectionResult.tempViewBlocked || !overrideProtectionResult.clearedOnCycle) {
+      throw new Error('User Look Override Protection verification failed');
+    }
+
     // Stop demo if running so test exits cleanly
     await this.evaluate('window.simulator.demoDirector.stop()');
 
