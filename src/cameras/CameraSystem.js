@@ -82,6 +82,17 @@ export class CameraSystem {
     this.pointerLocked = false;
     this.prevMouse = { x: 0, y: 0 };
 
+    // Mobile Touch Look & Pinch Zoom State
+    this.activeTouchId = null;
+    this.isPinching = false;
+    this.pinchDistance = 0;
+    this.lastTapTime = 0;
+    this.lastTapPos = { x: 0, y: 0 };
+    this.touchStartX = 0;
+    this.touchStartY = 0;
+    this.touchMoved = false;
+    this.onResetLook = null;
+
     // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
     this.enableEdgePan = true;
     this.edgePanMargin = 30; // Threshold distance in pixels from screen boundary
@@ -98,16 +109,30 @@ export class CameraSystem {
     this.initMouseLook();
   }
 
-  initMouseLook() {
-    if (!this.domElement || typeof window === 'undefined') return;
+  /**
+   * Determine if an event target is an interactive UI control or on-screen touch flight control
+   * that should NOT trigger camera look-around dragging.
+   */
+  isInteractiveUI(target) {
+    if (!target || typeof target.closest !== 'function') return false;
+    return !!target.closest(
+      'button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .hud-strip, #demo-banner, .toast, .stall-banner, .crash-overlay, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #help-modal, #diagnostics-overlay'
+    );
+  }
 
-    if (this.domElement.style) {
+  initMouseLook() {
+    if (!this.domElement && typeof window === 'undefined') return;
+
+    if (this.domElement && this.domElement.style) {
       this.domElement.style.cursor = 'grab';
+      this.domElement.style.touchAction = 'none';
     }
 
     const onMouseDown = (e) => {
+      // Ignore synthesized mouse events while touch dragging
+      if (this.activeTouchId !== null) return;
       // Ignore clicks on UI buttons/cards
-      if (e.target && e.target.closest && e.target.closest('button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .hud-strip, #demo-banner, .toast, .stall-banner, .crash-overlay')) {
+      if (this.isInteractiveUI(e.target)) {
         return;
       }
       if (e.button === 0 || e.button === 2) {
@@ -124,8 +149,9 @@ export class CameraSystem {
       }
     };
 
-    if (typeof this.domElement.addEventListener === 'function') {
+    if (this.domElement && typeof this.domElement.addEventListener === 'function') {
       this.domElement.addEventListener('mousedown', onMouseDown);
+      this.domElement.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
       // Mouse wheel zoom
       this.domElement.addEventListener('wheel', (e) => {
         if (this.mode === CameraSystem.MODES.CHASE) {
@@ -138,6 +164,7 @@ export class CameraSystem {
 
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       window.addEventListener('mouseup', () => {
+        if (this.activeTouchId !== null) return;
         this.isDragging = false;
         if (this.domElement && this.domElement.style && !this.pointerLocked) {
           this.domElement.style.cursor = 'grab';
@@ -146,12 +173,13 @@ export class CameraSystem {
 
       // Suppress context menu on right-click drag so free look is unhindered
       window.addEventListener('contextmenu', (e) => {
-        if (e.target === this.domElement || (e.target && e.target.id === 'canvas-container') || (e.target && !e.target.closest('button, a, input, select, .btn, .modal-card'))) {
+        if (e.target === this.domElement || (e.target && e.target.id === 'canvas-container') || (e.target && !this.isInteractiveUI(e.target))) {
           e.preventDefault();
         }
       });
 
       window.addEventListener('mousemove', (e) => {
+        if (this.activeTouchId !== null) return;
         // Real-time cursor tracking (카메라 시선 미세 추종)
         this.setCursorPosition(e.clientX, e.clientY);
 
@@ -169,8 +197,16 @@ export class CameraSystem {
         }
       });
 
+      // Mobile Touch Event Listeners on Window
+      window.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+      window.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+      window.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
+      window.addEventListener('touchcancel', (e) => this.handleTouchEnd(e), { passive: false });
+
       window.addEventListener('blur', () => {
         this.isDragging = false;
+        this.activeTouchId = null;
+        this.isPinching = false;
         if (this.domElement && this.domElement.style && !this.pointerLocked) {
           this.domElement.style.cursor = 'grab';
         }
@@ -183,7 +219,7 @@ export class CameraSystem {
 
       // Reset view on double click
       window.addEventListener('dblclick', (e) => {
-        if (e.target && e.target.closest && e.target.closest('button, a, input, select, .btn, .modal-card')) {
+        if (this.isInteractiveUI(e.target)) {
           return;
         }
         this.resetLook();
@@ -197,6 +233,169 @@ export class CameraSystem {
           this.domElement.style.cursor = this.pointerLocked ? 'none' : 'grab';
         }
       });
+    }
+  }
+
+  /**
+   * Handle mobile touchstart event for single-finger drag look and two-finger pinch zoom
+   */
+  handleTouchStart(e) {
+    if (!e || e._camHandled) return;
+    const touches = e.touches ? Array.from(e.touches) : [];
+    const cameraTouches = touches.filter(t => !this.isInteractiveUI(t.target));
+    if (cameraTouches.length === 0) return;
+    e._camHandled = true;
+
+    // Two-finger pinch gesture on scenery/canvas
+    if (cameraTouches.length >= 2) {
+      const t0 = cameraTouches[0];
+      const t1 = cameraTouches[1];
+      this.pinchDistance = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+      this.isPinching = true;
+      this.activeTouchId = null;
+      this.isDragging = false;
+      this.lastTapTime = 0;
+      if (typeof e.preventDefault === 'function' && e.cancelable) {
+        e.preventDefault();
+      }
+      return;
+    }
+
+    // Single-finger touch drag look-around
+    const touch = cameraTouches[0];
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const dist = Math.hypot(touch.clientX - this.lastTapPos.x, touch.clientY - this.lastTapPos.y);
+
+    // Double tap within 350ms resets camera look orientation to forward center
+    if (this.lastTapTime > 0 && (now - this.lastTapTime < 350) && dist < 50) {
+      this.resetLook();
+      if (typeof this.onResetLook === 'function') {
+        this.onResetLook();
+      }
+      this.lastTapTime = 0;
+      this.activeTouchId = null;
+      this.isDragging = false;
+      this.touchMoved = false;
+      if (typeof e.preventDefault === 'function' && e.cancelable) {
+        e.preventDefault();
+      }
+      return;
+    }
+
+    this.lastTapTime = now;
+    this.lastTapPos = { x: touch.clientX, y: touch.clientY };
+
+    this.activeTouchId = touch.identifier;
+    this.isDragging = true;
+    this.isPinching = false;
+    this.touchStartX = touch.clientX;
+    this.touchStartY = touch.clientY;
+    this.touchMoved = false;
+    this.prevMouse.x = touch.clientX;
+    this.prevMouse.y = touch.clientY;
+    this.setCursorPosition(touch.clientX, touch.clientY);
+
+    if (typeof e.preventDefault === 'function' && e.cancelable) {
+      e.preventDefault();
+    }
+  }
+
+  /**
+   * Handle mobile touchmove event for drag look rotation and pinch zoom distance
+   */
+  handleTouchMove(e) {
+    if (!e) return;
+    const touches = e.touches ? Array.from(e.touches) : [];
+    const cameraTouches = touches.filter(t => !this.isInteractiveUI(t.target));
+
+    // Handle two-finger pinch zoom
+    if (this.isPinching) {
+      this.lastTapTime = 0;
+      if (cameraTouches.length >= 2) {
+        const t0 = cameraTouches[0];
+        const t1 = cameraTouches[1];
+        const currentDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+        const deltaDist = currentDist - this.pinchDistance;
+        this.pinchDistance = currentDist;
+        this.applyPinchZoom(deltaDist);
+        if (typeof e.preventDefault === 'function' && e.cancelable) {
+          e.preventDefault();
+        }
+      }
+      return;
+    }
+
+    // Handle single-finger touch drag look
+    if (this.activeTouchId !== null && this.isDragging) {
+      const touch = cameraTouches.find(t => t.identifier === this.activeTouchId);
+      if (touch) {
+        const moveDist = Math.hypot(touch.clientX - this.touchStartX, touch.clientY - this.touchStartY);
+        if (moveDist > 10) {
+          this.touchMoved = true;
+          this.lastTapTime = 0;
+        }
+
+        const dx = touch.clientX - this.prevMouse.x;
+        const dy = touch.clientY - this.prevMouse.y;
+        this.prevMouse.x = touch.clientX;
+        this.prevMouse.y = touch.clientY;
+
+        this.applyMouseDelta(dx, dy);
+        this.setCursorPosition(touch.clientX, touch.clientY);
+
+        if (typeof e.preventDefault === 'function' && e.cancelable) {
+          e.preventDefault();
+        }
+      }
+    }
+  }
+
+  /**
+   * Handle mobile touchend & touchcancel event to finish drag or pinch
+   */
+  handleTouchEnd(e) {
+    if (!e) return;
+    const touches = e.touches ? Array.from(e.touches) : [];
+    const cameraTouches = touches.filter(t => !this.isInteractiveUI(t.target));
+
+    if (this.touchMoved) {
+      this.lastTapTime = 0;
+    }
+
+    if (this.isPinching) {
+      if (cameraTouches.length < 2) {
+        this.isPinching = false;
+        this.pinchDistance = 0;
+        if (cameraTouches.length === 1) {
+          this.activeTouchId = cameraTouches[0].identifier;
+          this.isDragging = true;
+          this.prevMouse.x = cameraTouches[0].clientX;
+          this.prevMouse.y = cameraTouches[0].clientY;
+        } else {
+          this.activeTouchId = null;
+          this.isDragging = false;
+        }
+      }
+      return;
+    }
+
+    if (this.activeTouchId !== null) {
+      const stillActive = cameraTouches.some(t => t.identifier === this.activeTouchId);
+      if (!stillActive) {
+        this.activeTouchId = null;
+        this.isDragging = false;
+      }
+    }
+  }
+
+  /**
+   * Apply two-finger pinch zoom to camera distance
+   */
+  applyPinchZoom(deltaDist) {
+    if (this.mode === CameraSystem.MODES.CHASE) {
+      this.chaseDistance = Math.max(20.0, Math.min(140.0, this.chaseDistance - deltaDist * 0.15));
+    } else if (this.mode === CameraSystem.MODES.DRONE) {
+      this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance - deltaDist * 0.12));
     }
   }
 

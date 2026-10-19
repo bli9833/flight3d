@@ -133,6 +133,9 @@ class FlightSimulator {
     this.touchControls = new TouchFlightControls(this.controls);
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
+    this.cameraSystem.onResetLook = () => {
+      this.showToast('카메라 시선 정면 초기화');
+    };
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
 
