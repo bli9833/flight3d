@@ -1,23 +1,105 @@
 {
-  "gridSize": 256,
+  "gridSize": 513,
   "worldSize": 22000,
-  "minElevation": 1535.52,
-  "maxElevation": 6687.56,
-  "luklaAirport": {
-    "lat": 27.6878,
-    "lon": 86.7314,
-    "gridX": 134.20498488890007,
-    "gridY": 147.97934788211714,
-    "interpolatedElevation": 2856.4069138995214,
-    "publishedElevation": 2845.0,
-    "runway": {
-      "designator": "06/24",
-      "lengthM": 527.0,
-      "widthM": 30.0,
-      "headingDeg": 58.0,
-      "gradientPercent": 11.7,
-      "threshold06Elevation": 2805.0,
-      "threshold24Elevation": 2867.0
-    }
-  }
+  "sampleSpacingM": 42.96875,
+  "origin": {
+    "lat": 27.6868342,
+    "lon": 86.7294519,
+    "reference": "Midpoint of OSM runway way 1257098603 endpoints, retrieved 2026-10-19"
+  },
+  "projection": "PROJCS[\"unknown\",GEOGCS[\"unknown\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]]],PROJECTION[\"Azimuthal_Equidistant\"],PARAMETER[\"latitude_of_center\",27.6868342],PARAMETER[\"longitude_of_center\",86.7294519],PARAMETER[\"false_easting\",0],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH]]",
+  "axes": "x east, z south; binary rows north to south, columns west to east",
+  "dem": {
+    "dataset": "Copernicus DEM GLO-30 public (DSM)",
+    "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N27_00_E086_00_DEM/Copernicus_DSM_COG_10_N27_00_E086_00_DEM.tif",
+    "sourceSha256": "4dfc87a0dec44a8a037164ddade45dd24bb53187176b5a14175c265bd6d20e76",
+    "outputSha256": "7353be272d4c0afd05b72cbad3e3bd5568dce130b1e48b8185cbf3517915909b",
+    "resampling": "bilinear",
+    "verticalDatum": "EGM2008 orthometric metres",
+    "sourceSpacingArcSec": 1,
+    "attribution": "produced using Copernicus WorldDEM-30 \u00a9 DLR e.V. 2010-2014 and \u00a9 Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "checkpoints": [
+      {
+        "x": 0.0,
+        "z": 0.0,
+        "lat": 27.6868342,
+        "lon": 86.7294519,
+        "sourceHeightM": 2814.856201171875
+      },
+      {
+        "x": 0.0,
+        "z": -2406.25,
+        "lat": 27.70854839778753,
+        "lon": 86.7294519,
+        "sourceHeightM": 3664.568359375
+      },
+      {
+        "x": -1117.1875,
+        "z": 1890.625,
+        "lat": 27.669772534018684,
+        "lon": 86.71812829933339,
+        "sourceHeightM": 2381.314697265625
+      },
+      {
+        "x": -2406.25,
+        "z": 0.0,
+        "lat": 27.686832052299046,
+        "lon": 86.70505881649005,
+        "sourceHeightM": 2660.952392578125
+      },
+      {
+        "x": 1890.625,
+        "z": -1546.875,
+        "lat": 27.70079200872081,
+        "lon": 86.74862033224781,
+        "sourceHeightM": 4300.68310546875
+      }
+    ]
+  },
+  "imagery": {
+    "service": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+    "zoom": 13,
+    "tileSha256": {
+      "13/3437/6067": "8c68ef42c9f5b251b5ddbeb15a3841152a83a2769e825fd62233cbc8e96fa547",
+      "13/3437/6068": "45c19b65b36f5b32d602fc0dbc33688fcf0c18d7d2adbf46957ef38a48b0c426",
+      "13/3437/6069": "f48041dd88be6f4537e0c4ab2c65d6184f945402f63ab9eb453924c81243111d",
+      "13/3437/6070": "da94c271e7d5d2c5bdf0f856de6775df90173d44dfddc24b1c834aaf4a9b5a30",
+      "13/3437/6071": "909136f2a627f1b3acfad88fdc2affe818d9da9ecaf5d9dbf100d5cd126ceeb5",
+      "13/3437/6072": "b1dba21f231ecf489efda1677829c57c61f510bb4715a8d6d0b1409d59a4a4cd",
+      "13/3438/6067": "ef67d4baa2cfa0800fc605ac79605c62ae56ee1670caff9ab3ac4225e9670518",
+      "13/3438/6068": "e4f35f8f7b43d0af32bc48d268cfe89b405011c5bdd942d5d7a526e02c6b90e8",
+      "13/3438/6069": "b429eb4022f30784073f12999bbac84c282f4894be048b77e9ec2ce1f470847e",
+      "13/3438/6070": "e18f9e7b238d635c02f38449b11dae0fe9c1c98c14cb178eddb0d8d2d8f98167",
+      "13/3438/6071": "92f5939d679c4687ea105f5b8fa77f2855940b50c15a894ae8ddee3ecd8fb55d",
+      "13/3438/6072": "6f2c695f63bab1f8a8544d806676bdc3386757f377cbcd68bf1765dcb6a30854",
+      "13/3439/6067": "5394432f2cf861d01b8d16caa48018e8c58e2372f397043059ce6389303e7a02",
+      "13/3439/6068": "cbdd3c596de9e78ec99af50f81fd0c485f4a637a25e86f543b349b174868b527",
+      "13/3439/6069": "4a4aa459929dfa5d91d2d339900075e9ac0eefe9f9c5db27e456e0924a9d5a7a",
+      "13/3439/6070": "4032ee4b4954ad99378b67fd43dd0ec064f4379dfb76cd32acfb207316242226",
+      "13/3439/6071": "04be6342ade9fae53381c833c2b677340c4e7f27ea460edd7945c2d2ff267ff5",
+      "13/3439/6072": "8e10ed6aac0fed4a2c7cb693fd7e8b2753054005f5322aa02dac233c2f8fffe3",
+      "13/3440/6067": "7c1d13894b53409b54d188f1346a70d4349fb5d20ef43969132dcd5e6dee363c",
+      "13/3440/6068": "0795820b80ffb5d6d8f686da457a50ca9abb0b1369e628499a1c0f2aa3607c14",
+      "13/3440/6069": "06e95795cb2084063c24c85e8434219ff72a1a351e2d3ab98f42900f9b00d0b8",
+      "13/3440/6070": "1fd526b47c84be2ffb05c99223b5efbd869ba07eb75084d5f1052ce7ee225a27",
+      "13/3440/6071": "f8b9bfabbc736bbc74491bc9eeca9c7c5a26dc44566550f33e11e811bad649f7",
+      "13/3440/6072": "553296d2dd68efbbabacbabe41992cfc14b006f0b9123fed9eada632d47cd7f2",
+      "13/3441/6067": "0cd8d102e4cf7e4a3f3ab78601b9be8c7dbec3d18c9fcdafcccb5441377c8a5f",
+      "13/3441/6068": "fd5cf232cf6de87a70bd7ee8c62131d70cf159946ae02980057403b3897df36f",
+      "13/3441/6069": "69a8edcd4b20d1781640a53d385b775d27669d867d796a44a3b3b12ab25a7094",
+      "13/3441/6070": "bb73f0e9e56889b30a3e1e440548f91dcc1e6c4ba0fa8406aeef89f24de10caa",
+      "13/3441/6071": "b2439b73636b09917b3e8b998c7ab5f9a0c7a5c44451049eeb9b24d102a0297a",
+      "13/3441/6072": "f8158406068a144d89c4d42631865e075d991d2e262e733c5fedadd8376d60b7",
+      "13/3442/6067": "285d422dce4a6339d221b5d198f02e0cec9148922fbe8c2ba49538265965e740",
+      "13/3442/6068": "56c86ed351718367d8d23658eeb61633cfb05af665d671e7f942f43825e7a684",
+      "13/3442/6069": "c07faae1fa0c8dc26cf8bcda1b1c6588927afc9633b003c1e6a2180873cbd511",
+      "13/3442/6070": "5ad228ef186504807f8490a4af8b03f738eefe945b5f07baa8dfee00e6ac6850",
+      "13/3442/6071": "6ea5774d4d60365d6a8fad3050e6c3e314c47889078650bfcfbbba3f44be6c2a",
+      "13/3442/6072": "c2daaba6141435b595709a76768c797ad39ac0d49390564e7f8b539427d38320"
+    },
+    "resampling": "bilinear to same local-meter extent"
+  },
+  "minElevation": 1461.5120849609375,
+  "maxElevation": 6684.7998046875,
+  "limitations": "DSM includes vegetation/buildings. OSM alignment is not surveyed. Airport runway/apron grading is a simulator approximation; surrounding terrain is unmodified DEM."
 }

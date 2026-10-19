@@ -1,0 +1,14 @@
+Lukla terrain data
+
+produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved
+
+Source: https://copernicus-dem-30m.s3.amazonaws.com/readme.html
+Licence/specifications: https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM
+
+Imagery: Esri World Imagery and its contributors.
+Service/attribution: https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer
+Runway alignment: © OpenStreetMap contributors (ODbL).
+https://www.openstreetmap.org/copyright
+https://www.openstreetmap.org/way/1257098603
+
+This is a surface model, including vegetation and buildings, not a surveyed bare-earth airport model. Source spacing is nominally 30 m; the bundled 22 km grid has 42.97 m sample spacing and the main render mesh about 86 m. Airport facilities, runway heights and local grading remain simulator approximations. No artificial regional cliff or departure canyon is added. See lukla_metadata.json for projection, source URL and checksums.
