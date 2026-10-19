@@ -132,6 +132,23 @@ describe('Landing Gear View & Touchdown Effects', () => {
   });
 
   describe('TireSmokeSystem (Touchdown Rubber Smoke Particles)', () => {
+    it('emits braking smoke only from moving grounded main wheels', (t) => {
+      t.mock.method(Math, 'random', () => 0);
+      const smoke = new TireSmokeSystem(new THREE.Scene());
+      const contacts = [
+        { id: 'nose', isGrounded: true, worldPos: new THREE.Vector3() },
+        { id: 'mainLeft', isGrounded: true, worldPos: new THREE.Vector3() },
+        { id: 'mainRight', isGrounded: false, worldPos: new THREE.Vector3() }
+      ];
+      smoke.spawnBrakingSmoke(contacts, new THREE.Vector3(), 1);
+      assert.equal(smoke.particles.length, 0, 'Holding brakes while parked must not emit smoke');
+      smoke.spawnBrakingSmoke(contacts, new THREE.Vector3(30, 0, 0), 1);
+      assert.equal(smoke.particles.length, 3, 'Only the grounded main wheel emits');
+      smoke.update(3);
+      smoke.spawnBrakingSmoke(contacts, new THREE.Vector3(), 1);
+      assert.equal(smoke.particles.length, 0, 'Smoke dissipates and stays clear after stopping');
+    });
+
     it('should spawn realistic tire smoke particles on touchdown', () => {
       const scene = new THREE.Scene();
       const smokeSystem = new TireSmokeSystem(scene);

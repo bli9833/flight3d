@@ -384,6 +384,10 @@ class FlightSimulator {
     const groundHeight = this.terrain.getHeight(this.position.x, this.position.z);
     const heightAboveGround = Math.max(0, this.position.y - groundHeight);
 
+    // Physics may run several substeps before rendering. Refresh the root world
+    // matrix so gear contacts use this substep's pose rather than the last frame.
+    this.aircraft.group.updateWorldMatrix(true, false);
+
     // 4. Landing Gear Forces & Ground Friction
     const gearResult = this.gear.update(
       dt,
