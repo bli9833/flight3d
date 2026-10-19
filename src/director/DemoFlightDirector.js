@@ -14,14 +14,19 @@ import { CameraSystem } from '../cameras/CameraSystem.js';
  *    - 11.7% Uphill Touchdown, Tire Smoke, Reverser & Full Brake Rollout onto Apron
  * 
  * 2. Coastal International Airport (Runway 09L):
- *    - Runway 09L Takeoff Roll, Rotation & Initial Climb
- *    - Scenic Coastal Banking Turn over Bay & Hills
- *    - Ocean Waves & Shipping Fleet Cruise
- *    - 3NM Final Approach on 3° Glideslope with PAPI Guidance
- *    - Touchdown, Spoilers, Reverse Thrust & Safe Rollout
+ *    - Pre-Flight Drone Orbit Inspection (Elevated 360° Drone View, Flaps 5, Golden Morning)
+ *    - Runway 09L Takeoff Roll (Cockpit View, TOGA 100%, Vr rotation)
+ *    - Liftoff & Climb (Chase Exterior View, Gear Retraction, Mountains & City)
+ *    - Scenic Coastal Banking Turn (Wing View, 20° Bank over Bay & Hills)
+ *    - Ocean Waves & Shipping Fleet Cruise (Cinematic Flyby View, Gerstner Waves & Ships)
+ *    - 3NM Final Approach on 3° Glideslope (Cockpit View, PAPI Guidance)
+ *    - Flare, Touchdown, Spoilers & Reverse Thrust Rollout (Gear/Chase View, Safe Stop)
+ *    - Post-Landing Drone Orbit Showcase (Elevated 360° Drone View, Safe Stop Inspection)
+ *    - Seamless Handover to User Manual Flight
  */
 export class DemoFlightDirector {
   static LUKLA_STAGES = {
+    IDLE: -1,
     CLIFF_TAKEOFF: 0,
     CANYON_CLIMB: 1,
     HIMALAYAN_CRUISE: 2,
@@ -30,23 +35,26 @@ export class DemoFlightDirector {
     COMPLETED: 5
   };
 
-  static COASTAL_STAGES = {
-    TAKEOFF_ROLL: 0,
-    ROTATION_CLIMB: 1,
-    COASTAL_BANK: 2,
-    OCEAN_CRUISE: 3,
-    FINAL_APPROACH: 4,
-    TOUCHDOWN_ROLLOUT: 5,
-    COMPLETED: 6
+  static STAGES = {
+    IDLE: -1,
+    PREFLIGHT_ORBIT: 0,
+    TAKEOFF_ROLL: 1,
+    ROTATION_CLIMB: 2,
+    COASTAL_BANK: 3,
+    OCEAN_CRUISE: 4,
+    FINAL_APPROACH: 5,
+    TOUCHDOWN_ROLLOUT: 6,
+    POSTFLIGHT_ORBIT: 7,
+    COMPLETED: 8
   };
 
-  static STAGES = DemoFlightDirector.LUKLA_STAGES;
+  static COASTAL_STAGES = DemoFlightDirector.STAGES;
 
   constructor(simulator) {
     this.sim = simulator;
     this.isActive = false;
-    this.activeDemoAirport = 'lukla';
-    this.currentStage = -1;
+    this.activeDemoAirport = this.sim?.activeAirport || 'lukla';
+    this.currentStage = DemoFlightDirector.STAGES.IDLE;
     this.stageTimer = 0;
     this.totalTimer = 0;
 
@@ -55,6 +63,11 @@ export class DemoFlightDirector {
     this.titleEl = null;
     this.descEl = null;
     this.skipBtn = null;
+    this.closeBtn = null;
+    this.openBtn = null;
+    this.badgeEl = null;
+    this.pillTextEl = null;
+    this.isBannerMinimized = false;
 
     // Approach tracking state
     this.approachFlarInitiated = false;
@@ -69,6 +82,10 @@ export class DemoFlightDirector {
     this.titleEl = document.getElementById('demo-stage-title');
     this.descEl = document.getElementById('demo-stage-desc');
     this.skipBtn = document.getElementById('btn-skip-demo');
+    this.closeBtn = document.getElementById('btn-demo-close');
+    this.openBtn = document.getElementById('btn-demo-open');
+    this.badgeEl = this.bannerEl?.querySelector('.demo-badge');
+    this.pillTextEl = document.getElementById('demo-pill-text');
 
     if (this.skipBtn) {
       this.skipBtn.addEventListener('click', () => {
@@ -76,18 +93,55 @@ export class DemoFlightDirector {
       });
     }
 
-    const replayBtn = document.getElementById('btn-demo');
-    if (replayBtn) {
-      replayBtn.addEventListener('click', () => {
-        this.start();
+    if (this.closeBtn) {
+      this.closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeBanner();
       });
     }
 
-    // Keyboard cancel/restart listeners
+    if (this.badgeEl) {
+      this.badgeEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeBanner();
+      });
+      this.badgeEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.closeBanner();
+        }
+      });
+    }
+
+    if (this.openBtn) {
+      this.openBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openBanner();
+      });
+    }
+
+    const replayBtn = document.getElementById('btn-demo');
+    if (replayBtn) {
+      replayBtn.addEventListener('click', () => {
+        if (this.isActive) {
+          if (this.isBannerMinimized) {
+            this.openBanner();
+          } else {
+            this.closeBanner();
+          }
+        } else {
+          this.start();
+        }
+      });
+    }
+
+    // Keyboard cancel/restart/toggle listeners
     window.addEventListener('keydown', (e) => {
       if (this.isActive) {
         if (e.code === 'Escape') {
           this.stop('데모 비행 종료: 직접 조종으로 전환되었습니다.');
+        } else if (e.code === 'KeyP') {
+          this.toggleBanner();
         } else if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
           // Touching flight control keys automatically hands over control
           this.stop('조종 입력 감지: 조종사 수동 조종으로 전환되었습니다.');
@@ -98,10 +152,37 @@ export class DemoFlightDirector {
     });
   }
 
+  closeBanner() {
+    this.isBannerMinimized = true;
+    if (this.bannerEl) {
+      this.bannerEl.style.display = 'none';
+    }
+    if (this.isActive && this.openBtn) {
+      this.openBtn.style.display = 'inline-flex';
+    }
+  }
+
+  openBanner() {
+    this.isBannerMinimized = false;
+    if (this.openBtn) {
+      this.openBtn.style.display = 'none';
+    }
+    if (this.isActive && this.bannerEl) {
+      this.bannerEl.style.display = 'flex';
+    }
+  }
+
+  toggleBanner() {
+    if (this.isBannerMinimized) {
+      this.openBanner();
+    } else {
+      this.closeBanner();
+    }
+  }
+
   start(targetAirport = null) {
-    // Determine which airport demo to run (defaults to active airport, or 'lukla')
-    const airport = targetAirport || this.sim.activeAirport || 'lukla';
-    if (this.sim.activeAirport !== airport) {
+    const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaAirport ? 'lukla' : 'coastal');
+    if (this.sim.setAirport && this.sim.activeAirport !== airport) {
       this.sim.setAirport(airport);
     }
 
@@ -110,9 +191,13 @@ export class DemoFlightDirector {
     this.totalTimer = 0;
     this.approachFlarInitiated = false;
     this.touchdownConfirmed = false;
+    this.isBannerMinimized = false;
 
     if (this.bannerEl) {
       this.bannerEl.style.display = 'flex';
+    }
+    if (this.openBtn) {
+      this.openBtn.style.display = 'none';
     }
 
     // Ensure audio starts on first user interaction or when allowed
@@ -125,20 +210,24 @@ export class DemoFlightDirector {
     if (this.activeDemoAirport === 'lukla') {
       this.setStage(DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
     } else {
-      this.setStage(DemoFlightDirector.COASTAL_STAGES.TAKEOFF_ROLL);
+      this.setStage(DemoFlightDirector.COASTAL_STAGES.PREFLIGHT_ORBIT);
     }
   }
 
   stop(message = null) {
     if (!this.isActive) return;
     this.isActive = false;
-    this.currentStage = -1;
+    this.currentStage = DemoFlightDirector.STAGES.IDLE;
+    this.isBannerMinimized = false;
 
     // Clear programmatic virtual inputs
     this.sim.controls.clearVirtualInputs();
 
     if (this.bannerEl) {
       this.bannerEl.style.display = 'none';
+    }
+    if (this.openBtn) {
+      this.openBtn.style.display = 'none';
     }
 
     if (message) {
@@ -434,7 +523,7 @@ export class DemoFlightDirector {
         this.sim.controls.setVirtualInput('throttle', 0.75);
 
         // Switch to exterior chase camera at 3.5s after showcasing touchdown impact
-        if (this.stageTimer > 3.5 && this.sim.cameraSystem.mode === CameraSystem.MODES.GEAR) {
+        if (this.stageTimer > 3.5 && this.sim.cameraSystem.mode !== CameraSystem.MODES.GEAR) {
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
@@ -456,52 +545,73 @@ export class DemoFlightDirector {
 
   setCoastalStage(newStage) {
     switch (newStage) {
-      case DemoFlightDirector.COASTAL_STAGES.TAKEOFF_ROLL:
+      case DemoFlightDirector.STAGES.PREFLIGHT_ORBIT:
         this.updateBanner(
-          '🛫 [1/6] 활주로 이륙 활주 (Runway 09L Takeoff Roll)',
-          'TOGA 100% 추력 가속 • 보잉 글래스 콕핏(MCP, PFD, ND, ISFD) 계기 감상'
+          '🚁 [1/8] 비행 전 드론 서클 점검 (Pre-Flight Drone Inspection)',
+          '활주로 09L 대기 • 보잉 737 기체 외형 360° 공중 점검 • 플랩 5° 및 엔진 가동 준비'
         );
         this.sim.setPreset('runway', true);
+        this.sim.cameraSystem.setMode(CameraSystem.MODES.DRONE);
+        this.sim.cameraSystem.resetDroneOrbit?.(1.8, 38.0, 11.5);
+        this.sim.sky.setTimeOfDay(7.2); // Golden morning
+        this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
+
+        // Keep parked on runway with brakes applied & idle thrust
+        this.sim.controls.setVirtualInput('throttle', 0.0);
+        this.sim.engines.setThrottle(0.0);
+        this.sim.controls.setVirtualInput('elevator', 0.0);
+        this.sim.controls.setVirtualInput('aileron', 0.0);
+        this.sim.controls.setVirtualInput('rudder', 0.0);
+        this.sim.controls.setVirtualInput('brakes', 1.0);
+        this.sim.gear.setBrakes(1.0);
+        this.sim.aero.setFlapPosition(2); // Flaps 5 for takeoff
+        break;
+
+      case DemoFlightDirector.STAGES.TAKEOFF_ROLL:
+        this.updateBanner(
+          '🛫 [2/8] 활주로 이륙 활주 (Runway 09L Takeoff Roll)',
+          'TOGA 100% 추력 가속 • 보잉 글래스 콕핏(MCP, PFD, ND, ISFD) 계기 감상'
+        );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
         this.sim.sky.setTimeOfDay(7.2);
         this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
+        this.sim.controls.setVirtualInput('brakes', 0.0);
+        this.sim.gear.setBrakes(0.0);
         this.sim.controls.setVirtualInput('throttle', 1.0);
         this.sim.engines.setThrottle(1.0);
         this.sim.controls.setVirtualInput('elevator', 0.0);
         this.sim.controls.setVirtualInput('aileron', 0.0);
         this.sim.controls.setVirtualInput('rudder', 0.0);
-        this.sim.controls.setVirtualInput('brakes', 0.0);
-        this.sim.gear.setBrakes(0.0);
         break;
 
-      case DemoFlightDirector.COASTAL_STAGES.ROTATION_CLIMB:
+      case DemoFlightDirector.STAGES.ROTATION_CLIMB:
         this.updateBanner(
-          '✈️ [2/6] V_r 로테이션 & 이륙 상승 (Rotation & Initial Climb)',
+          '✈️ [3/8] V_r 로테이션 & 이륙 상승 (Rotation & Initial Climb)',
           '133 KT 부드러운 기수 인상(2.2°/s) • 랜딩 기어 접기 • 기체 외형 및 도심 전경'
         );
         this.sim.controls.setVirtualInput('elevator', 0.65);
         break;
 
-      case DemoFlightDirector.COASTAL_STAGES.COASTAL_BANK:
+      case DemoFlightDirector.STAGES.COASTAL_BANK:
         this.updateBanner(
-          '⛰️ [3/6] 해안가 선회 비행 (Scenic Coastal Banking Turn)',
+          '⛰️ [4/8] 해안가 선회 비행 (Scenic Coastal Banking Turn)',
           '우측 20° 선회 • 굴곡 산맥 지형, 3,500+ 그루 식생 및 500+ 채 도심 빌딩 조망'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.WING);
         this.sim.aero.setFlapPosition(0);
         break;
 
-      case DemoFlightDirector.COASTAL_STAGES.OCEAN_CRUISE:
+      case DemoFlightDirector.STAGES.OCEAN_CRUISE:
         this.updateBanner(
-          '🚢 [4/6] 해상 선박 & 거스트너 파도 수면 순항 (Ocean Waves & Fleet Cruise)',
+          '🚢 [5/8] 해상 선박 & 거스트너 파도 수면 순항 (Ocean Waves & Fleet Cruise)',
           '햇빛 반사 수면 • 컨테이너 화물선, 대형 유람선 및 쾌속 모터보트 웨이크 감상'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.FLYBY);
         break;
 
-      case DemoFlightDirector.COASTAL_STAGES.FINAL_APPROACH:
+      case DemoFlightDirector.STAGES.FINAL_APPROACH:
         this.updateBanner(
-          '🛬 [5/6] 3NM 최종 착륙 접근 (Runway 09L Final Approach)',
+          '🛬 [6/8] 3NM 최종 착륙 접근 (Runway 09L Final Approach)',
           'PAPI 4등식 3.0° 활공각 유도(2 White 2 Red) • ALS 진입 스트로브 • 플랩 30 전개'
         );
         this.sim.setPreset('approach', true);
@@ -512,15 +622,28 @@ export class DemoFlightDirector {
         this.touchdownConfirmed = false;
         break;
 
-      case DemoFlightDirector.COASTAL_STAGES.TOUCHDOWN_ROLLOUT:
+      case DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT:
         this.updateBanner(
-          '🛑 [6/6] 활주로 접지 & 역추진 제동 (Touchdown & Reverser Rollout)',
+          '🛑 [7/8] 활주로 접지 & 역추진 제동 (Touchdown & Reverser Rollout)',
           '랜딩 기어 뷰: 올레오 서스펜션 완충 접지 • 타이어 연기 • 스포일러 & 역추진 제동'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
         break;
 
-      case DemoFlightDirector.COASTAL_STAGES.COMPLETED:
+      case DemoFlightDirector.STAGES.POSTFLIGHT_ORBIT:
+        this.updateBanner(
+          '🚁 [8/8] 안전 착륙 완료 & 드론 서클 쇼케이스 (Touchdown Complete • Drone Orbit View)',
+          '활주로 정지 완료 • 스포일러/역추진 격납 • 보잉 737 기체 전경 드론 조망 [Esc: 직접 조종]'
+        );
+        this.sim.cameraSystem.setMode(CameraSystem.MODES.DRONE);
+        this.sim.cameraSystem.resetDroneOrbit?.(this.sim.cameraSystem.droneOrbitAngle, 38.0, 11.5);
+        this.sim.controls.setVirtualInput('brakes', 1.0);
+        this.sim.gear.setBrakes(1.0);
+        this.sim.controls.setVirtualInput('throttle', 0.0);
+        this.sim.engines.setThrottle(0.0);
+        break;
+
+      case DemoFlightDirector.STAGES.COMPLETED:
         this.updateBanner(
           '🎉 데모 시연 완료! 조종사 수동 조종 인계',
           '이제 원하는 프리셋과 카메라 뷰를 선택하여 직접 비행을 즐겨보세요! [Esc]'
@@ -534,14 +657,41 @@ export class DemoFlightDirector {
     const tel = this.sim.telemetry;
 
     switch (this.currentStage) {
-      case DemoFlightDirector.COASTAL_STAGES.TAKEOFF_ROLL: {
-        if (tel.iasKnots >= 132 || this.stageTimer > 23.0) {
-          this.setStage(DemoFlightDirector.COASTAL_STAGES.ROTATION_CLIMB);
+      // -------------------------------------------------------------
+      // STAGE 0: Pre-Flight Drone Orbit Inspection
+      // -------------------------------------------------------------
+      case DemoFlightDirector.STAGES.PREFLIGHT_ORBIT: {
+        // Hold parked position on runway for 6.0 seconds while drone orbits around aircraft
+        this.sim.controls.setVirtualInput('brakes', 1.0);
+        this.sim.gear.setBrakes(1.0);
+        this.sim.controls.setVirtualInput('throttle', 0.0);
+        this.sim.engines.setThrottle(0.0);
+        this.sim.controls.setVirtualInput('elevator', 0.0);
+        this.sim.controls.setVirtualInput('aileron', 0.0);
+        this.sim.controls.setVirtualInput('rudder', 0.0);
+
+        if (this.stageTimer >= 6.0) {
+          this.setStage(DemoFlightDirector.STAGES.TAKEOFF_ROLL);
         }
         break;
       }
 
-      case DemoFlightDirector.COASTAL_STAGES.ROTATION_CLIMB: {
+      // -------------------------------------------------------------
+      // STAGE 1: Runway Takeoff Roll
+      // -------------------------------------------------------------
+      case DemoFlightDirector.STAGES.TAKEOFF_ROLL: {
+        // Accelerate until Vr (133 KT)
+        if (tel.iasKnots >= 132 || this.stageTimer > 23.0) {
+          this.setStage(DemoFlightDirector.STAGES.ROTATION_CLIMB);
+        }
+        break;
+      }
+
+      // -------------------------------------------------------------
+      // STAGE 2: Rotation & Climb
+      // -------------------------------------------------------------
+      case DemoFlightDirector.STAGES.ROTATION_CLIMB: {
+        // Wings-level stabilization during climb with roll-rate damping
         const rollRateDeg = -THREE.MathUtils.radToDeg(this.sim.angularVelocity.z);
         const rollErr = 0.0 - tel.rollDeg;
         const aileronCmd = rollErr * 0.035 - rollRateDeg * 0.02;
@@ -562,12 +712,16 @@ export class DemoFlightDirector {
         }
 
         if (tel.altitudeFt > 650 || this.stageTimer > 12.0) {
-          this.setStage(DemoFlightDirector.COASTAL_STAGES.COASTAL_BANK);
+          this.setStage(DemoFlightDirector.STAGES.COASTAL_BANK);
         }
         break;
       }
 
-      case DemoFlightDirector.COASTAL_STAGES.COASTAL_BANK: {
+      // -------------------------------------------------------------
+      // STAGE 3: Coastal Banking Turn
+      // -------------------------------------------------------------
+      case DemoFlightDirector.STAGES.COASTAL_BANK: {
+        // Coordinated 20° bank turn towards South-East (Heading ~155°)
         const targetHeading = 155.0;
         const hdgDiff = ((targetHeading - tel.headingDeg + 540) % 360) - 180;
         const targetBankDeg = Math.max(-20.0, Math.min(20.0, hdgDiff * 0.65));
@@ -588,12 +742,16 @@ export class DemoFlightDirector {
         this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
 
         if (this.stageTimer > 11.0) {
-          this.setStage(DemoFlightDirector.COASTAL_STAGES.OCEAN_CRUISE);
+          this.setStage(DemoFlightDirector.STAGES.OCEAN_CRUISE);
         }
         break;
       }
 
-      case DemoFlightDirector.COASTAL_STAGES.OCEAN_CRUISE: {
+      // -------------------------------------------------------------
+      // STAGE 4: Ocean Waves & Shipping Fleet Cruise
+      // -------------------------------------------------------------
+      case DemoFlightDirector.STAGES.OCEAN_CRUISE: {
+        // Fly level over bay at 1,200ft, speed 205 knots
         const targetAlt = 1200;
         const altErr = targetAlt - tel.altitudeFt;
         const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
@@ -615,12 +773,16 @@ export class DemoFlightDirector {
         }
 
         if (this.stageTimer > 10.5) {
-          this.setStage(DemoFlightDirector.COASTAL_STAGES.FINAL_APPROACH);
+          this.setStage(DemoFlightDirector.STAGES.FINAL_APPROACH);
         }
         break;
       }
 
-      case DemoFlightDirector.COASTAL_STAGES.FINAL_APPROACH: {
+      // -------------------------------------------------------------
+      // STAGE 5: 3NM Final Approach with PAPI
+      // -------------------------------------------------------------
+      case DemoFlightDirector.STAGES.FINAL_APPROACH: {
+        // Track 3° glideslope down to Runway 09L threshold (x = -1350m, alt = 47ft / 14m)
         const targetTouchdownX = -1250;
         const distToThreshold = targetTouchdownX - this.sim.position.x;
         const idealAltFt = Math.max(47, (distToThreshold * Math.tan(THREE.MathUtils.degToRad(3.0))) * 3.28084 + 47);
@@ -651,12 +813,16 @@ export class DemoFlightDirector {
         }
 
         if (isOverRunway && (tel.onGround || (this.approachFlarInitiated && tel.radioAltFt <= 8.5))) {
-          this.setStage(DemoFlightDirector.COASTAL_STAGES.TOUCHDOWN_ROLLOUT);
+          this.setStage(DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT);
         }
         break;
       }
 
-      case DemoFlightDirector.COASTAL_STAGES.TOUCHDOWN_ROLLOUT: {
+      // -------------------------------------------------------------
+      // STAGE 6: Touchdown & Reverser Rollout
+      // -------------------------------------------------------------
+      case DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT: {
+        // Deploy full spoilers, reverse thrust, and maximum brakes
         this.sim.controls.setVirtualInput('elevator', 0.0);
         this.sim.controls.setVirtualInput('aileron', 0.0);
         this.sim.controls.setVirtualInput('rudder', -this.sim.position.z * 0.02);
@@ -666,14 +832,35 @@ export class DemoFlightDirector {
         this.sim.controls.setVirtualInput('throttle', 0.0);
         this.sim.engines.setThrottle(0.0);
 
+        // Switch to exterior chase camera at 4.5s after showcasing touchdown impact and tire smoke
         if (this.stageTimer > 4.5 && this.sim.cameraSystem.mode === CameraSystem.MODES.GEAR) {
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
+        // Aircraft brought to complete safe stop -> transition to post-flight drone orbit view
         if (tel.iasKnots < 5.0 || this.stageTimer > 12.0) {
           this.sim.engines.setReverser(false, true);
           this.sim.aero.spoilers = 0.0;
-          this.setStage(DemoFlightDirector.COASTAL_STAGES.COMPLETED);
+          this.setStage(DemoFlightDirector.STAGES.POSTFLIGHT_ORBIT);
+        }
+        break;
+      }
+
+      // -------------------------------------------------------------
+      // STAGE 7: Post-Landing Drone Orbit Showcase
+      // -------------------------------------------------------------
+      case DemoFlightDirector.STAGES.POSTFLIGHT_ORBIT: {
+        // Hold safe parked position on runway for 7.0 seconds while drone orbits around aircraft
+        this.sim.controls.setVirtualInput('brakes', 1.0);
+        this.sim.gear.setBrakes(1.0);
+        this.sim.controls.setVirtualInput('throttle', 0.0);
+        this.sim.engines.setThrottle(0.0);
+        this.sim.controls.setVirtualInput('elevator', 0.0);
+        this.sim.controls.setVirtualInput('aileron', 0.0);
+        this.sim.controls.setVirtualInput('rudder', 0.0);
+
+        if (this.stageTimer >= 7.0) {
+          this.setStage(DemoFlightDirector.STAGES.COMPLETED);
         }
         break;
       }
@@ -683,5 +870,11 @@ export class DemoFlightDirector {
   updateBanner(title, desc) {
     if (this.titleEl) this.titleEl.textContent = title;
     if (this.descEl) this.descEl.textContent = desc;
+    if (this.pillTextEl) {
+      const match = title.match(/\[(\d+\/\d+)\]/);
+      this.pillTextEl.textContent = match
+        ? `🎬 AUTO DEMO [${match[1]}] [안내 열기 ▾]`
+        : `🎬 AUTO DEMO [안내 열기 ▾]`;
+    }
   }
 }

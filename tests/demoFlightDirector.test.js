@@ -50,6 +50,7 @@ function createMockSimulator(activeAirport = 'lukla') {
     cameraSystem: {
       mode: CameraSystem.MODES.COCKPIT,
       setMode: function(m) { this.mode = m; },
+      resetDroneOrbit: () => {},
       lookPitch: 0,
       lookYaw: 0
     },
@@ -128,7 +129,7 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
     director.start('coastal');
     assert.strictEqual(director.isActive, true);
     assert.strictEqual(director.activeDemoAirport, 'coastal');
-    assert.strictEqual(director.currentStage, DemoFlightDirector.COASTAL_STAGES.TAKEOFF_ROLL);
+    assert.strictEqual(director.currentStage, DemoFlightDirector.COASTAL_STAGES.PREFLIGHT_ORBIT);
   });
 
   it('should cleanly stop demo and clear virtual control inputs', () => {

@@ -27,6 +27,7 @@ import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
+import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 
 // Expose THREE globally for test harness and browser console debugging
 if (typeof window !== 'undefined') {
@@ -78,6 +79,17 @@ class FlightSimulator {
     );
     this.scene.add(this.aircraft.group);
 
+    // 3b. Boeing 737 2D Real-Photo Cockpit Overlay
+    this.cockpitPhotoOverlay = new CockpitPhotoOverlay(
+      this.pfdCanvas,
+      this.ndCanvas,
+      this.eicasCanvas,
+      this.isfdCanvas
+    );
+    if (typeof window !== 'undefined') {
+      this.cockpitPhotoOverlay.onResize(window.innerWidth, window.innerHeight);
+    }
+
     // 4. Physics Engines
     this.aero = new Aerodynamics();
     this.engines = new EngineModel();
@@ -120,6 +132,7 @@ class FlightSimulator {
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
+    this.cameraSystem.setTerrain(this.terrain);
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
 
@@ -850,12 +863,19 @@ class FlightSimulator {
       this.totalSimTime += this.physicsDt;
     }
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
-    this.aircraft.setCockpitMode(isCockpit);
+    const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit;
+    this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
+    if (this.cockpitPhotoOverlay) {
+      this.cockpitPhotoOverlay.enabled = isPhotoCockpit;
+      if (isPhotoCockpit) {
+        this.cockpitPhotoOverlay.update(this.telemetry);
+      }
+    }
     this.aircraft.update(this.physicsDt, this.telemetry);
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.aircraft.group.updateMatrixWorld(true);
-    this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry);
+    this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry, (x, z) => this.terrain.getHeight(x, z));
     this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
@@ -917,7 +937,14 @@ class FlightSimulator {
 
     // 4. Update Cockpit Visibility & Audio
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
-    this.aircraft.setCockpitMode(isCockpit);
+    const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit;
+    this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
+    if (this.cockpitPhotoOverlay) {
+      this.cockpitPhotoOverlay.enabled = isPhotoCockpit;
+      if (isPhotoCockpit) {
+        this.cockpitPhotoOverlay.update(this.telemetry);
+      }
+    }
     this.audio.update(frameDelta, this.telemetry, isCockpit);
 
     // 6. Update Camera System & Dynamic FOV (60° in cockpit eliminates fisheye speed distortion)
@@ -926,7 +953,7 @@ class FlightSimulator {
       this.camera.fov = targetFov;
       this.camera.updateProjectionMatrix();
     }
-    this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry);
+    this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry, (x, z) => this.terrain.getHeight(x, z));
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
@@ -935,6 +962,11 @@ class FlightSimulator {
 
     // 8. Render 3D Scene
     this.renderer.render(this.scene, this.camera);
+
+    // 9. Render 2D Photorealistic Cockpit Overlay (when in photo cockpit mode)
+    if (isPhotoCockpit && this.cockpitPhotoOverlay) {
+      this.cockpitPhotoOverlay.render(this.renderer);
+    }
   }
 
   updateHUD() {
@@ -1029,9 +1061,23 @@ class FlightSimulator {
       this.resetCrash();
     });
 
+    // Toggle Cockpit Photo Mode by clicking HUD Camera item
+    document.getElementById('hud-cam')?.addEventListener('click', () => {
+      if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {
+        const isPhoto = this.cameraSystem.toggleCockpitPhoto();
+        this.showToast(isPhoto ? '실사 포토 콕핏 (Photo Panel)' : '3D 가상 콕핏 (3D Virtual)');
+      }
+    });
+
     window.addEventListener('keydown', (e) => {
       if (this.isCrashed && (e.code === 'Space' || e.code === 'KeyR' || e.code === 'Enter')) {
         this.resetCrash();
+      }
+      if (e.code === 'F2') {
+        if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {
+          const isPhoto = this.cameraSystem.toggleCockpitPhoto();
+          this.showToast(isPhoto ? '실사 포토 콕핏 (Photo Panel)' : '3D 가상 콕핏 (3D Virtual)');
+        }
       }
     });
   }
@@ -1040,10 +1086,21 @@ class FlightSimulator {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    if (this.cockpitPhotoOverlay) {
+      this.cockpitPhotoOverlay.onResize(window.innerWidth, window.innerHeight);
+    }
   }
 }
 
-// Start Simulator when DOM is ready
-window.addEventListener('DOMContentLoaded', () => {
-  window.simulator = new FlightSimulator();
-});
+// Start Simulator when DOM is ready (guaranteed across all browser lifecycle states)
+function initFlightSimulator() {
+  if (!window.simulator) {
+    window.simulator = new FlightSimulator();
+  }
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', initFlightSimulator);
+} else {
+  initFlightSimulator();
+}

@@ -9,21 +9,28 @@ const ARTIFACT_DIR = process.env.ARTIFACT_DIR || '/home/stlim/.gemini/antigravit
 
 async function main() {
   console.log('💥 Launching Autonomous Crash & Explosion Test Suite...');
-  const profileDir = `/tmp/chrome-crash-test-${Date.now()}`;
+  const profileDir = path.resolve(process.cwd(), '.chrome-profile/crash');
+  fs.mkdirSync(profileDir, { recursive: true });
   const args = [
     '--headless=new',
     `--user-data-dir=${profileDir}`,
     `--remote-debugging-port=${CDP_PORT}`,
     '--window-size=1280,720',
-    '--use-gl=angle',
-    '--use-angle=swiftshader',
     '--enable-unsafe-swiftshader',
+    '--disable-dev-shm-usage',
+    '--no-sandbox',
     '--no-first-run',
     '--no-default-browser-check',
     SIM_URL
   ];
 
-  const chrome = spawn('google-chrome-stable', args, { stdio: 'ignore' });
+  const chrome = spawn('google-chrome-stable', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  chrome.stderr.on('data', (d) => {
+    const s = d.toString();
+    if (s.includes('FATAL') || s.includes('ERROR:content') || s.includes('Crash')) {
+      console.error('[Chrome Stderr]', s.trim());
+    }
+  });
 
   try {
     let pageTarget = null;
@@ -48,6 +55,12 @@ async function main() {
 
     let msgId = 1;
     const pending = new Map();
+    ws.addEventListener('close', () => {
+      for (const [id, { reject }] of pending) {
+        reject(new Error('WebSocket closed unexpectedly'));
+      }
+      pending.clear();
+    });
     ws.addEventListener('message', (ev) => {
       const msg = JSON.parse(ev.data);
       if (msg.id && pending.has(msg.id)) {
@@ -66,7 +79,10 @@ async function main() {
 
     const evalJs = async (expr) => {
       const res = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
-      if (res.exceptionDetails) throw new Error(res.exceptionDetails.text);
+      if (res.exceptionDetails) {
+        const text = res.exceptionDetails.exception?.description || res.exceptionDetails.text;
+        throw new Error(text);
+      }
       return res.result?.value;
     };
 
@@ -84,11 +100,17 @@ async function main() {
     await send('Runtime.enable');
 
     console.log('⏳ Waiting for simulator to initialize in browser DOM...');
-    await new Promise(r => setTimeout(r, 3000));
+    for (let i = 0; i < 40; i++) {
+      try {
+        const ready = await evalJs('typeof window.simulator !== "undefined" && window.simulator.aircraft !== undefined');
+        if (ready) break;
+      } catch (e) {}
+      await new Promise(r => setTimeout(r, 250));
+    }
 
     // Stop demo flight director to test manual crash dynamics
     await evalJs(`
-      if (window.simulator.demoDirector) {
+      if (window.simulator && window.simulator.demoDirector) {
         window.simulator.demoDirector.stop();
       }
     `);
@@ -158,9 +180,9 @@ async function main() {
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
-        // High alpine rocky peak above tree line (elevation ~350m, no trees above 280m)
-        const peakGroundH = sim.terrain.getHeight(4500, -3500);
-        sim.position.set(4420, peakGroundH - 15, -3500);
+        // High mountain ridge (elevation > 120m, no trees along runway extended centerline z = 0)
+        const peakGroundH = sim.terrain.getHeight(2650, 0);
+        sim.position.set(2580, peakGroundH - 25, 0);
         sim.linearVelocity.set(90, 0, 0);
         sim.quaternion.setFromAxisAngle(new window.THREE.Vector3(0, 1, 0), -Math.PI * 0.5);
         sim.aircraft.group.position.copy(sim.position);
@@ -219,14 +241,16 @@ async function main() {
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
-        // Find a tree on gentle terrain
-        const t = sim.foliage.treeData[30];
-        const startX = t.x - 30;
-        const localGroundH = sim.terrain.getHeight(startX, t.z);
-        // Fly directly at upper canopy level above ground
-        const flightY = Math.max(localGroundH + 2.5, t.y + t.height * 0.7);
+        // Find a tall tree on flat terrain
+        const t = sim.foliage.treeData.find(item => {
+          const h1 = sim.terrain.getHeight(item.x - 15, item.z);
+          const h2 = sim.terrain.getHeight(item.x, item.z);
+          return Math.abs(h1 - h2) < 0.3 && item.height > 10;
+        }) || sim.foliage.treeData[0];
+        const startX = t.x - 12;
+        const flightY = t.y + t.height * 0.65;
         sim.position.set(startX, flightY, t.z);
-        sim.linearVelocity.set(60, 0, 0);
+        sim.linearVelocity.set(55, 0, 0);
         sim.quaternion.setFromAxisAngle(new window.THREE.Vector3(0, 1, 0), -Math.PI * 0.5);
         sim.aircraft.group.position.copy(sim.position);
         sim.aircraft.group.quaternion.copy(sim.quaternion);

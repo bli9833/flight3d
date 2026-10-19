@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
 /**
  * Atmospheric Sky, Sun, Dynamic Lighting & Volumetric Clouds
@@ -55,6 +56,36 @@ export class SkyAtmosphere {
     this.scene.add(this.cloudsGroup);
 
     this.updateSun();
+    this.initEnvironmentMap();
+  }
+
+  initEnvironmentMap() {
+    if (typeof window === 'undefined') return;
+    try {
+      const loader = new RGBELoader();
+      loader.load(
+        '/textures/environment/sky_1k.hdr',
+        (texture) => {
+          texture.mapping = THREE.EquirectangularReflectionMapping;
+          this.scene.environment = texture;
+        },
+        undefined,
+        () => {
+          // Fallback: generate PMREM from sky shader if HDR is unreachable
+          if (this.renderer && this.sky) {
+            try {
+              const pmrem = new THREE.PMREMGenerator(this.renderer);
+              this.scene.environment = pmrem.fromScene(this.sky).texture;
+              pmrem.dispose();
+            } catch (e) {
+              // Ignore in headless / unsupported contexts
+            }
+          }
+        }
+      );
+    } catch (e) {
+      // Graceful fallback
+    }
   }
 
   setRenderer(renderer) {

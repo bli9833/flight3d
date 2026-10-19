@@ -56,18 +56,25 @@
       </div>
     </header>
 
+    <!-- Minimized Demo Flight Showcase Pill (Tap to Reopen) -->
+    <button id="btn-demo-open" class="demo-pill-btn" style="display: none;" title="데모 비행 안내 팝업 열기" aria-label="데모 비행 안내 팝업 열기">
+      <span class="demo-dot"></span>
+      <span id="demo-pill-text" class="demo-pill-text">🎬 AUTO DEMO [안내 열기 ▾]</span>
+    </button>
+
     <!-- Cinematic Demo Flight Showcase Banner -->
     <div id="demo-banner" class="demo-banner" style="display: none;">
-      <div class="demo-badge">
+      <div class="demo-badge" title="클릭하여 안내 팝업 접기" role="button" tabindex="0">
         <span class="demo-dot"></span>
         <span class="demo-badge-text">AUTO DEMO</span>
       </div>
       <div class="demo-info">
-        <div id="demo-stage-title" class="demo-stage-title">🛫 [1/6] 활주로 이륙 활주 (Runway 09L Takeoff Roll)</div>
-        <div id="demo-stage-desc" class="demo-stage-desc">TOGA 100% 추력 가속 • 보잉 글래스 콕핏(MCP, PFD, ND, ISFD) 계기 감상</div>
+        <div id="demo-stage-title" class="demo-stage-title">🚁 [1/8] 비행 전 드론 서클 점검 (Pre-Flight Drone Inspection)</div>
+        <div id="demo-stage-desc" class="demo-stage-desc">활주로 09L 대기 • 보잉 737 기체 외형 360° 공중 점검 • 플랩 5° 및 엔진 가동 준비</div>
       </div>
       <div class="demo-actions">
         <button id="btn-skip-demo" class="btn btn-demo-skip" title="수동 직접 조종으로 전환 (Esc)">직접 조종하기 [Esc]</button>
+        <button id="btn-demo-close" class="btn btn-demo-close" title="안내 팝업 닫기 (접기)" aria-label="안내 팝업 닫기">✕</button>
       </div>
     </div>
 
@@ -176,7 +183,7 @@
               <tr><td><kbd>G</kbd></td><td>랜딩 기어 접기/펼치기 (Gear Up/Down)</td></tr>
               <tr><td><kbd>B</kbd></td><td>스포일러 / 에어브레이크 전개 (양력 감쇄)</td></tr>
               <tr><td><kbd>R</kbd></td><td>역추진 장치 (Reverser - 착륙 후 제동)</td></tr>
-              <tr><td><kbd>C</kbd></td><td>카메라 변경 (콕핏, 3인칭, 윙 뷰, 관제탑, 플라이바이, 랜딩 기어 뷰)</td></tr>
+              <tr><td><kbd>C</kbd></td><td>카메라 변경 (콕핏, 3인칭, 윙 뷰, 관제탑, 플라이바이, 랜딩 기어 뷰, 드론 서클 뷰)</td></tr>
               <tr><td><kbd>마우스 드래그</kbd></td><td>콕핏 내부 자유 시점 (360° 고개 회전)</td></tr>
               <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td>시간대 변경 (새벽, 정오, 석양, 황혼, 야경)</td></tr>
               <tr><td><kbd>M</kbd></td><td>엔진 및 제트기 사운드 음소거/해제</td></tr>

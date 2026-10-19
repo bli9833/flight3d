@@ -1,0 +1,23 @@
+# Task map
+
+Use this table to start a bounded investigation; ARCHITECTURE.md gives broader
+context, while the current implementation defines actual behavior.
+
+| Task | Implementation to read first | Verification |
+| --- | --- | --- |
+| Integration, reset, simulation timing | src/main.js; src/config/simConfig.js | npm test; relevant browser scenario |
+| Aircraft parameters | src/config/aircraftConfigs.js | physics tests; flight scenario |
+| Lift, drag, atmosphere, engines | src/physics/Aerodynamics.js; Atmosphere.js; EngineModel.js | tests/aerodynamics.test.js; atmosphere.test.js; engine.test.js |
+| Gear, collision, touchdown | src/physics/LandingGear.js; CollisionDetector.js | tests/landingGear.test.js; collision.test.js; gearCamAndTouchdown.test.js; npm run test:crash |
+| Keyboard, gamepad, touch input | src/controls/FlightControls.js; TouchFlightControls.js; index.html; style.css | tests/flightControls.test.js; npm run test:mobile |
+| Cameras and framing | src/cameras/CameraSystem.js | tests/gearCamAndTouchdown.test.js; browser screenshots |
+| Autonomous flight and stage transitions | src/director/DemoFlightDirector.js | npm run test:demo; npm run test:flight |
+| Aircraft geometry and cockpit displays | src/aircraft/ | npm run build; cockpit browser screenshots |
+| Terrain, airport, ocean, sky | src/environment/ | npm run build; relevant scene screenshots |
+| Sound | src/audio/FlightAudio.js | browser interaction and listening |
+| Crash and tire effects | src/effects/ | npm run test:crash; screenshots |
+| Events and diagnostics | src/core/EventBus.js; src/ui/DiagnosticsInspector.js | relevant Node tests and browser inspection |
+| CI and agent guidance | package.json; .github/workflows/ci.yml; scripts/check-*.mjs; AGENTS.md | npm run check; npm test; npm run build |
+
+Paths separated by semicolons within one directory refer to that same directory.
+Browser scenario prerequisites and limitations are in [ci.md](ci.md).

@@ -43,3 +43,6 @@ lukla_*.png
 .cache/
 .worktrees/
 .chrome-profile/
+
+# Local Cloudflare state
+.wrangler/

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Cockpit } from './Cockpit.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /**
  * Boeing 737-800 Airliner 3D Model
@@ -14,6 +15,16 @@ export class Boeing737 {
     // Internal cockpit
     this.cockpit = new Cockpit(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas, isfdCanvas, cduCanvas);
     this.group.add(this.cockpit.group);
+
+    // GLTF PBR High-Detail Model references
+    this.gltfModel = null;
+    this.gltfGroup = new THREE.Group();
+    this.gltfGroup.name = 'GLTF_Boeing737';
+    this.gltfGroup.visible = false;
+    this.group.add(this.gltfGroup);
+    this.gltfFans = [];
+    this.useGltf = false;
+    this.modelLoaded = false;
 
     // Control surfaces references
     this.aileronL = null;
@@ -103,6 +114,9 @@ export class Boeing737 {
 
     // 6. Navigation, Strobe & Landing Lights
     this.buildLights();
+
+    // 7. Asynchronous High-Detail GLTF PBR Model Loading with Procedural Fallback
+    this.loadGltfModel('/models/b737-800.glb');
   }
 
   buildFuselage(whiteMat, blueMat, winMat) {
@@ -618,18 +632,96 @@ export class Boeing737 {
       light.intensity = beaconActive ? 6.0 : 0.1;
     });
 
-    // 5. Update Cockpit Interior Controls
+    // 5. GLTF Turbine Fan Spin Animation
+    if (this.gltfFans && this.gltfFans.length > 0 && flightState.engineN1) {
+      const fanAngle = flightState.engineN1 * (Math.PI * 2.0) * 0.08;
+      this.gltfFans.forEach(fan => {
+        fan.rotation.x += fanAngle;
+      });
+    }
+
+    // 6. Update Cockpit Interior Controls
     this.cockpit.updateControls(flightState);
   }
 
-  setCockpitMode(isCockpit) {
-    if (this.fuselageGroup) this.fuselageGroup.visible = !isCockpit;
-    if (this.cockpit && this.cockpit.group) this.cockpit.group.visible = isCockpit;
+  loadGltfModel(url) {
+    if (typeof window === 'undefined') return;
+    try {
+      const loader = new GLTFLoader();
+      loader.load(
+        url,
+        (gltf) => {
+          this.gltfModel = gltf.scene;
+          // Rotate 90° clockwise around Y so nose (-X in raw asset) faces -Z (simulator flight direction)
+          this.gltfModel.rotation.y = Math.PI * 0.5;
+          this.gltfModel.position.set(0, 0, 0);
+
+          // PBR enhancements: cast/receive shadow and tune roughness/metalness
+          this.gltfModel.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              if (child.material) {
+                child.material.roughness = Math.min(child.material.roughness, 0.35);
+                child.material.metalness = Math.max(child.material.metalness, 0.3);
+                child.material.envMapIntensity = 1.35;
+                child.material.needsUpdate = true;
+              }
+            }
+          });
+
+          // Turbine fan blades
+          this.gltfFans = [];
+          const fan1 = this.gltfModel.getObjectByName('tur_01');
+          const fan2 = this.gltfModel.getObjectByName('turbs');
+          if (fan1) this.gltfFans.push(fan1);
+          if (fan2) this.gltfFans.push(fan2);
+
+          this.gltfGroup.add(this.gltfModel);
+          this.gltfGroup.visible = true;
+          this.modelLoaded = true;
+          this.useGltf = true;
+
+          // Switch exterior visibility: hide procedural fuselage and wings, keep landing gear & lights
+          if (this.fuselageGroup) this.fuselageGroup.visible = false;
+          if (this.wingGroup) this.wingGroup.visible = false;
+          if (this.empennageGroup) this.empennageGroup.visible = false;
+          if (this.enginesGroup) this.enginesGroup.visible = false;
+        },
+        undefined,
+        (err) => {
+          // Graceful fallback to procedural model
+          console.warn('GLTF B737 model failed to load, falling back to procedural:', err);
+          this.useGltf = false;
+        }
+      );
+    } catch (e) {
+      this.useGltf = false;
+    }
+  }
+
+  setCockpitMode(isCockpit, showInterior = true) {
+    if (this.useGltf && this.gltfGroup) {
+      this.gltfGroup.visible = !isCockpit;
+    } else {
+      if (this.fuselageGroup) this.fuselageGroup.visible = !isCockpit;
+      if (this.wingGroup) this.wingGroup.visible = !isCockpit;
+      if (this.empennageGroup) this.empennageGroup.visible = !isCockpit;
+      if (this.enginesGroup) this.enginesGroup.visible = !isCockpit;
+    }
+    if (this.cockpit && this.cockpit.group) {
+      this.cockpit.group.visible = isCockpit && showInterior;
+    }
   }
 
   triggerCrashVisuals(collisionType) {
     this.isCrashed = true;
     if (this.lightsGroup) this.lightsGroup.visible = false;
+
+    if (this.gltfGroup) {
+      this.gltfGroup.rotation.z = -0.18;
+      this.gltfGroup.rotation.x = 0.12;
+    }
 
     // Dislocate/damage wing structures upon catastrophic impact
     if (this.wingGroup && this.wingGroup.children.length >= 2) {
@@ -643,6 +735,11 @@ export class Boeing737 {
   resetCrashVisuals() {
     this.isCrashed = false;
     if (this.lightsGroup) this.lightsGroup.visible = this.lightsOn;
+
+    if (this.gltfGroup) {
+      this.gltfGroup.rotation.z = 0;
+      this.gltfGroup.rotation.x = 0;
+    }
 
     // Restore pristine wing geometry
     if (this.wingGroup && this.wingGroup.children.length >= 2) {
