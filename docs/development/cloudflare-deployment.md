@@ -15,11 +15,17 @@ Create → Import a repository, then select `stlim0727/flight3d` and set:
 | Worker name | `flight3d` |
 | Production branch | `main` |
 | Root directory | Repository root |
-| Build command | `npm ci` |
+| Build command | `npm ci && npm run build` |
 | Deploy command | `npx --yes wrangler@4.151.1 deploy` |
-| Node version | `22.23.2` (also declared in `.node-version`) |
+| Non-production deploy command (if enabled) | `npx --yes wrangler@4.151.1 versions upload` |
+| Build variable | `NODE_VERSION=22.23.2` (also declared in `.node-version`) |
 
-`wrangler.toml` runs `npm run build` during deployment and uploads only `dist/`.
+The dashboard build command installs dependencies and generates `dist/` before
+the deploy command runs. `wrangler.toml` uploads only `dist/`. Workers Builds
+[does not honor Wrangler custom builds](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#build-settings),
+so keep `npm run build` in the dashboard build command for both production and
+non-production builds. For a local deployment, run `npm ci && npm run build`
+before the Wrangler deploy command as well.
 The simulator has no backend credentials or required build-time variables.
 Cloudflare provides deployment authentication within Workers Builds.
 Subsequent pushes to `main` automatically rebuild and deploy the connected Worker.
