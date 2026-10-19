@@ -58,6 +58,9 @@ export class Boeing737 {
     this.mainTruckL = null;
     this.mainTruckR = null;
     this.gearDoors = [];
+    this.gearScissors = [];
+    this.gltfGear = null;
+    this.landingGearLoaded = false;
 
     // Lighting
     this.strobeLights = [];
@@ -126,6 +129,7 @@ export class Boeing737 {
 
     // 7. Asynchronous High-Detail GLTF PBR Model Loading with Procedural Fallback
     this.loadGltfModel('/models/b737-800.glb');
+    this.loadLandingGearModel('/models/b737-landing-gear.glb');
   }
 
   buildFuselage(whiteMat, blueMat, winMat) {
@@ -410,11 +414,15 @@ export class Boeing737 {
 
   buildLandingGear() {
     this.gearGroup = new THREE.Group();
+    this.gearDoors = [];
+    this.gearScissors = [];
 
     const strutMat = new THREE.MeshStandardMaterial({ color: 0x88929e, metalness: 0.8, roughness: 0.3 });
     const chromePistonMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.95, roughness: 0.1 });
     const tireMat = new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.9, metalness: 0.1 });
     const rimMat = new THREE.MeshStandardMaterial({ color: 0xdde3ea, metalness: 0.7, roughness: 0.3 });
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0xf4f7fa, roughness: 0.28, metalness: 0.18 });
+    const brakeMat = new THREE.MeshStandardMaterial({ color: 0x2b2e34, metalness: 0.85, roughness: 0.5 });
 
     const makeWheel = (radius, width) => {
       const wheel = new THREE.Group();
@@ -428,6 +436,24 @@ export class Boeing737 {
 
       wheel.add(tire, rim);
       return wheel;
+    };
+
+    const makeScissorsPair = (length, width, parentGroup, rootY, truckRef) => {
+      const linkGeo = new THREE.BoxGeometry(width, length, 0.04);
+      const upperPivot = new THREE.Group();
+      upperPivot.position.set(0, rootY, 0.12);
+      const upperMesh = new THREE.Mesh(linkGeo, strutMat);
+      upperMesh.position.y = -length * 0.5;
+      upperPivot.add(upperMesh);
+
+      const lowerPivot = new THREE.Group();
+      lowerPivot.position.set(0, rootY - length, 0.12);
+      const lowerMesh = new THREE.Mesh(linkGeo, strutMat);
+      lowerMesh.position.y = length * 0.5;
+      lowerPivot.add(lowerMesh);
+
+      parentGroup.add(upperPivot, lowerPivot);
+      this.gearScissors.push({ truck: truckRef, upper: upperPivot, lower: lowerPivot });
     };
 
     // 1. Nose Gear Assembly (Center forward: x=0, y=-0.85m, z=-12.5m)
@@ -452,10 +478,33 @@ export class Boeing737 {
     nWheelR.position.set(0.24, -2.42, 0);
     this.noseTruck.add(nWheelL, nWheelR);
 
+    // Nose Scissors
+    makeScissorsPair(0.35, 0.06, this.noseTruck, -1.6, this.noseTruck);
+
     this.noseGearGroup.add(this.noseTruck);
 
+    // Nose Gear Doors (Left & Right)
+    const nDoorGeo = new THREE.BoxGeometry(0.03, 0.28, 1.8);
+    const noseDoorL = new THREE.Group();
+    noseDoorL.position.set(-0.35, -0.95, 0);
+    const nDoorMeshL = new THREE.Mesh(nDoorGeo, doorMat);
+    nDoorMeshL.position.set(-0.14, 0, 0);
+    noseDoorL.add(nDoorMeshL);
+
+    const noseDoorR = new THREE.Group();
+    noseDoorR.position.set(0.35, -0.95, 0);
+    const nDoorMeshR = new THREE.Mesh(nDoorGeo, doorMat);
+    nDoorMeshR.position.set(0.14, 0, 0);
+    noseDoorR.add(nDoorMeshR);
+
+    this.noseGearGroup.add(noseDoorL, noseDoorR);
+    this.gearDoors.push(
+      { obj: noseDoorL, axis: 'z', side: -1, maxAngle: Math.PI * 0.45 },
+      { obj: noseDoorR, axis: 'z', side: 1, maxAngle: Math.PI * 0.45 }
+    );
+
     // 2. Main Gear Assembly (Left: x=-3.2, Right: x=3.2, z=1.8)
-    const makeMainBogie = (xPos) => {
+    const makeMainBogie = (xPos, isLeft) => {
       const mainGear = new THREE.Group();
       mainGear.position.set(xPos, -0.9, 1.8);
 
@@ -474,14 +523,44 @@ export class Boeing737 {
       wL.position.set(-0.35, -2.40, 0);
       const wR = makeWheel(0.48, 0.32);
       wR.position.set(0.35, -2.40, 0);
-      truck.add(wL, wR);
+
+      // Brake calipers on wheels
+      const brakeGeo = new THREE.CylinderGeometry(0.30, 0.30, 0.08, 12);
+      brakeGeo.rotateZ(Math.PI * 0.5);
+      const bL = new THREE.Mesh(brakeGeo, brakeMat);
+      bL.position.set(-0.18, -2.40, 0);
+      const bR = new THREE.Mesh(brakeGeo, brakeMat);
+      bR.position.set(0.18, -2.40, 0);
+
+      truck.add(wL, wR, bL, bR);
+
+      // Main Scissors
+      makeScissorsPair(0.42, 0.08, truck, -1.5, truck);
 
       mainGear.add(truck);
+
+      // Inboard Keel Gear Door
+      const mDoorGeo = new THREE.BoxGeometry(0.85, 0.04, 1.6);
+      const sideSign = isLeft ? -1 : 1;
+      const mainDoor = new THREE.Group();
+      mainDoor.position.set(-sideSign * 1.0, -0.95, 0);
+      const mDoorMesh = new THREE.Mesh(mDoorGeo, doorMat);
+      mDoorMesh.position.set(sideSign * 0.42, 0, 0);
+      mainDoor.add(mDoorMesh);
+      mainGear.add(mainDoor);
+
+      this.gearDoors.push({
+        obj: mainDoor,
+        axis: 'z',
+        side: sideSign,
+        maxAngle: Math.PI * 0.42
+      });
+
       return { root: mainGear, truck };
     };
 
-    const mainL = makeMainBogie(-3.2);
-    const mainR = makeMainBogie(3.2);
+    const mainL = makeMainBogie(-3.2, true);
+    const mainR = makeMainBogie(3.2, false);
 
     this.mainGearLGroup = mainL.root;
     this.mainTruckL = mainL.truck;
@@ -611,6 +690,22 @@ export class Boeing737 {
       this.mainGearRGroup.rotation.z = (1.0 - gearState) * (Math.PI * 0.5);
     }
 
+    // Gear Doors Articulation (flush when gearState <= 0.05, open during transit and down)
+    if (this.gearDoors && this.gearDoors.length > 0) {
+      const transitSine = Math.sin(Math.min(1.0, Math.max(0.0, gearState)) * Math.PI);
+      const doorOpen = gearState > 0.05 ? Math.max(gearState, transitSine) : 0.0;
+      for (const item of this.gearDoors) {
+        if (item.obj) {
+          const targetAngle = (item.side * doorOpen * item.maxAngle) || 0;
+          if (item.axis === 'z') {
+            item.obj.rotation.z = targetAngle;
+          } else if (item.axis === 'x') {
+            item.obj.rotation.x = targetAngle;
+          }
+        }
+      }
+    }
+
     // Dynamic Oleo Strut Suspension Squat ("털썩" 하중 압축)
     if (gearState > 0.8 && flightState.compressions) {
       const compNose = Math.min(0.9, Math.max(0, flightState.compressions.nose || 0));
@@ -624,6 +719,15 @@ export class Boeing737 {
       if (this.noseTruck) this.noseTruck.position.y = 0;
       if (this.mainTruckL) this.mainTruckL.position.y = 0;
       if (this.mainTruckR) this.mainTruckR.position.y = 0;
+    }
+
+    // Dynamic Scissors torque link folding
+    if (this.gearScissors && this.gearScissors.length > 0) {
+      for (const item of this.gearScissors) {
+        const comp = item.truck ? (item.truck.position.y || 0) : 0;
+        if (item.upper) item.upper.rotation.x = (-comp * 0.7) || 0;
+        if (item.lower) item.lower.rotation.x = (comp * 0.7) || 0;
+      }
     }
 
     // 4. Strobe & Beacon Flashing Animation
@@ -731,6 +835,119 @@ export class Boeing737 {
       if (this.empennageGroup) this.empennageGroup.visible = !this.isCockpit;
       if (this.enginesGroup) this.enginesGroup.visible = !this.isCockpit;
     }
+  }
+
+  loadLandingGearModel(url = '/models/b737-landing-gear.glb') {
+    if (typeof window === 'undefined') return;
+    try {
+      const loader = new GLTFLoader();
+      loader.load(
+        url,
+        (gltf) => {
+          this.bindGltfLandingGear(gltf.scene);
+        },
+        undefined,
+        (err) => {
+          console.warn('GLTF Landing gear failed to load, retaining procedural gear:', err);
+        }
+      );
+    } catch (e) {
+      console.warn('GLTF Landing gear exception:', e);
+    }
+  }
+
+  bindGltfLandingGear(scene) {
+    if (!scene) return;
+    this.gltfGear = scene;
+    this.gltfGear.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) {
+          child.material.envMapIntensity = 1.35;
+          child.material.needsUpdate = true;
+        }
+      }
+    });
+
+    const gltfNose = scene.getObjectByName('NoseGear');
+    const gltfMainL = scene.getObjectByName('MainGearL');
+    const gltfMainR = scene.getObjectByName('MainGearR');
+
+    if (!gltfNose || !gltfMainL || !gltfMainR) return;
+
+    // Helper to wrap wheel group in THREE.Group so truck.children.find(c => c.isGroup) is preserved
+    const wrapWheelGroup = (truck, groupName, posY) => {
+      const orig = truck.getObjectByName(groupName);
+      if (!orig) return;
+      const g = new THREE.Group();
+      g.name = groupName;
+      g.position.set(0, posY, 0);
+      while (orig.children.length > 0) {
+        g.add(orig.children[0]);
+      }
+      truck.remove(orig);
+      truck.add(g);
+    };
+
+    // Swap procedural geometry with high-detail GLTF geometry inside root groups
+    if (this.noseGearGroup) {
+      this.noseGearGroup.clear();
+      while (gltfNose.children.length > 0) {
+        this.noseGearGroup.add(gltfNose.children[0]);
+      }
+      this.noseTruck = this.noseGearGroup.getObjectByName('NoseTruck') || this.noseTruck;
+      if (this.noseTruck) wrapWheelGroup(this.noseTruck, 'NoseWheelGroup', -2.42);
+    }
+
+    if (this.mainGearLGroup) {
+      this.mainGearLGroup.clear();
+      while (gltfMainL.children.length > 0) {
+        this.mainGearLGroup.add(gltfMainL.children[0]);
+      }
+      this.mainTruckL = this.mainGearLGroup.getObjectByName('MainTruckL') || this.mainTruckL;
+      if (this.mainTruckL) wrapWheelGroup(this.mainTruckL, 'MainWheelGroupL', -2.40);
+    }
+
+    if (this.mainGearRGroup) {
+      this.mainGearRGroup.clear();
+      while (gltfMainR.children.length > 0) {
+        this.mainGearRGroup.add(gltfMainR.children[0]);
+      }
+      this.mainTruckR = this.mainGearRGroup.getObjectByName('MainTruckR') || this.mainTruckR;
+      if (this.mainTruckR) wrapWheelGroup(this.mainTruckR, 'MainWheelGroupR', -2.40);
+    }
+
+    // Bind doors and scissors
+    this.gearDoors = [];
+    const nDoorL = this.noseGearGroup?.getObjectByName('NoseDoorL');
+    const nDoorR = this.noseGearGroup?.getObjectByName('NoseDoorR');
+    const mDoorL = this.mainGearLGroup?.getObjectByName('MainDoorL');
+    const mDoorR = this.mainGearRGroup?.getObjectByName('MainDoorR');
+
+    if (nDoorL) this.gearDoors.push({ obj: nDoorL, axis: 'z', side: -1, maxAngle: Math.PI * 0.45 });
+    if (nDoorR) this.gearDoors.push({ obj: nDoorR, axis: 'z', side: 1, maxAngle: Math.PI * 0.45 });
+    if (mDoorL) this.gearDoors.push({ obj: mDoorL, axis: 'z', side: 1, maxAngle: Math.PI * 0.42 });
+    if (mDoorR) this.gearDoors.push({ obj: mDoorR, axis: 'z', side: -1, maxAngle: Math.PI * 0.42 });
+
+    this.gearScissors = [];
+    if (this.noseTruck) {
+      const up = this.noseTruck.getObjectByName('NoseScissorsUpper');
+      const low = this.noseTruck.getObjectByName('NoseScissorsLower');
+      if (up && low) this.gearScissors.push({ truck: this.noseTruck, upper: up, lower: low });
+    }
+    if (this.mainTruckL) {
+      const up = this.mainTruckL.getObjectByName('MainScissorsUpperL');
+      const low = this.mainTruckL.getObjectByName('MainScissorsLowerL');
+      if (up && low) this.gearScissors.push({ truck: this.mainTruckL, upper: up, lower: low });
+    }
+    if (this.mainTruckR) {
+      const up = this.mainTruckR.getObjectByName('MainScissorsUpperR');
+      const low = this.mainTruckR.getObjectByName('MainScissorsLowerR');
+      if (up && low) this.gearScissors.push({ truck: this.mainTruckR, upper: up, lower: low });
+    }
+
+    this.landingGearLoaded = true;
   }
 
   setCockpitMode(isCockpit, showInterior = true) {
