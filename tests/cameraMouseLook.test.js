@@ -324,4 +324,282 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       assert.ok(camSys.lookYaw < initialYaw, 'update() should execute edge pan when dragging at edge');
     });
   });
+
+  describe('Mobile Touch Drag Look & Gestures (모바일 터치 시선 변경)', () => {
+    it('should initialize mobile touch state variables', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+
+      assert.strictEqual(camSys.activeTouchId, null);
+      assert.strictEqual(camSys.isPinching, false);
+      assert.strictEqual(camSys.pinchDistance, 0);
+      assert.strictEqual(camSys.lastTapTime, 0);
+      assert.strictEqual(camSys.isDragging, false);
+    });
+
+    it('should rotate cockpit gaze (yaw and pitch) on single-finger touch drag', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      const canvasTarget = { closest: () => null };
+
+      // Touch down at (500, 300)
+      camSys.handleTouchStart({
+        touches: [{ identifier: 101, clientX: 500, clientY: 300, target: canvasTarget }],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+
+      assert.strictEqual(camSys.activeTouchId, 101);
+      assert.strictEqual(camSys.isDragging, true);
+      assert.strictEqual(camSys.prevMouse.x, 500);
+      assert.strictEqual(camSys.prevMouse.y, 300);
+
+      const initialYaw = camSys.lookYaw;
+      const initialPitch = camSys.lookPitch;
+
+      // Drag right by 100px, drag down by 80px (clientX: 600, clientY: 380)
+      camSys.handleTouchMove({
+        touches: [{ identifier: 101, clientX: 600, clientY: 380, target: canvasTarget }],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+
+      assert.ok(camSys.lookYaw < initialYaw, 'lookYaw should decrease (turn head right) on right drag');
+      assert.ok(camSys.lookPitch < initialPitch, 'lookPitch should decrease (tilt head down) on downward drag');
+      assert.strictEqual(camSys.prevMouse.x, 600);
+      assert.strictEqual(camSys.prevMouse.y, 380);
+
+      // Touch end
+      camSys.handleTouchEnd({
+        touches: [],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+
+      assert.strictEqual(camSys.activeTouchId, null);
+      assert.strictEqual(camSys.isDragging, false);
+    });
+
+    it('should orbit chase camera in 360° on single-finger touch drag in CHASE mode', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.CHASE);
+
+      const canvasTarget = { closest: () => null };
+
+      // Touch down at (400, 200)
+      camSys.handleTouchStart({
+        touches: [{ identifier: 202, clientX: 400, clientY: 200, target: canvasTarget }],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+
+      assert.strictEqual(camSys.chaseYaw, 0);
+      assert.strictEqual(camSys.chasePitch, 0);
+
+      // Drag left by 120px (clientX: 280) -> chaseYaw increases
+      camSys.handleTouchMove({
+        touches: [{ identifier: 202, clientX: 280, clientY: 200, target: canvasTarget }],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+
+      assert.ok(camSys.chaseYaw > 0, `chaseYaw (${camSys.chaseYaw}) should increase on dragging left`);
+
+      camSys.handleTouchEnd({ touches: [] });
+      assert.strictEqual(camSys.isDragging, false);
+    });
+
+    it('should adjust look angles in WING, DRONE, and GEAR modes on touch drag', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      const canvasTarget = { closest: () => null };
+
+      // WING mode
+      camSys.setMode(CameraSystem.MODES.WING);
+      camSys.handleTouchStart({
+        touches: [{ identifier: 301, clientX: 300, clientY: 300, target: canvasTarget }],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+      camSys.handleTouchMove({
+        touches: [{ identifier: 301, clientX: 350, clientY: 260, target: canvasTarget }]
+      });
+      assert.ok(camSys.wingLookYaw < 0, 'wingLookYaw should adjust on touch drag');
+      assert.ok(camSys.wingLookPitch > 0, 'wingLookPitch should adjust on touch drag');
+      camSys.handleTouchEnd({ touches: [] });
+
+      // DRONE mode
+      camSys.setMode(CameraSystem.MODES.DRONE);
+      const initialDroneAngle = camSys.droneOrbitAngle;
+      const initialDroneHeight = camSys.droneHeight;
+      camSys.handleTouchStart({
+        touches: [{ identifier: 302, clientX: 300, clientY: 300, target: canvasTarget }],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+      camSys.handleTouchMove({
+        touches: [{ identifier: 302, clientX: 250, clientY: 340, target: canvasTarget }]
+      });
+      assert.ok(camSys.droneOrbitAngle > initialDroneAngle, 'droneOrbitAngle should increase on left touch drag');
+      assert.ok(camSys.droneHeight > initialDroneHeight, 'droneHeight should increase on downward touch drag');
+      camSys.handleTouchEnd({ touches: [] });
+    });
+
+    it('should ignore touchstart on interactive UI elements and touch flight controls', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      // Mock UI element inside .touch-stick-card
+      const stickTarget = {
+        closest: (selector) => selector.includes('.touch-stick-card') ? stickTarget : null
+      };
+
+      camSys.handleTouchStart({
+        touches: [{ identifier: 401, clientX: 800, clientY: 350, target: stickTarget }]
+      });
+
+      assert.strictEqual(camSys.activeTouchId, null, 'activeTouchId must remain null when touching stick');
+      assert.strictEqual(camSys.isDragging, false, 'isDragging must remain false when touching flight controls');
+    });
+
+    it('should allow camera touch look when another finger is holding the flight stick (multi-touch)', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      const stickTarget = {
+        closest: (selector) => selector.includes('.touch-stick-card') ? stickTarget : null
+      };
+      const canvasTarget = {
+        closest: () => null
+      };
+
+      // Two touches: Touch 1 on flight stick, Touch 2 on canvas
+      camSys.handleTouchStart({
+        touches: [
+          { identifier: 501, clientX: 800, clientY: 350, target: stickTarget },
+          { identifier: 502, clientX: 300, clientY: 200, target: canvasTarget }
+        ],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+
+      // CameraSystem should isolate the non-UI touch (identifier 502)
+      assert.strictEqual(camSys.activeTouchId, 502, 'Camera should track the canvas touch identifier');
+      assert.strictEqual(camSys.isDragging, true);
+      assert.strictEqual(camSys.isPinching, false);
+
+      const initialYaw = camSys.lookYaw;
+
+      // Finger 2 drags to the right (clientX: 400)
+      camSys.handleTouchMove({
+        touches: [
+          { identifier: 501, clientX: 820, clientY: 360, target: stickTarget },
+          { identifier: 502, clientX: 400, clientY: 200, target: canvasTarget }
+        ],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+
+      assert.ok(camSys.lookYaw < initialYaw, 'lookYaw should turn right with multi-touch camera finger');
+
+      // Finger 2 lifts up while stick touch 501 remains
+      camSys.handleTouchEnd({
+        touches: [
+          { identifier: 501, clientX: 820, clientY: 360, target: stickTarget }
+        ]
+      });
+
+      assert.strictEqual(camSys.activeTouchId, null);
+      assert.strictEqual(camSys.isDragging, false);
+    });
+
+    it('should perform two-finger pinch-to-zoom on camera distance in CHASE and DRONE modes', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.CHASE);
+
+      const canvasTarget = { closest: () => null };
+
+      // Initial chase distance is 55.0
+      assert.strictEqual(camSys.chaseDistance, 55.0);
+
+      // Two fingers touch down 100px apart: (300, 200) and (400, 200)
+      camSys.handleTouchStart({
+        touches: [
+          { identifier: 601, clientX: 300, clientY: 200, target: canvasTarget },
+          { identifier: 602, clientX: 400, clientY: 200, target: canvasTarget }
+        ],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+
+      assert.strictEqual(camSys.isPinching, true);
+      assert.strictEqual(camSys.isDragging, false);
+      assert.strictEqual(camSys.activeTouchId, null);
+      assert.strictEqual(Math.round(camSys.pinchDistance), 100);
+
+      // Pinch out (spread fingers apart to 180px -> deltaDist = +80px) -> zooms closer
+      camSys.handleTouchMove({
+        touches: [
+          { identifier: 601, clientX: 260, clientY: 200, target: canvasTarget },
+          { identifier: 602, clientX: 440, clientY: 200, target: canvasTarget }
+        ],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+
+      assert.ok(camSys.chaseDistance < 55.0, `chaseDistance (${camSys.chaseDistance}) should decrease (zoom in) on pinch out`);
+
+      // Pinch end
+      camSys.handleTouchEnd({
+        touches: []
+      });
+
+      assert.strictEqual(camSys.isPinching, false);
+    });
+
+    it('should reset camera look orientation on double tap within 350ms', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+      let resetCount = 0;
+      camSys.onResetLook = () => { resetCount++; };
+
+      // Mutate look angles
+      camSys.lookYaw = 0.85;
+      camSys.lookPitch = 0.35;
+
+      const canvasTarget = { closest: () => null };
+
+      // First tap at (400, 300) without drag
+      camSys.handleTouchStart({
+        touches: [{ identifier: 701, clientX: 400, clientY: 300, target: canvasTarget }],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+      camSys.handleTouchEnd({ touches: [] });
+
+      assert.strictEqual(camSys.lookYaw, 0.85);
+
+      // Second tap within 100ms at same spot (402, 301)
+      camSys.handleTouchStart({
+        touches: [{ identifier: 702, clientX: 402, clientY: 301, target: canvasTarget }],
+        cancelable: true,
+        preventDefault: () => {}
+      });
+
+      // Should have triggered resetLook() and onResetLook callback
+      assert.strictEqual(camSys.lookYaw, 0, 'lookYaw should be reset to 0');
+      assert.strictEqual(camSys.lookPitch, -0.25, 'lookPitch should be reset to -0.25');
+      assert.strictEqual(resetCount, 1, 'onResetLook callback should be fired');
+      assert.strictEqual(camSys.isDragging, false);
+    });
+  });
 });
+

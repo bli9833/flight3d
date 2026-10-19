@@ -17,7 +17,7 @@ import path from 'node:path';
 const PORT = 5173;
 const CDP_PORT = 9458;
 const SIM_URL = `http://localhost:${PORT}/`;
-const ARTIFACT_DIR = process.env.ARTIFACT_DIR || '/home/stlim/.gemini/antigravity-cli/brain/ad33c4b1-3b1c-4752-ad5e-b09f9794851b';
+const ARTIFACT_DIR = process.env.ARTIFACT_DIR || process.cwd();
 
 class MobileTouchTestRunner {
   constructor() {
@@ -242,11 +242,16 @@ class MobileTouchTestRunner {
     const screenshot = await this.send('Page.captureScreenshot', { format: 'png' });
     const buffer = Buffer.from(screenshot.data, 'base64');
     
-    const outPathArtifact = path.join(ARTIFACT_DIR, 'mobile_touch_controls_showcase.png');
     const outPathWorkspace = path.join(process.cwd(), 'mobile_touch_controls_showcase.png');
-    fs.writeFileSync(outPathArtifact, buffer);
     fs.writeFileSync(outPathWorkspace, buffer);
-    this.log(`Saved mobile touch controls showcase: ${outPathArtifact} (${(buffer.length / 1024).toFixed(1)} KB)`, '🎉');
+    if (ARTIFACT_DIR && ARTIFACT_DIR !== process.cwd()) {
+      try {
+        fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+        const outPathArtifact = path.join(ARTIFACT_DIR, 'mobile_touch_controls_showcase.png');
+        fs.writeFileSync(outPathArtifact, buffer);
+      } catch (_) {}
+    }
+    this.log(`Saved mobile touch controls showcase: ${outPathWorkspace} (${(buffer.length / 1024).toFixed(1)} KB)`, '🎉');
 
     // 6. Test Quick Action Buttons (Gear cycle, Camera cycle)
     this.log('Testing Touch Quick Action buttons (Gear & Camera cycle)...', '🎥');
@@ -258,6 +263,84 @@ class MobileTouchTestRunner {
     `);
     const newCamMode = await this.evaluate('window.simulator.cameraSystem.getModeName()');
     this.log(`Camera mode after touch button: ${newCamMode}`, '✨');
+
+    // 7. Test Mobile Touch Drag Look & Gestures (모바일 터치 시선 드래그 변경 및 리셋 검증)
+    this.log('Testing Mobile Touch Drag Look (Cockpit Look Drag & Double-Tap Reset)...', '👁️');
+    const touchDragResult = await this.evaluate(`
+      (() => {
+        const sim = window.simulator;
+        const cam = sim.cameraSystem;
+        cam.setMode(0); // COCKPIT
+        cam.resetLook();
+        const initialYaw = cam.lookYaw;
+        const initialPitch = cam.lookPitch;
+
+        // Simulate single-finger touch drag on canvas
+        const canvas = sim.renderer.domElement;
+        const t0 = { identifier: 991, clientX: 460, clientY: 200, target: canvas };
+        cam.handleTouchStart({ touches: [t0], cancelable: true, preventDefault: () => {} });
+
+        const t1 = { identifier: 991, clientX: 560, clientY: 260, target: canvas };
+        cam.handleTouchMove({ touches: [t1], cancelable: true, preventDefault: () => {} });
+        cam.handleTouchEnd({ touches: [] });
+
+        const draggedYaw = cam.lookYaw;
+        const draggedPitch = cam.lookPitch;
+
+        // Simulate double-tap reset
+        cam.handleTouchStart({ touches: [{ identifier: 992, clientX: 500, clientY: 200, target: canvas }], cancelable: true, preventDefault: () => {} });
+        cam.handleTouchEnd({ touches: [] });
+        cam.handleTouchStart({ touches: [{ identifier: 993, clientX: 502, clientY: 201, target: canvas }], cancelable: true, preventDefault: () => {} });
+        cam.handleTouchEnd({ touches: [] });
+
+        const resetYaw = cam.lookYaw;
+        const resetPitch = cam.lookPitch;
+
+        return {
+          initialYaw,
+          initialPitch,
+          draggedYaw,
+          draggedPitch,
+          resetYaw,
+          resetPitch,
+          yawChanged: draggedYaw !== initialYaw,
+          pitchChanged: draggedPitch !== initialPitch,
+          yawReset: resetYaw === initialYaw,
+          pitchReset: resetPitch === initialPitch
+        };
+      })()
+    `);
+    this.log(`Touch Drag Look result: ${JSON.stringify(touchDragResult)}`, '📊');
+    if (!touchDragResult.yawChanged || !touchDragResult.pitchChanged || !touchDragResult.yawReset || !touchDragResult.pitchReset) {
+      throw new Error('Mobile touch drag look or double-tap reset verification failed');
+    }
+
+    // 8. Test Mobile Touch Drag Look in Chase Mode (360° Orbit)
+    this.log('Testing Mobile Touch Drag in Chase Mode (360° Orbit)...', '🛰️');
+    const chaseTouchResult = await this.evaluate(`
+      (() => {
+        const sim = window.simulator;
+        const cam = sim.cameraSystem;
+        cam.setMode(1); // CHASE
+        cam.resetLook();
+        const initialChaseYaw = cam.chaseYaw;
+
+        const canvas = sim.renderer.domElement;
+        cam.handleTouchStart({ touches: [{ identifier: 994, clientX: 400, clientY: 200, target: canvas }], cancelable: true, preventDefault: () => {} });
+        cam.handleTouchMove({ touches: [{ identifier: 994, clientX: 280, clientY: 200, target: canvas }], cancelable: true, preventDefault: () => {} });
+        cam.handleTouchEnd({ touches: [] });
+
+        return {
+          initialChaseYaw,
+          finalChaseYaw: cam.chaseYaw,
+          orbited: cam.chaseYaw > initialChaseYaw
+        };
+      })()
+    `);
+    this.log(`Chase mode touch orbit result: ${JSON.stringify(chaseTouchResult)}`, '📊');
+    if (!chaseTouchResult.orbited) {
+      throw new Error('Chase camera touch orbit failed');
+    }
 
     // Stop demo if running so test exits cleanly
     await this.evaluate('window.simulator.demoDirector.stop()');
