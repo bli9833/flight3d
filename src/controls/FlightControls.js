@@ -17,6 +17,7 @@ export class FlightControls {
     this.pitchTrim = 2.0;   // Degrees
     this.pitchTrimRate = 0.0;
     this.brakes = 0.0;      // 0.0 to 1.0
+    this.parkingBrake = false;
     this.mouseControl = false;
 
     // Virtual inputs for AI agent / Autopilot / Test harness
@@ -196,17 +197,29 @@ export class FlightControls {
       this.pitchTrim -= dt * 1.5;
       this.pitchTrimRate = -1.0;
     }
-    this.pitchTrim = Math.max(-4.0, Math.min(12.0, this.pitchTrim));
+    // Auto-release parking brake when pilot applies substantial forward throttle (> 25%)
+    if (this.parkingBrake && this.throttle > 0.25) {
+      this.parkingBrake = false;
+    }
 
-    // 6. Wheel Brakes (Spacebar or Virtual/Touch Brakes)
+    // 6. Wheel Brakes (Spacebar, Virtual/Touch Brakes, or Parking Brake)
     if (this.keys['Space']) {
       this.brakes = 1.0;
     } else if (this.virtualBrakes !== null && this.virtualBrakes !== undefined) {
       this.brakes = this.virtualBrakes;
     } else if (this.touchBrakes > 0) {
       this.brakes = this.touchBrakes;
+    } else if (this.parkingBrake) {
+      this.brakes = 1.0;
     } else {
       this.brakes = 0.0;
+    }
+  }
+
+  setParkingBrake(enabled) {
+    this.parkingBrake = Boolean(enabled);
+    if (this.parkingBrake) {
+      this.brakes = 1.0;
     }
   }
 

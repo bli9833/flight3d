@@ -24,6 +24,12 @@ function createMockSimulator() {
       isTransit: false
     },
     controls: {
+      brakes: 0.0,
+      parkingBrake: false,
+      setParkingBrake: function(v) {
+        this.parkingBrake = Boolean(v);
+        if (this.parkingBrake) this.brakes = 1.0;
+      },
       setVirtualInput: (k, v) => { virtualInputs[k] = v; },
       clearVirtualInputs: () => {
         for (const k of Object.keys(virtualInputs)) delete virtualInputs[k];
@@ -35,7 +41,8 @@ function createMockSimulator() {
       setReverser: () => {}
     },
     gear: {
-      setBrakes: () => {},
+      brakes: 0.0,
+      setBrakes: function(v) { this.brakes = v; },
       setGearTarget: () => {}
     },
     aero: {
@@ -106,6 +113,9 @@ describe('LuklaCircuitScenario (Continuous Circuit Flight without Teleportation)
     director.stageTimer = 8.5;
     director.update(0.1);
     assert.strictEqual(director.isActive, false);
+    assert.strictEqual(sim.controls.parkingBrake, true, 'Parking brake must be set upon Lukla rollout completion to prevent backward slope rollback');
+    assert.strictEqual(sim.controls.brakes, 1.0);
+    assert.strictEqual(sim.gear.brakes, 1.0);
     assert.strictEqual(midflightPresetCalled, false, 'The entire circuit must complete with zero mid-flight teleportation');
   });
 

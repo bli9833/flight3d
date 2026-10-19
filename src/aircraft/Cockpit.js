@@ -950,6 +950,11 @@ export class Cockpit {
       if (this.trimWheelL) this.trimWheelL.rotation.x += flightState.pitchTrimRate * 0.1;
       if (this.trimWheelR) this.trimWheelR.rotation.x += flightState.pitchTrimRate * 0.1;
     }
+
+    // 8. Parking Brake Handle
+    if (this.parkBrakeHandle) {
+      this.parkBrakeHandle.rotation.x = flightState.parkBrake ? 0.45 : 0.15;
+    }
   }
 
   /**

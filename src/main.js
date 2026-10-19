@@ -191,7 +191,8 @@ class FlightSimulator {
       touchdown: false,
       onGround: true,
       x: 0,
-      z: 0
+      z: 0,
+      parkBrake: false
     };
 
     // Autopilot simple leveler / heading hold
@@ -458,6 +459,7 @@ class FlightSimulator {
     }
 
     this.controls.clearVirtualInputs();
+    this.controls.setParkingBrake?.(false);
     this.controls.brakes = 0.0;
     this.gear.setBrakes(0.0);
     this.physicsAccumulator = 0;
@@ -753,7 +755,8 @@ class FlightSimulator {
       throttle: this.controls.throttle,
       pitchTrim: this.aero.pitchTrim,
       x: this.position.x,
-      z: this.position.z
+      z: this.position.z,
+      parkBrake: Boolean(this.controls.parkingBrake || (gearResult.onGround && this.controls.brakes > 0.8 && Atmosphere.msToKnots(groundSpeed) < 1.0))
     };
 
     // 11. Touchdown Tire Smoke & Landing Contact Gate
