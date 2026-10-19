@@ -204,11 +204,14 @@ class FlightSimulator {
     // Resize handler
     window.addEventListener('resize', () => this.handleResize());
 
-    // Click to start audio context
-    window.addEventListener('click', () => {
+    // Start audio context on first user interaction (touch, pointer, click, keydown)
+    const unlockAudio = () => {
       this.audio.init();
       this.audio.ensureContextRunning();
-    }, { once: true });
+    };
+    ['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, unlockAudio, { once: true, passive: true });
+    });
 
     // Begin Animation Loop
     this.animate = this.animate.bind(this);
@@ -219,6 +222,11 @@ class FlightSimulator {
   }
 
   initControls() {
+    this.controls.onUserInteract = () => {
+      this.audio.init();
+      this.audio.ensureContextRunning();
+    };
+
     this.controls.onToggleGear = () => {
       this.gear.toggleGear();
     };
@@ -260,9 +268,9 @@ class FlightSimulator {
     this.controls.onToggleAudio = () => {
       this.audio.init();
       this.audio.ensureContextRunning();
-      const muted = !this.audio.isMuted;
-      this.audio.setMuted(muted);
-      this.showToast(`Sound: ${muted ? 'MUTED' : 'UNMUTED'}`);
+      const state = this.audio.cycleVolume();
+      this.updateAudioUI(state);
+      this.showToast(`사운드: ${state.text}`);
     };
   }
 
@@ -1034,6 +1042,34 @@ class FlightSimulator {
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
   }
 
+  updateAudioUI(state) {
+    if (!state && this.audio) state = this.audio.getVolumeState();
+    if (!state) return;
+
+    const btnSound = document.getElementById('btn-sound');
+    if (btnSound) {
+      if (state.muted) {
+        btnSound.className = 'btn btn-preset btn-sound-toggle muted';
+        btnSound.textContent = '🔇 음소거 [M]';
+      } else if (state.boost) {
+        btnSound.className = 'btn btn-preset btn-sound-toggle active-boost';
+        btnSound.textContent = '🔊⚡ 부스트 (150%)';
+      } else {
+        btnSound.className = 'btn btn-preset btn-sound-toggle';
+        btnSound.textContent = '🔊 소리: 100% [M]';
+      }
+    }
+
+    const btnSoundAction = document.getElementById('btn-sound-action');
+    if (btnSoundAction) {
+      btnSoundAction.textContent = state.muted ? '🔇 음소거' : (state.boost ? '🔊⚡ 150%' : '🔊 볼륨 [M]');
+    }
+
+    if (this.touchControls && typeof this.touchControls.updateAudioUI === 'function') {
+      this.touchControls.updateAudioUI(state);
+    }
+  }
+
   showToast(msg) {
     const toast = document.getElementById('toast-msg');
     if (!toast) return;
@@ -1068,6 +1104,7 @@ class FlightSimulator {
     });
     document.getElementById('btn-time')?.addEventListener('click', () => this.controls.onCycleTimeOfDay(3.0));
     document.getElementById('btn-sound')?.addEventListener('click', () => this.controls.onToggleAudio());
+    document.getElementById('btn-sound-action')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-diag')?.addEventListener('click', () => this.diagnostics.toggle());
     document.getElementById('btn-touch-toggle')?.addEventListener('click', () => {
       this.touchControls.toggle();
@@ -1081,6 +1118,9 @@ class FlightSimulator {
 
     // Initialize Demo Director UI bindings
     this.demoDirector.initUI();
+
+    // Initialize Audio UI state
+    this.updateAudioUI();
 
     // Flight Guide Modal
     const helpModal = document.getElementById('help-modal');
