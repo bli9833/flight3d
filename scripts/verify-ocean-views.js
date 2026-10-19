@@ -2,10 +2,10 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SIM_PORT = 5173;
-const CDP_PORT = 9234;
-const SIM_URL = `http://127.0.0.1:${SIM_PORT}/`;
-const OUTPUT_DIR = process.env.ARTIFACT_DIR || '/home/bli/.gemini/antigravity-cli/brain/a3ad2ff1-feab-42d2-8534-a320d9e30f37';
+const PORT = 5173;
+const CDP_PORT = 9463;
+const SIM_URL = `http://localhost:${PORT}/`;
+const OUTPUT_DIR = process.env.ARTIFACT_DIR || process.cwd();
 
 async function main() {
   console.log('🌊 Verifying Ocean Water Camera Anchoring & Far Edge Horizon Blending...');
@@ -19,6 +19,7 @@ async function main() {
     '--use-gl=angle',
     '--use-angle=swiftshader',
     '--enable-unsafe-swiftshader',
+    '--no-sandbox',
     '--no-first-run',
     SIM_URL
   ];
@@ -35,7 +36,7 @@ async function main() {
 
   // Wait for Chrome to bind port
   let connected = false;
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 30; i++) {
     try {
       const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/list`);
       if (res.ok) {
@@ -85,6 +86,15 @@ async function main() {
     });
   }
 
+  async function evalJs(expression, returnByValue = true) {
+    const res = await send('Runtime.evaluate', { expression, returnByValue, awaitPromise: true });
+    if (res.exceptionDetails) {
+      const desc = res.exceptionDetails.exception?.description || res.exceptionDetails.text;
+      throw new Error(`Browser eval error: ${desc}\nExpression: ${expression}`);
+    }
+    return returnByValue ? res.result?.value : res.result;
+  }
+
   await send('Runtime.enable');
   await send('Page.enable');
 
@@ -92,11 +102,8 @@ async function main() {
   console.log('⏳ Waiting for 3D simulator to boot...');
   let simReady = false;
   for (let i = 0; i < 30; i++) {
-    const evalRes = await send('Runtime.evaluate', {
-      expression: 'Boolean((window.sim || window.simulator) && (window.sim || window.simulator).water && (window.sim || window.simulator).aircraft)',
-      returnByValue: true
-    });
-    if (evalRes && evalRes.result && evalRes.result.value) {
+    const isReady = await evalJs('Boolean((window.sim || window.simulator) && (window.sim || window.simulator).water && (window.sim || window.simulator).aircraft)');
+    if (isReady) {
       simReady = true;
       break;
     }
@@ -109,18 +116,16 @@ async function main() {
   }
 
   console.log('✅ Simulator loaded and initialized!');
-  await send('Runtime.evaluate', { expression: 'window.sim = window.sim || window.simulator;' });
+  await evalJs('window.sim = window.sim || window.simulator;');
 
   // Test Case 1: Cruise preset (Z = 3200) - Verify Chase view over coastal ocean
   console.log('📸 Capturing View 1: Cruise over coastal ocean (Z = 3200)...');
-  await send('Runtime.evaluate', {
-    expression: `
-      window.sim.setPreset('CRUISE');
-      window.sim.cameraSystem.setMode('CHASE');
-      // Advance physics frames
-      for (let i = 0; i < 30; i++) window.sim.stepSimulation(0.016);
-    `
-  });
+  await evalJs(`
+    window.sim.setPreset('cruise');
+    window.sim.cameraSystem.setMode(1); // CHASE
+    // Advance physics frames
+    for (let i = 0; i < 30; i++) window.sim.stepSimulation(0.016);
+  `);
   await new Promise(r => setTimeout(r, 600));
 
   const screenshot1 = await send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
@@ -130,28 +135,24 @@ async function main() {
 
   // Test Case 2: Boundary test - Position plane at Z = 17,500 (where previously the 36km mesh cut off!)
   console.log('📸 Capturing View 2: Former mesh boundary test (Z = 17,500)...');
-  await send('Runtime.evaluate', {
-    expression: `
-      window.sim.position.set(0, 1500, 17500);
-      window.sim.velocity.set(0, 0, 220);
-      window.sim.rotation.set(0, 0, 0);
-      window.sim.cameraSystem.setMode('CHASE');
-      // Step simulation to trigger cameraSystem and water anchoring
-      for (let i = 0; i < 30; i++) window.sim.stepSimulation(0.016);
-    `
-  });
+  await evalJs(`
+    window.sim.position.set(0, 1500, 17500);
+    window.sim.linearVelocity.set(0, 0, 220);
+    window.sim.quaternion.set(0, 0, 0, 1);
+    window.sim.angularVelocity.set(0, 0, 0);
+    window.sim.cameraSystem.setMode(1); // CHASE
+    // Step simulation to trigger cameraSystem and water anchoring
+    for (let i = 0; i < 30; i++) window.sim.stepSimulation(0.016);
+  `);
   await new Promise(r => setTimeout(r, 600));
 
-  const waterPosCheck = await send('Runtime.evaluate', {
-    expression: `({
-      waterMeshX: window.sim.water.mesh.position.x,
-      waterMeshZ: window.sim.water.mesh.position.z,
-      camX: window.sim.camera.position.x,
-      camZ: window.sim.camera.position.z
-    })`,
-    returnByValue: true
-  });
-  console.log('Water mesh position check at Z=17,500:', waterPosCheck.result.value);
+  const waterPosCheck = await evalJs(`({
+    waterMeshX: window.sim.water.mesh.position.x,
+    waterMeshZ: window.sim.water.mesh.position.z,
+    camX: window.sim.camera.position.x,
+    camZ: window.sim.camera.position.z
+  })`);
+  console.log('Water mesh position check at Z=17,500:', waterPosCheck);
 
   const screenshot2 = await send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
   const img2Path = path.join(OUTPUT_DIR, 'ocean_verification_boundary_17500.jpg');
@@ -160,26 +161,23 @@ async function main() {
 
   // Test Case 3: Far open ocean test - Position plane at Z = 45,000 (deep open ocean far beyond original 18km limit!)
   console.log('📸 Capturing View 3: Deep open ocean test (Z = 45,000)...');
-  await send('Runtime.evaluate', {
-    expression: `
-      window.sim.position.set(0, 2500, 45000);
-      window.sim.velocity.set(0, 0, 240);
-      window.sim.cameraSystem.setMode('CHASE');
-      for (let i = 0; i < 30; i++) window.sim.stepSimulation(0.016);
-    `
-  });
+  await evalJs(`
+    window.sim.position.set(0, 2500, 45000);
+    window.sim.linearVelocity.set(0, 0, 240);
+    window.sim.quaternion.set(0, 0, 0, 1);
+    window.sim.angularVelocity.set(0, 0, 0);
+    window.sim.cameraSystem.setMode(1); // CHASE
+    for (let i = 0; i < 30; i++) window.sim.stepSimulation(0.016);
+  `);
   await new Promise(r => setTimeout(r, 600));
 
-  const waterPosCheck2 = await send('Runtime.evaluate', {
-    expression: `({
-      waterMeshX: window.sim.water.mesh.position.x,
-      waterMeshZ: window.sim.water.mesh.position.z,
-      camX: window.sim.camera.position.x,
-      camZ: window.sim.camera.position.z
-    })`,
-    returnByValue: true
-  });
-  console.log('Water mesh position check at Z=45,000:', waterPosCheck2.result.value);
+  const waterPosCheck2 = await evalJs(`({
+    waterMeshX: window.sim.water.mesh.position.x,
+    waterMeshZ: window.sim.water.mesh.position.z,
+    camX: window.sim.camera.position.x,
+    camZ: window.sim.camera.position.z
+  })`);
+  console.log('Water mesh position check at Z=45,000:', waterPosCheck2);
 
   const screenshot3 = await send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
   const img3Path = path.join(OUTPUT_DIR, 'ocean_verification_deep_ocean_45000.jpg');

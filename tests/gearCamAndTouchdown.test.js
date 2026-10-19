@@ -237,6 +237,23 @@ describe('Landing Gear View & Touchdown Effects', () => {
       smokeSystem.spawnBrakingSmoke(contacts, new THREE.Vector3(30, 0, 0), 0.8);
       assert.strictEqual(smokeSystem.particles.length, 0, 'No braking smoke during normal rollout deceleration');
     });
+
+    it('should NOT spawn touchdown smoke for nose-only touchdown contacts', () => {
+      const scene = new THREE.Scene();
+      const smokeSystem = new TireSmokeSystem(scene);
+
+      const noseContacts = [
+        {
+          id: 'nose',
+          worldPos: new THREE.Vector3(0, 12.0, -13.8),
+          groundSpeed: 72.0,
+          sinkRate: 2.0
+        }
+      ];
+
+      smokeSystem.spawnTouchdownSmoke(noseContacts, new THREE.Vector3(72.0, -2.0, 0));
+      assert.strictEqual(smokeSystem.particles.length, 0, 'Nose-only touchdown must produce zero smoke particles');
+    });
   });
 
   describe('Boeing737 3D Model (Suspension Oleo Articulation)', () => {

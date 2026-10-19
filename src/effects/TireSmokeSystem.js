@@ -59,9 +59,9 @@ export class TireSmokeSystem {
   spawnTouchdownSmoke(contacts, linearVelocity) {
     if (!contacts || contacts.length === 0) return;
 
-    // Filter to main landing gear if available (nose gear does not produce heavy spin-up smoke)
-    const hasMainGear = contacts.some(c => c.id !== 'nose');
-    const validContacts = hasMainGear ? contacts.filter(c => c.id !== 'nose') : contacts;
+    // Only main landing gear bogies produce high-energy touchdown spin-up rubber smoke (nose gear never smokes)
+    const validContacts = contacts.filter(c => c.id !== 'nose');
+    if (validContacts.length === 0) return;
 
     for (const c of validContacts) {
       const pos = c.worldPos;
