@@ -104,6 +104,9 @@ export class TouchFlightControls {
 
           <!-- Quick Action Buttons Column on Left -->
           <div class="touch-left-actions">
+            <button type="button" id="touch-btn-sound" class="btn-touch-pill active" title="사운드 볼륨 / 모바일 부스트 (M)">
+              <span class="pill-icon">🔊</span> VOL
+            </button>
             <button type="button" id="touch-btn-reverser" class="btn-touch-pill" title="역추진 (Reverse Thrust)">
               <span class="pill-icon">⚡</span> REV
             </button>
@@ -243,7 +246,14 @@ export class TouchFlightControls {
     this.brakeBtn.addEventListener('pointerleave', stopBraking);
 
     // 5. Quick Action Buttons
+    this.overlay.querySelector('#touch-btn-sound')?.addEventListener('click', () => {
+      if (this.controls.onUserInteract) this.controls.onUserInteract();
+      if (this.controls.onToggleAudio) this.controls.onToggleAudio();
+      this.triggerHaptic(20);
+    });
+
     this.overlay.querySelector('#touch-btn-gear')?.addEventListener('click', () => {
+      if (this.controls.onUserInteract) this.controls.onUserInteract();
       if (this.controls.onToggleGear) this.controls.onToggleGear();
       this.triggerHaptic(25);
     });
@@ -280,6 +290,7 @@ export class TouchFlightControls {
   /* ---------------- Virtual Stick Handling ---------------- */
   onStickPointerDown(e) {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
+    if (this.controls.onUserInteract) this.controls.onUserInteract();
     this.stickActive = true;
     this.stickPointerId = e.pointerId;
     this.stickZone.setPointerCapture(e.pointerId);
@@ -358,6 +369,7 @@ export class TouchFlightControls {
   /* ---------------- Throttle Quadrant Handling ---------------- */
   onThrottlePointerDown(e) {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
+    if (this.controls.onUserInteract) this.controls.onUserInteract();
     this.throttleActive = true;
     this.throttlePointerId = e.pointerId;
     this.throttleTrack.setPointerCapture(e.pointerId);
@@ -410,6 +422,7 @@ export class TouchFlightControls {
   /* ---------------- Rudder Bar Handling ---------------- */
   onRudderPointerDown(e) {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
+    if (this.controls.onUserInteract) this.controls.onUserInteract();
     this.rudderActive = true;
     this.rudderPointerId = e.pointerId;
     this.rudderTrack.setPointerCapture(e.pointerId);
@@ -565,6 +578,23 @@ export class TouchFlightControls {
     if (revBtn) {
       const isRev = telemetry.engine1?.reverserActive;
       revBtn.className = isRev ? 'btn-touch-pill active-amber' : 'btn-touch-pill';
+    }
+  }
+
+  /* ---------------- Audio UI State ---------------- */
+  updateAudioUI(state) {
+    if (!this.overlay || !state) return;
+    const soundBtn = this.overlay.querySelector('#touch-btn-sound');
+    if (!soundBtn) return;
+    if (state.muted) {
+      soundBtn.className = 'btn-touch-pill muted';
+      soundBtn.innerHTML = '<span class="pill-icon">🔇</span> OFF';
+    } else if (state.boost) {
+      soundBtn.className = 'btn-touch-pill active-amber';
+      soundBtn.innerHTML = '<span class="pill-icon">🔊⚡</span> 150%';
+    } else {
+      soundBtn.className = 'btn-touch-pill active';
+      soundBtn.innerHTML = '<span class="pill-icon">🔊</span> 100%';
     }
   }
 

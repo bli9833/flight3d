@@ -425,6 +425,20 @@ body, html {
   text-align: left;
 }
 
+.btn-sound-toggle {
+  border-left: 3px solid #10b981;
+}
+
+.btn-sound-toggle.active-boost {
+  border-left: 3px solid #f59e0b;
+  color: #fbbf24;
+}
+
+.btn-sound-toggle.muted {
+  border-left: 3px solid #ef4444;
+  color: #94a3b8;
+}
+
 .btn-accent {
   background: rgba(2, 132, 199, 0.85);
   color: #ffffff;
@@ -1105,6 +1119,13 @@ kbd {
   border-color: #f59e0b;
   color: #fde68a;
   box-shadow: 0 0 14px rgba(245, 158, 11, 0.6);
+}
+
+.btn-touch-pill.muted {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
 }
 
 /* Center Quadrant: Rudder & Brakes */
