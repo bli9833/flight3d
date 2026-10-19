@@ -56,9 +56,15 @@
       </div>
     </header>
 
+    <!-- Minimized Demo Flight Showcase Pill (Tap to Reopen) -->
+    <button id="btn-demo-open" class="demo-pill-btn" style="display: none;" title="데모 비행 안내 팝업 열기" aria-label="데모 비행 안내 팝업 열기">
+      <span class="demo-dot"></span>
+      <span id="demo-pill-text" class="demo-pill-text">🎬 AUTO DEMO [안내 열기 ▾]</span>
+    </button>
+
     <!-- Cinematic Demo Flight Showcase Banner -->
     <div id="demo-banner" class="demo-banner" style="display: none;">
-      <div class="demo-badge">
+      <div class="demo-badge" title="클릭하여 안내 팝업 접기" role="button" tabindex="0">
         <span class="demo-dot"></span>
         <span class="demo-badge-text">AUTO DEMO</span>
       </div>
@@ -68,6 +74,7 @@
       </div>
       <div class="demo-actions">
         <button id="btn-skip-demo" class="btn btn-demo-skip" title="수동 직접 조종으로 전환 (Esc)">직접 조종하기 [Esc]</button>
+        <button id="btn-demo-close" class="btn btn-demo-close" title="안내 팝업 닫기 (접기)" aria-label="안내 팝업 닫기">✕</button>
       </div>
     </div>
 

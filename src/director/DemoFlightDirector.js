@@ -41,6 +41,11 @@ export class DemoFlightDirector {
     this.titleEl = null;
     this.descEl = null;
     this.skipBtn = null;
+    this.closeBtn = null;
+    this.openBtn = null;
+    this.badgeEl = null;
+    this.pillTextEl = null;
+    this.isBannerMinimized = false;
 
     // Approach tracking state
     this.approachFlarInitiated = false;
@@ -55,6 +60,10 @@ export class DemoFlightDirector {
     this.titleEl = document.getElementById('demo-stage-title');
     this.descEl = document.getElementById('demo-stage-desc');
     this.skipBtn = document.getElementById('btn-skip-demo');
+    this.closeBtn = document.getElementById('btn-demo-close');
+    this.openBtn = document.getElementById('btn-demo-open');
+    this.badgeEl = this.bannerEl?.querySelector('.demo-badge');
+    this.pillTextEl = document.getElementById('demo-pill-text');
 
     if (this.skipBtn) {
       this.skipBtn.addEventListener('click', () => {
@@ -62,18 +71,55 @@ export class DemoFlightDirector {
       });
     }
 
-    const replayBtn = document.getElementById('btn-demo');
-    if (replayBtn) {
-      replayBtn.addEventListener('click', () => {
-        this.start();
+    if (this.closeBtn) {
+      this.closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeBanner();
       });
     }
 
-    // Keyboard cancel/restart listeners
+    if (this.badgeEl) {
+      this.badgeEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeBanner();
+      });
+      this.badgeEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.closeBanner();
+        }
+      });
+    }
+
+    if (this.openBtn) {
+      this.openBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openBanner();
+      });
+    }
+
+    const replayBtn = document.getElementById('btn-demo');
+    if (replayBtn) {
+      replayBtn.addEventListener('click', () => {
+        if (this.isActive) {
+          if (this.isBannerMinimized) {
+            this.openBanner();
+          } else {
+            this.closeBanner();
+          }
+        } else {
+          this.start();
+        }
+      });
+    }
+
+    // Keyboard cancel/restart/toggle listeners
     window.addEventListener('keydown', (e) => {
       if (this.isActive) {
         if (e.code === 'Escape') {
           this.stop('데모 비행 종료: 직접 조종으로 전환되었습니다.');
+        } else if (e.code === 'KeyP') {
+          this.toggleBanner();
         } else if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
           // Touching flight control keys automatically hands over control
           this.stop('조종 입력 감지: 조종사 수동 조종으로 전환되었습니다.');
@@ -84,14 +130,46 @@ export class DemoFlightDirector {
     });
   }
 
+  closeBanner() {
+    this.isBannerMinimized = true;
+    if (this.bannerEl) {
+      this.bannerEl.style.display = 'none';
+    }
+    if (this.isActive && this.openBtn) {
+      this.openBtn.style.display = 'inline-flex';
+    }
+  }
+
+  openBanner() {
+    this.isBannerMinimized = false;
+    if (this.openBtn) {
+      this.openBtn.style.display = 'none';
+    }
+    if (this.isActive && this.bannerEl) {
+      this.bannerEl.style.display = 'flex';
+    }
+  }
+
+  toggleBanner() {
+    if (this.isBannerMinimized) {
+      this.openBanner();
+    } else {
+      this.closeBanner();
+    }
+  }
+
   start() {
     this.isActive = true;
     this.totalTimer = 0;
     this.approachFlarInitiated = false;
     this.touchdownConfirmed = false;
+    this.isBannerMinimized = false;
 
     if (this.bannerEl) {
       this.bannerEl.style.display = 'flex';
+    }
+    if (this.openBtn) {
+      this.openBtn.style.display = 'none';
     }
 
     // Ensure audio starts on first user interaction or when allowed
@@ -108,12 +186,16 @@ export class DemoFlightDirector {
     if (!this.isActive) return;
     this.isActive = false;
     this.currentStage = DemoFlightDirector.STAGES.IDLE;
+    this.isBannerMinimized = false;
 
     // Clear programmatic virtual inputs
     this.sim.controls.clearVirtualInputs();
 
     if (this.bannerEl) {
       this.bannerEl.style.display = 'none';
+    }
+    if (this.openBtn) {
+      this.openBtn.style.display = 'none';
     }
 
     if (message) {
@@ -474,5 +556,11 @@ export class DemoFlightDirector {
   updateBanner(title, desc) {
     if (this.titleEl) this.titleEl.textContent = title;
     if (this.descEl) this.descEl.textContent = desc;
+    if (this.pillTextEl) {
+      const match = title.match(/\[(\d+\/\d+)\]/);
+      this.pillTextEl.textContent = match
+        ? `🎬 AUTO DEMO [${match[1]}] [안내 열기 ▾]`
+        : `🎬 AUTO DEMO [안내 열기 ▾]`;
+    }
   }
 }

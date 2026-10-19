@@ -274,5 +274,64 @@ describe('Drone Orbit View & Demo Pre/Post-Flight Integration', () => {
       assert.strictEqual(director.isActive, false);
       assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.IDLE);
     });
+
+    it('should allow closing, opening, and toggling demo banner UI without stopping demo', () => {
+      const sim = createMockSimulator();
+      const director = new DemoFlightDirector(sim);
+
+      const mockBanner = { style: { display: 'none' } };
+      const mockOpenBtn = { style: { display: 'none' } };
+      const mockTitle = { textContent: '' };
+      const mockDesc = { textContent: '' };
+      const mockPillText = { textContent: '' };
+
+      director.bannerEl = mockBanner;
+      director.openBtn = mockOpenBtn;
+      director.titleEl = mockTitle;
+      director.descEl = mockDesc;
+      director.pillTextEl = mockPillText;
+
+      // Start demo
+      director.start();
+      assert.strictEqual(director.isActive, true);
+      assert.strictEqual(director.isBannerMinimized, false);
+      assert.strictEqual(mockBanner.style.display, 'flex');
+      assert.strictEqual(mockOpenBtn.style.display, 'none');
+
+      // Close / minimize banner
+      director.closeBanner();
+      assert.strictEqual(director.isActive, true, 'Demo should remain active when banner is closed');
+      assert.strictEqual(director.isBannerMinimized, true);
+      assert.strictEqual(mockBanner.style.display, 'none');
+      assert.strictEqual(mockOpenBtn.style.display, 'inline-flex');
+
+      // Update banner should update title, desc, and pill text
+      director.updateBanner('🛫 [2/8] 활주로 이륙 활주', 'TOGA 가속');
+      assert.strictEqual(mockTitle.textContent, '🛫 [2/8] 활주로 이륙 활주');
+      assert.strictEqual(mockPillText.textContent, '🎬 AUTO DEMO [2/8] [안내 열기 ▾]');
+
+      // Reopen banner
+      director.openBanner();
+      assert.strictEqual(director.isBannerMinimized, false);
+      assert.strictEqual(mockBanner.style.display, 'flex');
+      assert.strictEqual(mockOpenBtn.style.display, 'none');
+
+      // Toggle banner
+      director.toggleBanner();
+      assert.strictEqual(director.isBannerMinimized, true);
+      assert.strictEqual(mockBanner.style.display, 'none');
+      assert.strictEqual(mockOpenBtn.style.display, 'inline-flex');
+
+      director.toggleBanner();
+      assert.strictEqual(director.isBannerMinimized, false);
+      assert.strictEqual(mockBanner.style.display, 'flex');
+
+      // Stopping demo should hide both banner and open button
+      director.stop();
+      assert.strictEqual(director.isActive, false);
+      assert.strictEqual(director.isBannerMinimized, false);
+      assert.strictEqual(mockBanner.style.display, 'none');
+      assert.strictEqual(mockOpenBtn.style.display, 'none');
+    });
   });
 });
