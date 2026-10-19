@@ -16,6 +16,8 @@ import { Airport } from './environment/Airport.js';
 import { FoliageAndCities } from './environment/FoliageAndCities.js';
 import { Ships } from './environment/Ships.js';
 import { SkyAtmosphere } from './environment/SkyAtmosphere.js';
+import { LuklaTerrain } from './environment/LuklaTerrain.js';
+import { LuklaAirport } from './environment/LuklaAirport.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
@@ -81,7 +83,7 @@ class FlightSimulator {
     this.engines = new EngineModel();
     this.gear = new LandingGear();
 
-    // 5. Procedural World & Environment
+    // 5. Procedural World & Real-World Environments
     this.terrain = new Terrain(22000, 256);
     this.scene.add(this.terrain.mesh);
 
@@ -97,6 +99,19 @@ class FlightSimulator {
     this.ships = new Ships(this.water);
     this.scene.add(this.ships.group);
 
+    // Nepal Tenzing-Hillary (Lukla VNLK) Real-World 30m DEM Terrain & Airport
+    this.luklaTerrain = new LuklaTerrain(22000, 255);
+    this.luklaTerrain.mesh.visible = false;
+    this.scene.add(this.luklaTerrain.mesh);
+
+    this.luklaAirport = new LuklaAirport();
+    this.luklaAirport.group.visible = false;
+    this.scene.add(this.luklaAirport.group);
+
+    this.activeAirport = 'coastal'; // 'coastal' | 'lukla'
+    this.currentTerrain = this.terrain;
+    this.currentAirport = this.airport;
+
     this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water);
     this.water.syncWithAtmosphere(this.sky);
 
@@ -110,14 +125,14 @@ class FlightSimulator {
 
     // 7. Collision Detection & Explosion & Tire Smoke Particle Systems
     this.collisionDetector = new CollisionDetector(
-      this.terrain,
-      this.airport,
+      this.currentTerrain,
+      this.currentAirport,
       this.foliage,
       this.ships,
       this.water
     );
-    this.explosionSystem = new ExplosionSystem(this.scene, this.terrain);
-    this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.terrain);
+    this.explosionSystem = new ExplosionSystem(this.scene, this.currentTerrain);
+    this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
     this.isCrashed = false;
     this.crashResult = null;
     this.lastOnGround = true;
@@ -256,60 +271,159 @@ class FlightSimulator {
       if (crashEl) crashEl.style.display = 'none';
     }
 
-    if (type === 'runway') {
-      // Aligned on Runway 09L Threshold (Heading 090° East)
-      // West threshold is at x = -1350m, y = airport elevation (12.0m) + gear height (2.1m)
-      this.position.set(-1350, 14.15, 0);
-      this.linearVelocity.set(0, 0, 0);
-      this.angularVelocity.set(0, 0, 0);
-      this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.5); // Face East (+X)
+    if (this.activeAirport === 'lukla') {
+      const sin58 = 0.848048;
+      const cos58 = 0.529919;
 
-      this.controls.throttle = 0.0;
-      this.engines.setThrottle(0.0);
-      this.engines.setReverser(false, true);
-      this.gear.setGearTarget(true);
-      this.gear.gearState = 1.0;
-      this.aero.setFlapPosition(2); // Flaps 5 for takeoff
-      this.aero.spoilers = 0.0;
-      this.aero.pitchTrim = 4.5; // Takeoff trim
+      if (type === 'runway') {
+        // Aligned on Lukla Runway 06 Threshold (Elevation 2,805m, Heading 058°, 11.7% uphill slope)
+        this.position.set(-210.0, 2808.8, 131.0);
+        this.linearVelocity.set(0, 0, 0);
+        this.angularVelocity.set(0, 0, 0);
 
-      this.showToast('Preset: Runway 09L (Ready for Takeoff)');
-    } else if (type === 'approach') {
-      // Final Approach 3 NM out on 3° glideslope (5.5 km west: x = -6500m, alt = 320m / 1050ft)
-      this.position.set(-6500, 310, 0);
-      // Speed 145 knots (74.5 m/s) heading East (+X), descending at -3.9 m/s (-770 fpm)
-      this.linearVelocity.set(74.5, -3.9, 0);
-      this.angularVelocity.set(0, 0, 0);
+        // Pitch 6.71° nose-up aligned with 11.7% gradient, Heading 058°
+        const euler = new THREE.Euler(
+          THREE.MathUtils.degToRad(6.71),
+          -THREE.MathUtils.degToRad(58.0) - Math.PI * 0.5,
+          0,
+          'YXZ'
+        );
+        this.quaternion.setFromEuler(euler);
 
-      // Pitch slightly nose-up (2.5°) with 3° descent path
-      const euler = new THREE.Euler(THREE.MathUtils.degToRad(2.5), -Math.PI * 0.5, 0, 'YXZ');
-      this.quaternion.setFromEuler(euler);
+        this.controls.throttle = 0.0;
+        this.engines.setThrottle(0.0);
+        this.engines.setReverser(false, true);
+        this.gear.setGearTarget(true);
+        this.gear.gearState = 1.0;
+        this.aero.setFlapPosition(2); // Flaps 5
+        this.aero.spoilers = 0.0;
+        this.aero.pitchTrim = 5.5;
 
-      this.controls.throttle = 0.52; // Approach thrust
-      this.engines.setThrottle(0.52);
-      this.gear.setGearTarget(true);
-      this.gear.gearState = 1.0;
-      this.aero.setFlapPosition(5); // Flaps 30 for landing
-      this.aero.spoilers = 0.0;
-      this.aero.pitchTrim = 6.0;
+        this.showToast('Preset: 루클라 활주로 06 (해발 2,805m, 11.7% 급경사 대기)');
+      } else if (type === 'approach') {
+        // Final Approach 2.5 NM out in Dudh Kosi Canyon (Alt 3,120m / 10,230ft)
+        const distSW = -3800.0;
+        this.position.set(distSW * sin58, 3120.0, -distSW * cos58);
+        // Speed 135 knots (69.4 m/s) heading 058°, descending at -3.6 m/s (-700 fpm)
+        this.linearVelocity.set(69.4 * sin58, -3.6, -69.4 * cos58);
+        this.angularVelocity.set(0, 0, 0);
 
-      this.showToast('Preset: 3NM Final Approach (Runway 09L, 145 KTS, Flaps 30)');
-    } else if (type === 'cruise') {
-      // Scenic Coastal Cruise over Bay & Ships at 2,600 ft (800m), Speed 210 knots (108 m/s)
-      this.position.set(-600, 750, 3200);
-      this.linearVelocity.set(96, 0, -49); // Aligned with heading 153° (yaw -0.35pi)
-      this.angularVelocity.set(0, 0, 0);
-      this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.35);
+        // Pitch 2.0° nose-up, heading 058°
+        const euler = new THREE.Euler(
+          THREE.MathUtils.degToRad(2.0),
+          -THREE.MathUtils.degToRad(58.0) - Math.PI * 0.5,
+          0,
+          'YXZ'
+        );
+        this.quaternion.setFromEuler(euler);
 
-      this.controls.throttle = 0.65;
-      this.engines.setThrottle(0.65);
-      this.gear.setGearTarget(false);
-      this.gear.gearState = 0.0;
-      this.aero.setFlapPosition(0); // Clean
-      this.aero.spoilers = 0.0;
-      this.aero.pitchTrim = 2.5;
+        this.controls.throttle = 0.58;
+        this.engines.setThrottle(0.58);
+        this.gear.setGearTarget(true);
+        this.gear.gearState = 1.0;
+        this.aero.setFlapPosition(5); // Flaps 30 for short runway landing
+        this.aero.spoilers = 0.0;
+        this.aero.pitchTrim = 6.2;
 
-      this.showToast('Preset: Scenic Cruise (Bay & Ships)');
+        this.showToast('Preset: 루클라 협곡 착륙 챌린지 (고도 10,230 FT, Rwy 06)');
+      } else if (type === 'cliff') {
+        // Lukla Runway 24 Downhill Cliff Dive Takeoff!
+        // Starts at upper threshold 24 (x: 210, y: 2868.5, z: -131), heading 238° downhill
+        this.position.set(210.0, 2868.5, -131.0);
+        this.linearVelocity.set(0, 0, 0);
+        this.angularVelocity.set(0, 0, 0);
+        // Pitch nose down -6.71° along 11.7% downhill slope, Yaw 238°
+        const euler = new THREE.Euler(
+          THREE.MathUtils.degToRad(-6.71),
+          -THREE.MathUtils.degToRad(238.0) - Math.PI * 0.5,
+          0,
+          'YXZ'
+        );
+        this.quaternion.setFromEuler(euler);
+
+        this.controls.throttle = 1.0; // TOGA 100%
+        this.engines.setThrottle(1.0);
+        this.engines.setReverser(false, true);
+        this.gear.setGearTarget(true);
+        this.gear.gearState = 1.0;
+        this.aero.setFlapPosition(2); // Flaps 5
+        this.aero.spoilers = 0.0;
+        this.aero.pitchTrim = 4.0;
+
+        this.showToast('Preset: 루클라 24번 활주로 절벽 가속 이륙 (11.7% 내리막 질주)');
+      } else if (type === 'cruise') {
+        // Scenic Himalayan Valley Cruise at 13,000 FT (3,960m)
+        this.position.set(-1500, 3960, -800);
+        this.linearVelocity.set(80, 0, -60);
+        this.angularVelocity.set(0, 0, 0);
+        this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.3);
+
+        this.controls.throttle = 0.65;
+        this.engines.setThrottle(0.65);
+        this.gear.setGearTarget(false);
+        this.gear.gearState = 0.0;
+        this.aero.setFlapPosition(0);
+        this.aero.spoilers = 0.0;
+        this.aero.pitchTrim = 2.5;
+
+        this.showToast('Preset: 히말라야 산맥 순항 비행 (13,000 FT)');
+      }
+    } else {
+      // Coastal International Airport Presets
+      if (type === 'runway') {
+        // Aligned on Runway 09L Threshold (Heading 090° East)
+        this.position.set(-1350, 14.15, 0);
+        this.linearVelocity.set(0, 0, 0);
+        this.angularVelocity.set(0, 0, 0);
+        this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.5); // Face East (+X)
+
+        this.controls.throttle = 0.0;
+        this.engines.setThrottle(0.0);
+        this.engines.setReverser(false, true);
+        this.gear.setGearTarget(true);
+        this.gear.gearState = 1.0;
+        this.aero.setFlapPosition(2); // Flaps 5 for takeoff
+        this.aero.spoilers = 0.0;
+        this.aero.pitchTrim = 4.5; // Takeoff trim
+
+        this.showToast('Preset: Runway 09L (Ready for Takeoff)');
+      } else if (type === 'approach') {
+        // Final Approach 3 NM out on 3° glideslope (5.5 km west: x = -6500m, alt = 320m / 1050ft)
+        this.position.set(-6500, 310, 0);
+        // Speed 145 knots (74.5 m/s) heading East (+X), descending at -3.9 m/s (-770 fpm)
+        this.linearVelocity.set(74.5, -3.9, 0);
+        this.angularVelocity.set(0, 0, 0);
+
+        // Pitch slightly nose-up (2.5°) with 3° descent path
+        const euler = new THREE.Euler(THREE.MathUtils.degToRad(2.5), -Math.PI * 0.5, 0, 'YXZ');
+        this.quaternion.setFromEuler(euler);
+
+        this.controls.throttle = 0.52; // Approach thrust
+        this.engines.setThrottle(0.52);
+        this.gear.setGearTarget(true);
+        this.gear.gearState = 1.0;
+        this.aero.setFlapPosition(5); // Flaps 30 for landing
+        this.aero.spoilers = 0.0;
+        this.aero.pitchTrim = 6.0;
+
+        this.showToast('Preset: 3NM Final Approach (Runway 09L, 145 KTS, Flaps 30)');
+      } else if (type === 'cruise') {
+        // Scenic Coastal Cruise over Bay & Ships at 2,600 ft (800m), Speed 210 knots (108 m/s)
+        this.position.set(-600, 750, 3200);
+        this.linearVelocity.set(96, 0, -49); // Aligned with heading 153° (yaw -0.35pi)
+        this.angularVelocity.set(0, 0, 0);
+        this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.35);
+
+        this.controls.throttle = 0.65;
+        this.engines.setThrottle(0.65);
+        this.gear.setGearTarget(false);
+        this.gear.gearState = 0.0;
+        this.aero.setFlapPosition(0); // Clean
+        this.aero.spoilers = 0.0;
+        this.aero.pitchTrim = 2.5;
+
+        this.showToast('Preset: Scenic Cruise (Bay & Ships)');
+      }
     }
 
     this.controls.clearVirtualInputs();
@@ -324,6 +438,76 @@ class FlightSimulator {
   }
 
   /**
+   * Switch Active Airport Environment (Coastal International vs Nepal Lukla)
+   */
+  setAirport(id) {
+    if (this.activeAirport === id) return;
+    this.activeAirport = id;
+    const isLukla = id === 'lukla';
+
+    // Toggle 3D mesh visibility
+    this.terrain.mesh.visible = !isLukla;
+    this.airport.group.visible = !isLukla;
+    this.water.mesh.visible = !isLukla;
+    this.ships.group.visible = !isLukla;
+    this.foliage.group.visible = !isLukla;
+
+    this.luklaTerrain.mesh.visible = isLukla;
+    this.luklaAirport.group.visible = isLukla;
+
+    this.currentTerrain = isLukla ? this.luklaTerrain : this.terrain;
+    this.currentAirport = isLukla ? this.luklaAirport : this.airport;
+
+    if (this.collisionDetector) {
+      if (isLukla) {
+        this.collisionDetector.setEnvironment(this.luklaTerrain, this.luklaAirport, null, null, null);
+      } else {
+        this.collisionDetector.setEnvironment(this.terrain, this.airport, this.foliage, this.ships, this.water);
+      }
+    }
+
+    if (this.explosionSystem) {
+      this.explosionSystem.terrain = this.currentTerrain;
+    }
+
+    if (this.tireSmokeSystem) {
+      this.tireSmokeSystem.terrain = this.currentTerrain;
+    }
+
+    // Update UI preset button labels
+    const btnRwy = document.getElementById('btn-preset-rwy');
+    const btnApp = document.getElementById('btn-preset-app');
+    const btnCru = document.getElementById('btn-preset-cru');
+    const btnCliff = document.getElementById('btn-preset-cliff');
+
+    if (isLukla) {
+      if (btnRwy) btnRwy.textContent = '🛫 루클라 06 대기';
+      if (btnApp) btnApp.textContent = '🛬 협곡 착륙 챌린지';
+      if (btnCru) btnCru.textContent = '✈️ 히말라야 순항 (13,000 FT)';
+      if (btnCliff) btnCliff.style.display = 'block';
+    } else {
+      if (btnRwy) btnRwy.textContent = '🛫 활주로 이륙 (09L)';
+      if (btnApp) btnApp.textContent = '🛬 착륙 접근 (3 NM)';
+      if (btnCru) btnCru.textContent = '✈️ 순항 비행 (6,000 FT)';
+      if (btnCliff) btnCliff.style.display = 'none';
+    }
+
+    document.getElementById('btn-airport-coastal')?.classList.toggle('active', !isLukla);
+    document.getElementById('btn-airport-lukla')?.classList.toggle('active', isLukla);
+
+    if (this.demoDirector && this.demoDirector.isActive) {
+      this.demoDirector.stop();
+    }
+
+    this.setPreset('runway');
+
+    const desc = isLukla
+      ? '네팔 텐징-힐러리 공항 (VNLK 06번 활주로, 해발 2,805m, 11.7% 급경사)'
+      : '태평양 해안 국제공항 (Runway 09L, 해발 12m)';
+    this.showToast(`공항 변경: ${desc}`);
+  }
+
+  /**
    * Physics Integration Substep (120 Hz)
    */
   integratePhysics(dt) {
@@ -332,7 +516,7 @@ class FlightSimulator {
       this.linearVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 2.8));
       this.angularVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 3.5));
       this.position.addScaledVector(this.linearVelocity, dt);
-      const groundH = this.terrain ? this.terrain.getHeight(this.position.x, this.position.z) : 0.0;
+      const groundH = this.currentTerrain ? this.currentTerrain.getHeight(this.position.x, this.position.z) : 0.0;
       if (this.position.y < groundH + 0.8) {
         this.position.y = groundH + 0.8;
       }
@@ -368,7 +552,7 @@ class FlightSimulator {
     const engineData = this.engines.update(dt, altitudeMeters, tas, atmos.densityRatio);
 
     // 3. Terrain Height & Ground Clearance
-    const groundHeight = this.terrain.getHeight(this.position.x, this.position.z);
+    const groundHeight = this.currentTerrain.getHeight(this.position.x, this.position.z);
     const heightAboveGround = Math.max(0, this.position.y - groundHeight);
 
     // 4. Landing Gear Forces & Ground Friction
@@ -377,7 +561,7 @@ class FlightSimulator {
       this.aircraft.group,
       this.linearVelocity,
       this.angularVelocity,
-      (x, z) => this.terrain.getHeight(x, z)
+      (x, z) => this.currentTerrain.getHeight(x, z)
     );
 
     // 5. Aerodynamic Forces & Moments
@@ -694,9 +878,13 @@ class FlightSimulator {
     this.cduCanvas.updateData(this.telemetry);
 
     // 3. Update Environment Animations & Explosion Particles
-    this.water.update(frameDelta);
-    this.airport.update(frameDelta, this.position);
-    this.ships.update(frameDelta, this.totalSimTime);
+    if (this.activeAirport !== 'lukla') {
+      this.water.update(frameDelta);
+      this.ships.update(frameDelta, this.totalSimTime);
+    }
+    if (this.currentAirport) {
+      this.currentAirport.update(frameDelta, this.position, this.totalSimTime);
+    }
     this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(frameDelta);
     this.tireSmokeSystem.update(frameDelta);
@@ -769,10 +957,15 @@ class FlightSimulator {
   }
 
   initUI() {
+    // Airport Selector UI buttons
+    document.getElementById('btn-airport-coastal')?.addEventListener('click', () => this.setAirport('coastal'));
+    document.getElementById('btn-airport-lukla')?.addEventListener('click', () => this.setAirport('lukla'));
+
     // Quick clickable UI buttons
     document.getElementById('btn-preset-rwy')?.addEventListener('click', () => this.setPreset('runway'));
     document.getElementById('btn-preset-app')?.addEventListener('click', () => this.setPreset('approach'));
     document.getElementById('btn-preset-cru')?.addEventListener('click', () => this.setPreset('cruise'));
+    document.getElementById('btn-preset-cliff')?.addEventListener('click', () => this.setPreset('cliff'));
 
     document.getElementById('btn-flaps-ext')?.addEventListener('click', () => this.controls.onCycleFlaps(1));
     document.getElementById('btn-flaps-ret')?.addEventListener('click', () => this.controls.onCycleFlaps(-1));

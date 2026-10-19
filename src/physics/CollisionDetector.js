@@ -85,6 +85,17 @@ export class CollisionDetector {
     }
   }
 
+  setEnvironment(terrain, airport, foliage = null, ships = null, water = null) {
+    this.terrain = terrain;
+    this.airport = airport;
+    this.foliage = foliage;
+    this.ships = ships;
+    this.water = water;
+    this.treeGrid.clear();
+    this.buildingGrid.clear();
+    this.buildSpatialGrids();
+  }
+
   /**
    * Main collision evaluation called every physics step
    * Returns null if no collision, or a collision result object

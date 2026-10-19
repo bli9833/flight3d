@@ -35,7 +35,11 @@ crash_*.png
 cockpit_view_swift.png
 demo_*.png
 fixed_demo_*.png
+flicker_test_*.png
 fog_*.png
+lukla_*.png
+
 # Temporary test and worktree directories
+.cache/
 .worktrees/
 .chrome-profile/

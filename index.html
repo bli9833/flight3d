@@ -111,13 +111,19 @@
     <!-- Toast Notification -->
     <div id="toast-msg" class="toast">Runway 09L Ready</div>
 
-    <!-- Quick Flight Presets (Top Left) -->
+    <!-- Quick Flight Presets & Airport Selector (Top Left) -->
     <div class="presets-bar">
+      <div class="airport-group">
+        <span class="airport-tag">공항</span>
+        <button id="btn-airport-coastal" class="btn btn-airport active" title="태평양 해안 국제공항 (Runway 09L)">🌊 국제공항</button>
+        <button id="btn-airport-lukla" class="btn btn-airport" title="네팔 텐징-힐러리 공항 (루클라 VNLK 실존 DEM 3D 지형)">🏔️ 루클라 (VNLK)</button>
+      </div>
       <button id="btn-demo" class="btn btn-preset btn-demo-toggle" title="데모 비행 시연 (P)">🎬 데모 비행 [P]</button>
       <button id="btn-touch-toggle" class="btn btn-preset btn-touch-toggle" title="모바일 / 온스크린 터치 조작 토글">📱 터치 조작</button>
       <button id="btn-preset-rwy" class="btn btn-preset" title="이륙 활주로 대기">🛫 활주로 이륙 (09L)</button>
       <button id="btn-preset-app" class="btn btn-preset" title="3마일 착륙 접근">🛬 착륙 접근 (3 NM)</button>
       <button id="btn-preset-cru" class="btn btn-preset" title="6,000피트 순항 비행">✈️ 순항 비행 (6,000 FT)</button>
+      <button id="btn-preset-cliff" class="btn btn-preset btn-cliff" style="display: none;" title="루클라 24번 활주로 절벽 가속 이륙">⚡ 절벽 이륙 (Rwy 24)</button>
     </div>
 
     <!-- Action Controls (Bottom Right) -->
@@ -197,6 +203,7 @@
             <li><strong>지면 효과 (Ground Effect):</strong> 활주로 접근 시 유도항력 감소 및 양력 증가로 현실적인 플레어(Flare) 부유감 구현.</li>
             <li><strong>보잉 글래스 콕핏:</strong> 60 FPS 벡터 PFD (인공수평선, 대기속도 테이프, 고도계, VSI), ND (활주로 침로, 웨이포인트, 바람), EICAS (N1, EGT, N2, 연료유량, 기어/플랩 인디케이터).</li>
             <li><strong>실감나는 환경:</strong> 햇빛 반사 거스트너 파도 수면, 부력으로 흔들리는 화물선·크루즈선·쾌속정, 65m 공항 관제탑과 회전 레이더, 순차 점멸 ALS 진입등.</li>
+            <li><strong>네팔 텐징-힐러리 공항 (루클라 VNLK) 실존 지형:</strong> 실제 30m 위성 DEM 표고 데이터와 ESRI 고해상도 위성 사진 텍스처를 매핑. 해발 2,845m, 11.7% 급경사 오르막 활주로, 700m 수직 절벽 및 고고도 희박 공기밀도($\rho \approx 0.92\text{ kg/m}^3$) 물리 시뮬레이션 완벽 재현.</li>
           </ul>
         </div>
       </div>
