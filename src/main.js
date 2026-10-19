@@ -44,8 +44,8 @@ class FlightSimulator {
 
     // 1. Scene, Camera, Renderer
     this.scene = new THREE.Scene();
-    // near: 0.25m and far: 45,000m combined with logarithmicDepthBuffer completely eliminates Z-fighting & screen flickering
-    this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.25, 45000);
+    // near: 0.08m and far: 45,000m combined with logarithmicDepthBuffer completely eliminates pillar clipping & Z-fighting
+    this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.08, 45000);
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,

@@ -210,6 +210,15 @@ describe('Cockpit PBR & Real-Photo Texture Enhancement System', () => {
     // Verify depth / polygonOffset to eliminate Z-fighting
     assert.strictEqual(cockpit.gltfCaptainPfd.material.polygonOffset, true);
     assert.strictEqual(cockpit.gltfCaptainPfd.material.polygonOffsetFactor, -1);
+
+    // Mount GLTF framing and verify windshield glass and ceiling trims
+    cockpit.setupGltfCockpitFraming();
+    assert.ok(cockpit.gltfCockpitFraming instanceof THREE.Group, 'GLTF cockpit framing group must exist');
+    assert.strictEqual(cockpit.gltfGlassPanels.length, 4, 'Must have 4 tinted windshield glass panels (1L, 1R, 2L, 2R)');
+    assert.ok(cockpit.gltfCeilingTrim instanceof THREE.Group, 'Ceiling eyebrow trim must exist');
+    assert.ok(cockpit.gltfCompassBracket instanceof THREE.Mesh, 'Compass center post bracket must exist');
+    assert.strictEqual(cockpit.gltfGlassPanels[0].material.transparent, true);
+    assert.strictEqual(cockpit.gltfGlassPanels[0].material.depthWrite, false);
   });
 
   it('should verify optimized 3D GLB models (balanced & lite) and Draco decoder assets exist in public/', () => {

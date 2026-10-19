@@ -88,6 +88,13 @@ export class CameraSystem {
     this.edgePanSpeedX = 280; // Virtual px/s equivalent for horizontal pan (~0.98 rad/s in cockpit, ~1.4 rad/s in chase)
     this.edgePanSpeedY = 220; // Virtual px/s equivalent for vertical tilt (~0.77 rad/s)
 
+    if (this.camera) {
+      this.camera.near = (this.mode === CameraSystem.MODES.COCKPIT) ? 0.08 : 0.25;
+      if (typeof this.camera.updateProjectionMatrix === 'function') {
+        this.camera.updateProjectionMatrix();
+      }
+    }
+
     this.initMouseLook();
   }
 
@@ -441,6 +448,12 @@ export class CameraSystem {
     this.cancelTemporaryView();
     this.mode = m;
     this.resetLook();
+    if (this.camera) {
+      this.camera.near = (this.mode === CameraSystem.MODES.COCKPIT) ? 0.08 : 0.25;
+      if (typeof this.camera.updateProjectionMatrix === 'function') {
+        this.camera.updateProjectionMatrix();
+      }
+    }
     if (this.mode === CameraSystem.MODES.FLYBY) {
       this.flybySet = false;
       this.flybyRegime = null;
