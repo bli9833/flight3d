@@ -1,18 +1,21 @@
 # Lukla physics acceptance
 
-Validated on upstream main `1e4666a` plus this change, using Node 22.23.2 and
+Validated on upstream main `3ca7119` plus this change, using Node 22.23.2 and
 Chrome's Intel Vulkan renderer (identity retained in report.json).
 
 - `npm run check`: pass.
-- `npm test`: 190 tests pass.
+- `npm test`: 207 tests pass.
 - `npm run build`: pass (existing bundle-size advisory).
 - `PORT=5181 npm run test:lukla -- --screenshots`: three full 120 Hz circuits,
-  loaded DEM, zero stall frames, peak contact speed approximately 1.62 m/s,
+  loaded DEM, zero stall frames, peak contact speed approximately 1.61 m/s,
   approximately 87 m of runway remaining, zero drift over the 10-second hold.
 - Negative integrated cases: 20 m/s descent and 7.59 m/s surface-normal uphill
   impact both crash before position correction; manual presets restore 66 t.
 
-The report contains a subsequent run of the same three circuits and integrated
-negative cases. The screenshot shows the first main-gear contact in the first
-visual run. The 43 t demonstration loading and uncalibrated damage-envelope
+The report and screenshot come from the same final visual run. The screenshot
+shows main-gear contact. `flight-regression.json` records five passing general
+flight scenarios (including takeoff, stall recovery, landing, presets/cameras,
+and director handover), with zero anomalies or browser errors. The landing
+fixture now starts trimmed with landing flaps already deployed, uses continuous
+flight controls, and observes 60 seconds to include the full braking sequence. The 43 t demonstration loading and uncalibrated damage-envelope
 limitations are documented in ../../docs/development/lukla-physics.md.

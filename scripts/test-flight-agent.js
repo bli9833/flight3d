@@ -508,74 +508,77 @@ class FlightTestAgent {
 
     await this.ensureSimulatorReady();
 
-    // Preset short final: 0.3 NM out (x = -1900m, alt = 42m / 138ft)
+    // Start in an already configured, trimmed short final. The old fixture
+    // spawned at 2deg pitch with flaps still travelling, then reduced elevator
+    // during flare; the new contact model correctly rejects that nose impact.
     await this.eval(`
-      window.simulator.controls.clearVirtualInputs();
-      window.simulator.position.set(-1900, 42, 0);
-      window.simulator.linearVelocity.set(68, -2.6, 0); // 132 knots descending
-      window.simulator.angularVelocity.set(0, 0, 0);
-      window.simulator.quaternion.setFromEuler(new window.THREE.Euler(window.THREE.MathUtils.degToRad(2.0), -Math.PI * 0.5, 0, 'YXZ'));
-      window.simulator.aircraft.group.position.copy(window.simulator.position);
-      window.simulator.aircraft.group.quaternion.copy(window.simulator.quaternion);
-      window.simulator.aircraft.group.updateMatrixWorld(true);
-      window.simulator.controls.setVirtualInput('throttle', 0.45);
-      window.simulator.engines.setThrottle(0.45);
-      window.simulator.gear.setGearTarget(true);
-      window.simulator.gear.gearState = 1.0;
-      window.simulator.aero.setFlapPosition(5); // Flaps 30
-      window.simulator.aero.pitchTrim = 5.5;
-      window.simulator.cameraSystem.setMode(1);
-      window.simulator.cameraSystem.snapToTarget(window.simulator.aircraft.group);
+      (() => {
+        const sim = window.simulator;
+        sim.setPreset('approach');
+        sim.controls.setParkingBrake(false);
+        sim.position.set(-1900, 42, 0);
+        sim.linearVelocity.set(68, -2.6, 0);
+        sim.angularVelocity.set(0, 0, 0);
+        sim.quaternion.setFromEuler(new window.THREE.Euler(window.THREE.MathUtils.degToRad(5.8), -Math.PI * 0.5, 0, 'YXZ'));
+        sim.aircraft.group.position.copy(sim.position);
+        sim.aircraft.group.quaternion.copy(sim.quaternion);
+        sim.aircraft.group.updateMatrixWorld(true);
+        sim.gear.setGearTarget(true);
+        sim.gear.gearState = 1;
+        sim.aero.setFlapPosition(6);
+        sim.aero.currentFlapAngle = 40;
+        sim.controls.pitchTrim = 5.5;
+        sim.aero.pitchTrim = 5.5;
+        sim.controls.elevator = 0.18;
+        sim.cameraSystem.setMode(1);
+        sim.cameraSystem.snapToTarget(sim.aircraft.group);
+        const original = sim.integratePhysics.bind(sim);
+        const pilot = { contact: false, pitch: null };
+        sim.integratePhysics = function(dt) {
+          const guidance = this.demoDirector.luklaScenario;
+          guidance.flyBank(0, this.telemetry);
+          this.controls.setVirtualInput('rudder', 0);
+          if (!pilot.contact && !this.gear.onGround) {
+            const height = this.position.y - this.currentTerrain.getHeight(this.position.x, this.position.z);
+            const descent = Math.max(-2.6, Math.min(-0.5, -(height - 3.9) * 0.35));
+            guidance.flyVerticalPath(descent, 132, this.telemetry);
+          } else {
+            pilot.contact = true;
+            pilot.pitch ??= this.telemetry.pitchDeg;
+            pilot.pitch = Math.max(0, pilot.pitch - dt * 2);
+            guidance.flyVerticalPath(0, 0, this.telemetry, 0, pilot.pitch);
+            const noseDown = this.gear.contacts[0].isGrounded;
+            const reverse = noseDown && this.telemetry.iasKnots > 40;
+            this.aero.spoilers = noseDown ? 1 : 0;
+            this.controls.setVirtualInput('brakes', noseDown ? 1 : 0);
+            this.engines.setReverser(reverse, this.gear.onGround);
+            this.controls.setVirtualInput('throttle', reverse ? 0.85 : 0);
+          }
+          original(dt);
+        };
+        window.restoreCoastalLandingIntegration = () => { sim.integratePhysics = original; };
+      })()
     `);
-    await new Promise(r => setTimeout(r, 600));
 
-    this.log('Tracking final approach down to Runway 09L threshold...', '📐');
-
-    let flareInitiated = false;
+    this.log('Tracking a trimmed final and controlled main/nose-gear touchdown...', '📐');
     let touchdownConfirmed = false;
     let stoppedOnRunway = false;
-
     const initialAnomalies = this.anomalies.length;
-    const history = await this.recordFlight(44, async (state, elapsedSec) => {
-      // Flare at 25 ft AGL
-      if (!flareInitiated && state.radioAltFt <= 25 && state.radioAltFt > 0) {
-        flareInitiated = true;
-        this.log(`Threshold 25 FT AGL: Executing gentle flare & retarding throttle to idle...`, '🛬');
-        await this.eval(`
-          window.simulator.controls.setVirtualInput('elevator', 0.12);
-          window.simulator.controls.setVirtualInput('throttle', 0.0);
-          window.simulator.engines.setThrottle(0.0);
-        `);
-      }
-
-      // Confirm touchdown from wheel contact; CG radio altitude alone is not contact.
-      if (!touchdownConfirmed && (state.onGround || state.touchdown)) {
-        touchdownConfirmed = true;
-        this.log(`TOUCHDOWN CONFIRMED! Radio Alt: ${Math.round(state.radioAltFt)} FT, G-Load: ${state.gForce.toFixed(2)} G`, '🎯');
-        this.log(`Deploying Spoilers, Maximum Brakes, and Reverse Thrust...`, '🛑');
-        await this.eval(`
-          window.simulator.controls.setVirtualInput('elevator', 0.0);
-          window.simulator.controls.setVirtualInput('aileron', 0.0);
-          window.simulator.controls.setVirtualInput('rudder', 0.0);
-          window.simulator.aero.spoilers = 1.0;
-          window.simulator.controls.setVirtualInput('brakes', 1.0);
-          window.simulator.gear.setBrakes(1.0);
-          window.simulator.engines.setReverser(true, true);
-          window.simulator.controls.setVirtualInput('throttle', 0.85); // Reverse thrust spool
-        `);
-      }
-
-      // Check deceleration to safe taxi speed (< 40 knots)
-      if (touchdownConfirmed && !stoppedOnRunway && state.iasKnots < 40) {
-        stoppedOnRunway = true;
-        this.log(`Aircraft safely decelerated on runway! IAS: ${Math.round(state.iasKnots)} KT`, '🏁');
-        // Stow reverse thrust at taxi speed (standard SOP)
-        await this.eval(`
-          window.simulator.engines.setReverser(false, true);
-          window.simulator.controls.setVirtualInput('throttle', 0.0);
-        `);
-      }
-    });
+    let history;
+    try {
+      history = await this.recordFlight(60, async state => {
+        if (!touchdownConfirmed && (state.onGround || state.touchdown)) {
+          touchdownConfirmed = true;
+          this.log(`TOUCHDOWN CONFIRMED! Radio Alt: ${Math.round(state.radioAltFt)} FT`, '🎯');
+        }
+        if (touchdownConfirmed && !stoppedOnRunway && state.iasKnots < 40 && !state.isCrashed) {
+          stoppedOnRunway = true;
+          this.log(`Aircraft safely decelerated on runway! IAS: ${Math.round(state.iasKnots)} KT`, '🏁');
+        }
+      });
+    } finally {
+      await this.eval('window.restoreCoastalLandingIntegration()');
+    }
 
     const passed = touchdownConfirmed && stoppedOnRunway && history.length > 0 && history.every(s => !s.isCrashed);
     const forceScreenshot = !passed || (this.anomalies.length > initialAnomalies);
@@ -583,8 +586,8 @@ class FlightTestAgent {
     const scenarioDurationMs = performance.now() - scenarioStart;
     const perf = {
       realDurationSec: parseFloat((scenarioDurationMs / 1000).toFixed(2)),
-      simulatedDurationSec: 44.0,
-      speedRatio: parseFloat((44.0 / (scenarioDurationMs / 1000)).toFixed(2)),
+      simulatedDurationSec: 60.0,
+      speedRatio: parseFloat((60.0 / (scenarioDurationMs / 1000)).toFixed(2)),
       steppingTimeSec: parseFloat(((history.performance?.steppingTimeMs || 0) / 1000).toFixed(2)),
       screenshotTimeSec: parseFloat((shot.durationMs / 1000).toFixed(2)),
       steps: history.performance?.steps || 0,
