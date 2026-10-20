@@ -110,8 +110,9 @@ suite. Stop only the browser/server you started afterward.
 ### Landing gear geometry acceptance
 
 `node scripts/test-gear-retraction.mjs --gpu` renders the loaded airframe and
-procedural fallback from above, below, the side, and close-up at five gear states.
-It checks full cycles and reversal and writes captures/results to
+procedural fallback from above, directly below, the side, and close-up at five gear states.
+It checks full cycles, reversal, and main-strut coaxiality through compression
+and release, and writes captures/results to
 `.tmp/gear-retraction`. Add `--animation` with an installed FFmpeg (or
 `FFMPEG_PATH`) for synchronized above/below full-cycle WebM evidence.
 See [gear fit evidence](../../review-artifacts/gear-fit/README.md).
