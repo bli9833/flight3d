@@ -224,7 +224,8 @@ export class DemoFlightDirector {
 
   stop(message = null, keepParkingBrake = false) {
     if (!this.isActive) return;
-    if (this.waitingForTerrain && this.luklaScenario.result.status === 'pending') {
+    if (this.activeDemoAirport === 'lukla' &&
+        ['pending', 'running'].includes(this.luklaScenario.result.status)) {
       this.luklaScenario.result.status = 'cancelled';
     }
     this.waitingForTerrain = false;
@@ -299,6 +300,11 @@ export class DemoFlightDirector {
   update(dt) {
     if (!this.isActive) return;
     if (this.waitingForTerrain) {
+      if (this.sim.currentTerrain?.loadError) {
+        this.luklaScenario.recordFailure({ description: this.sim.currentTerrain.loadError });
+        this.stop('루클라 지형을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.');
+        return;
+      }
       if (this.sim.currentTerrain?.isLoaded === true) this.start(this.activeDemoAirport);
       return;
     }
