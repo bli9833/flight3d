@@ -9,6 +9,7 @@ const CDP_PORT = Number(process.env.CDP_PORT || 9488);
 const SIM_URL = `http://127.0.0.1:${PORT}/`;
 const ARTIFACT_DIR = path.resolve(process.env.ARTIFACT_DIR || '.tmp/lukla-physics');
 const screenshots = process.argv.includes('--screenshots');
+const rootExecution = process.getuid?.() === 0;
 const repetitions = Number(process.env.LUKLA_RUNS || 3);
 assert.ok(Number.isInteger(repetitions) && repetitions > 0 && repetitions <= 10);
 
@@ -19,7 +20,8 @@ async function main() {
   const chrome = spawn('google-chrome-stable', [
     '--headless=new', `--user-data-dir=${profile}`, `--remote-debugging-port=${CDP_PORT}`,
     '--window-size=1280,720', '--use-gl=angle', '--use-angle=vulkan',
-    '--disable-dev-shm-usage', '--no-first-run', 'about:blank'
+    '--disable-dev-shm-usage', '--no-first-run',
+    ...(rootExecution ? ['--no-sandbox'] : []), 'about:blank'
   ], { stdio: 'ignore' });
   let ws;
   try {
@@ -93,6 +95,25 @@ async function main() {
       const ext = gl.getExtension('WEBGL_debug_renderer_info');
       return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
     })()`);
+    const cancellations = await evaluate(`(() => {
+      const sim = window.simulator;
+      sim.clock.getDelta = () => 0;
+      sim.physicsAccumulator = 0;
+      return ['escape', 'preset', 'airport'].map(action => {
+        sim.demoDirector.start('lukla');
+        const before = sim.demoDirector.luklaScenario.result.status;
+        if (action === 'escape') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        if (action === 'preset') document.getElementById('btn-preset-rwy').click();
+        if (action === 'airport') document.getElementById('btn-airport-coastal').click();
+        return { action, before, active: sim.demoDirector.isActive,
+          outcome: sim.demoDirector.luklaScenario.result.status };
+      });
+    })()`);
+    for (const cancellation of cancellations) {
+      assert.equal(cancellation.before, 'running');
+      assert.equal(cancellation.active, false);
+      assert.equal(cancellation.outcome, 'cancelled');
+    }
     const reports = [];
     for (let run = 0; run < repetitions; run++) {
       await evaluate(`(() => {
@@ -211,7 +232,39 @@ async function main() {
       assert.equal(impact.yChanged, false, 'Impact must be detected before correcting position');
       assert.equal(impact.massKg, 66000, 'Manual presets must restore default aircraft loading');
     }
-    fs.writeFileSync(path.join(ARTIFACT_DIR, 'report.json'), JSON.stringify({ renderer, startup, reports, crashStop, rejectedImpacts }, null, 2));
+    const loadFailures = [];
+    for (const mode of ['http', 'network']) {
+      heldDemRequest = undefined;
+      await send('Fetch.enable', { patterns: [{ urlPattern: '*/terrain/lukla_dem.bin', requestStage: 'Request' }] });
+      await send('Page.navigate', { url: SIM_URL + '?demFailure=' + mode });
+      for (let i = 0; i < 100 && !heldDemRequest; i++) await new Promise(r => setTimeout(r, 100));
+      assert.ok(heldDemRequest, 'Failure case must intercept a fresh DEM request');
+      if (mode === 'http') await send('Fetch.fulfillRequest', { requestId: heldDemRequest, responseCode: 503, body: '' });
+      else await send('Fetch.failRequest', { requestId: heldDemRequest, errorReason: 'Failed' });
+      await send('Fetch.disable');
+      let state;
+      for (let i = 0; i < 100; i++) {
+        state = await evaluate(`(() => {
+          const sim = window.simulator;
+          if (!sim || !sim.luklaTerrain.loadError) return null;
+          return { active: sim.demoDirector.isActive, waiting: sim.demoDirector.waitingForTerrain,
+            outcome: sim.demoDirector.luklaScenario.result.status,
+            reason: sim.demoDirector.luklaScenario.result.reason,
+            parkingBrake: sim.controls.parkingBrake, gearBrakes: sim.gear.brakes };
+        })()`);
+        if (state?.outcome === 'failed' && !state.active) break;
+        await new Promise(r => setTimeout(r, 100));
+      }
+      assert.ok(state, 'DEM failure must be observable');
+      assert.equal(state.outcome, 'failed');
+      assert.equal(state.active, false);
+      assert.equal(state.waiting, false);
+      assert.equal(state.parkingBrake, false);
+      assert.equal(state.gearBrakes, 0);
+      assert.ok(state.reason);
+      loadFailures.push({ mode, ...state });
+    }
+    fs.writeFileSync(path.join(ARTIFACT_DIR, 'report.json'), JSON.stringify({ renderer, rootExecution, startup, cancellations, reports, crashStop, rejectedImpacts, loadFailures }, null, 2));
     console.log(`PASS: ${reports.length} complete circuits. ${path.join(ARTIFACT_DIR, 'report.json')}`);
   } finally {
     ws?.close();

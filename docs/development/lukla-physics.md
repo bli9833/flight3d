@@ -57,8 +57,13 @@ director returns to idle. Successful handover retains the parking brake.
 
 Constructor auto-start remains pending with the parking brake set until the
 DEM is loaded. The active request can be cancelled by Esc, presets, or airport
-changes; cancelled requests never restart on load completion. The director
-starts the circuit from its next update after loading. Physics crashes use
+changes; both pending and running requests become `cancelled` on ordinary stop,
+while completed/failed outcomes are preserved. Cancelled requests never restart
+on load completion. The director
+starts the circuit from its next update after loading. HTTP failures, fetch
+rejections, and invalid DEM grids expose `loadError`; a pending director records
+`failed`, clears the loading UI, and releases the parking brake on the next
+update. A successful explicit loader retry clears the error. Physics crashes use
 `stopForCrash` to record the failure before deactivating the director, so an
 additional scenario update is not needed to persist the outcome.
 
@@ -72,7 +77,8 @@ PORT=5181 npm run test:lukla -- --screenshots
 ```
 
 `PORT`, `CDP_PORT`, `ARTIFACT_DIR`, and `LUKLA_RUNS` are configurable. The default
-is three circuits. The harness intercepts the initial DEM request to verify
+is three circuits. Chrome retains its normal sandbox for non-root users; UID 0
+launches add `--no-sandbox` for root-owned containers. The harness intercepts the initial DEM request to verify
 pending constructor auto-start and automatic resumption on load, then freezes wall-clock
 advance, and executes the actual browser `stepSimulation` at 120 Hz. Screenshots
 are opt-in. Missing completion, missing touchdown events, stalls, nonfinite
@@ -80,7 +86,9 @@ state, damage, less than 50 m of runway remaining, and movement during the
 10-second parking hold all fail. It also injects 20 m/s downward and level-into-
 uphill contacts: both must crash before any position correction. Manual preset
 mass restoration and synchronous failure recording through the real
-`triggerCrash` path are checked there as well. No fallback screenshot earns a pass.
+`triggerCrash` path are checked there as well. HTTP 503 and network-failure
+interception checks verify terminal loading failure, and real Esc/preset/airport
+UI actions must retain a cancelled outcome. No fallback screenshot earns a pass.
 
 The committed acceptance report identifies the GPU renderer and records each
 run's outcome, touchdown, peak normal impact, runway margin, and parking hold.

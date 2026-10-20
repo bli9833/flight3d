@@ -127,6 +127,41 @@ describe('Lukla continuous circuit and truthful completion', () => {
     assert.equal(sim.presetCalls, 1);
   });
 
+  it('fails and releases the pending UI and parking brake after a DEM load error', () => {
+    const { sim, director, scenario } = setup();
+    sim.currentTerrain = { isLoaded: false, loadError: null };
+    director.start('lukla');
+    sim.currentTerrain.loadError = 'Lukla DEM request failed (HTTP 503)';
+    director.update(0.1);
+    assert.equal(director.isActive, false);
+    assert.equal(director.waitingForTerrain, false);
+    assert.equal(scenario.result.status, 'failed');
+    assert.equal(scenario.result.reason, sim.currentTerrain.loadError);
+    assert.equal(sim.controls.parkingBrake, false);
+    assert.equal(sim.gear.brakes, 0);
+    director.update(10);
+    assert.equal(scenario.result.status, 'failed');
+    sim.currentTerrain.isLoaded = true;
+    sim.currentTerrain.loadError = null;
+    director.start('lukla');
+    assert.equal(scenario.result.status, 'running', 'A later successful load allows an explicit retry');
+  });
+
+  it('marks an in-flight stop as cancelled and preserves terminal outcomes', () => {
+    const { director, scenario } = setup();
+    director.stop();
+    assert.equal(director.isActive, false);
+    assert.equal(scenario.result.status, 'cancelled');
+    director.update(1);
+    assert.equal(scenario.result.status, 'cancelled');
+    for (const status of ['completed', 'failed']) {
+      director.start('lukla');
+      scenario.result.status = status;
+      director.stop();
+      assert.equal(scenario.result.status, status);
+    }
+  });
+
   it('does not overwrite a pending demo crash with cancellation', () => {
     const { sim, director, scenario } = setup();
     sim.currentTerrain = { isLoaded: false };
