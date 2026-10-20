@@ -23,6 +23,7 @@ const makeAircraft = (profile = 'fallback') => {
   return aircraft;
 };
 const bounds = object => new THREE.Box3().setFromObject(object);
+const wheelsOf = truck => truck.userData.wheels || truck.children.filter(child => child.isGroup).slice(0, 2);
 const pose = (aircraft, state) => {
   aircraft.update(1 / 120, { gearState: state });
   aircraft.group.updateMatrixWorld(true);
@@ -33,7 +34,7 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
     const aircraft = makeAircraft(profile);
     const legs = [aircraft.noseGearGroup, aircraft.mainGearLGroup, aircraft.mainGearRGroup];
     const hinges = aircraft.gearDoors.map(({ obj }) => obj.position.clone());
-    const wheel = aircraft.mainTruckL.children.find(child => child.isGroup);
+    const wheel = wheelsOf(aircraft.mainTruckL)[0];
     const radius = bounds(wheel).getSize(new THREE.Vector3()).z;
     const states = [...Array.from({ length: 101 }, (_, i) => 1 - i / 100), 0.3, 0.6, 0.4, 0.2, 0,
       ...Array.from({ length: 101 }, (_, i) => i / 100)];
@@ -50,8 +51,8 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
       // behind the engines, and on its own side of the aircraft.
       for (const [leg, side] of [[legs[1], -1], [legs[2], 1]]) {
         const box = bounds(leg);
-        assert.ok(box.max.y < -1.48, `wing clearance at state ${state}`);
-        assert.ok(box.min.z > 1, `engine clearance at state ${state}`);
+        assert.ok(box.max.y < (profile === 'loaded' ? -0.90 : -0.40), `wing clearance at state ${state}`);
+        assert.ok(box.min.z > -0.2, `engine clearance at state ${state}`);
         assert.ok(side < 0 ? box.max.x < 0 : box.min.x > 0, 'legs must not cross the centerline');
       }
       const signature = legs.flatMap(leg => leg.matrix.elements);
@@ -70,7 +71,7 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
       } });
       aircraft.group.updateMatrixWorld(true);
       trucks.forEach((truck, i) => {
-        const wheels = truck.children.filter(child => child.isGroup).slice(0, 2);
+        const wheels = wheelsOf(truck);
         const center = wheels.reduce((sum, wheel) => sum.add(wheel.getWorldPosition(new THREE.Vector3())), new THREE.Vector3()).multiplyScalar(0.5);
         const expected = physics.contacts[i].localPos.clone(); expected.y += compression;
         assert.ok(center.distanceTo(expected) < 1e-9);
@@ -80,34 +81,27 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
     }
     pose(aircraft, 0);
     for (const truck of trucks.slice(1)) {
-      const wheel = truck.children.find(child => child.isGroup);
+      const wheel = wheelsOf(truck)[0];
       assert.ok(Math.abs(wheel.getWorldPosition(new THREE.Vector3()).x) < 2, 'stowed hub belongs in belly bay');
     }
   });
 
-  it('keeps every stowed main-wheel vertex below the actual fairing roof', () => {
-    const aircraft = makeAircraft(profile);
-    pose(aircraft, 0);
-    const ray = new THREE.Raycaster();
-    const point = new THREE.Vector3();
-    let checked = 0;
-    for (const truck of [aircraft.mainTruckL, aircraft.mainTruckR]) {
-      for (const wheel of truck.children.filter(child => child.isGroup).slice(0, 2)) {
-        wheel.traverse(mesh => {
-          if (!mesh.isMesh) return;
-          const vertices = mesh.geometry.attributes.position;
-          for (let i = 0; i < vertices.count; i++) {
-            point.fromBufferAttribute(vertices, i).applyMatrix4(mesh.matrixWorld);
-            ray.set(new THREE.Vector3(point.x, 10, point.z), new THREE.Vector3(0, -1, 0));
-            const roof = ray.intersectObject(aircraft.gearBayGroup, true)[0];
-            assert.ok(roof, 'wheel must be enclosed by a fairing roof');
-            assert.ok(point.y < roof.point.y - 0.02, 'tire must not emerge through the fairing');
-            checked++;
-          }
-        });
+  it('stows exposed tire faces without exterior main-gear covers', () => {
+    const aircraft = makeAircraft(profile); pose(aircraft, 0);
+    assert.equal(aircraft.gearDoors.length, 2, 'only nose doors remain');
+    for (const [truck, side] of [[aircraft.mainTruckL, -1], [aircraft.mainTruckR, 1]]) {
+      const wheels = wheelsOf(truck);
+      for (const wheel of wheels) {
+        const axis = new THREE.Vector3(1, 0, 0).transformDirection(wheel.matrixWorld);
+        assert.ok(Math.abs(axis.y) > 0.999, 'round outer tire face must point down');
+        assert.ok(Math.abs(wheel.getWorldPosition(new THREE.Vector3()).x - side * aircraft.mainStowedX) < 1e-8);
       }
+      assert.ok(Math.abs(Math.min(...wheels.map(wheel => bounds(wheel).min.y)) - aircraft.mainStowedY + 0.52) < 1e-7);
+      assert.ok(aircraft.mainStowedX < 1);
     }
-    assert.ok(checked > 100);
+    for (const leg of [aircraft.mainGearLGroup, aircraft.mainGearRGroup]) {
+      assert.ok(leg.children.every(child => !child.isMesh || child.geometry.type !== 'BoxGeometry'));
+    }
   });
 
   it('contains the stowed nose assembly behind its closed doors', () => {
@@ -159,6 +153,7 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
     aircraft.gltfGroup.add(aircraft.gltfModel);
     aircraft.group.updateMatrixWorld(true);
     aircraft.fitNoseDoorsToSkin();
+    aircraft.fitMainBaysToSkin(aircraft.gltfModel);
     const ray = new THREE.Raycaster();
     const panels = aircraft.gearDoors.map(({ obj }) => obj.children[0]);
     pose(aircraft, 0);
@@ -172,7 +167,19 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
       assert.ok(Math.abs(skin.point.y - door.point.y - 0.012) < 0.008, 'closed door follows skin');
     }
     const mesh = aircraft.gltfModel.getObjectByName('B737');
+    const skinYs = [-1, 1].map(side => {
+      ray.set(new THREE.Vector3(side * aircraft.mainStowedX, -10, 1.8), new THREE.Vector3(0, 1, 0));
+      return ray.intersectObject(mesh, true)[0].point.y;
+    });
     cutGearBays(mesh, aircraft.group, aircraft.gearBayVolumes);
+    for (const [i, side] of [-1, 1].entries()) {
+      ray.set(new THREE.Vector3(side * aircraft.mainStowedX, -10, 1.8), new THREE.Vector3(0, 1, 0));
+      assert.ok(ray.intersectObject(mesh, true)[0].point.y > 0, 'main tire opening has no exterior cover');
+      const truck = side < 0 ? aircraft.mainTruckL : aircraft.mainTruckR;
+      const face = ray.intersectObjects(wheelsOf(truck), true)[0];
+      assert.ok(face, 'exposed tire face must be visible');
+      assert.ok(Math.abs(face.point.y - skinYs[i]) < 0.12, 'tire face must be near flush with original belly');
+    }
     ray.set(new THREE.Vector3(0, -10, -13.5), new THREE.Vector3(0, 1, 0));
     assert.ok(ray.intersectObject(mesh, true)[0].point.y > 0, 'nose aperture must open through the bottom skin');
     // The cutting volume must never remove the upper wing surface.

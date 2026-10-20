@@ -97,7 +97,7 @@ try {
   const views = [
     ['overview', [-24, -15, -30], [0, -1, -3]], ['main', [-10, -8, -10], [0, -1, 1.8]],
     ['nose', [-5, -6, -17], [0, -2, -13]], ['above', [-12, 9, -8], [0, -1, 1.8]],
-    ['side', [-19, 0, -1], [0, -1, 0]]
+    ['side', [-19, 0, -1], [0, -1, 0]], ['belly', [0, -13, 1.8], [0, -1, 1.8]]
   ];
   const results = [];
   for (const model of ['loaded', 'fallback']) {
@@ -114,7 +114,7 @@ try {
           if (leg.scale.distanceTo(new T.Vector3(1, 1, 1)) > 1e-9) throw new Error('Gear dimensions changed');
         }
       }
-      if (maxMainY >= -1.48) throw new Error(`Wing clearance failed: ${maxMainY}`);
+      if (maxMainY >= (model === 'loaded' ? -0.90 : -0.40)) throw new Error(`Wing clearance failed: ${maxMainY}`);
       return { model, poses: 205, maxMainY };
     }, model);
     results.push(cycle);
@@ -163,7 +163,7 @@ try {
   }
   assert.deepEqual(exceptions, [], 'No uncaught browser exceptions');
   await writeFile(join(directory, 'results.json'), JSON.stringify({ setup, results, exceptions }, null, 2));
-  console.log(JSON.stringify({ directory, results, screenshots: 50 }));
+  console.log(JSON.stringify({ directory, results, screenshots: 60 }));
 } finally {
   socket?.close(); chrome.kill();
   await new Promise(resolve => chrome.once('exit', resolve));

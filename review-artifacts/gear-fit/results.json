@@ -7,12 +7,12 @@
     {
       "model": "loaded",
       "poses": 205,
-      "maxMainY": -1.5299999982118608
+      "maxMainY": -0.9543932257455039
     },
     {
       "model": "fallback",
       "poses": 205,
-      "maxMainY": -1.5299999982118608
+      "maxMainY": -0.4894169981958131
     }
   ],
   "exceptions": []
