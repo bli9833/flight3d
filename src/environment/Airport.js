@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs } from './Pavement.js';
 
 /**
  * International Airport Environment (Runway 09L/27R, Control Tower, Terminal, Hangars, Lighting)
@@ -48,14 +49,7 @@ export class Airport {
 
   initAirport() {
     // Materials with hardware polygon offset to guarantee zero Z-fighting with terrain
-    const asphaltMat = new THREE.MeshStandardMaterial({
-      color: 0x1e242b,
-      roughness: 0.85,
-      metalness: 0.1,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1
-    });
+    const asphaltMat = createPavementMaterial('asphalt');
 
     const concreteMat = new THREE.MeshStandardMaterial({
       color: 0x94a3b8,
@@ -78,7 +72,7 @@ export class Airport {
     this.buildRunway(asphaltMat);
 
     // 2. Taxiway System & Apron
-    this.buildTaxiways(asphaltMat);
+    this.buildTaxiways(asphaltMat, createPavementMaterial('concrete'));
 
     // 3. Airfield Lighting (Edge Lights, Threshold, ALS Strobes, PAPI)
     this.buildLighting();
@@ -94,10 +88,29 @@ export class Airport {
     // Main Runway Tarmac Slab
     const rwyGeo = new THREE.PlaneGeometry(this.runwayLength, this.runwayWidth);
     rwyGeo.rotateX(-Math.PI * 0.5);
+    setPavementUVs(rwyGeo);
     const rwyMesh = new THREE.Mesh(rwyGeo, asphaltMat);
+    rwyMesh.name = 'runway-pavement';
     rwyMesh.position.set(0, this.elevation + 0.06, 0);
     rwyMesh.receiveShadow = true;
     this.group.add(rwyMesh);
+
+    const repairs = createRunwayRepairs(this.runwayWidth, this.runwayLength);
+    repairs.rotation.y = Math.PI / 2;
+    repairs.position.y = this.elevation + 0.06;
+    this.group.add(repairs);
+    const wearMat = createRunwayWearMaterial();
+    if (wearMat) {
+      const wearGeo = new THREE.PlaneGeometry(18, 360);
+      wearGeo.rotateX(-Math.PI * 0.5);
+      for (const end of [-1, 1]) {
+        const wear = new THREE.Mesh(wearGeo, wearMat);
+        wear.rotation.y = end * Math.PI * 0.5;
+        wear.position.set(end * (this.runwayLength / 2 - 450), this.elevation + 0.07, 0);
+        wear.receiveShadow = true;
+        this.group.add(wear);
+      }
+    }
 
     // Runway Markings Material (polygonOffset & depthWrite: false prevents all flickering)
     const whiteMarkMat = new THREE.MeshStandardMaterial({
@@ -244,12 +257,13 @@ export class Airport {
     this.group.add(markingsGroup);
   }
 
-  buildTaxiways(asphaltMat) {
+  buildTaxiways(asphaltMat, apronMat) {
     const taxiGroup = new THREE.Group();
 
     // Parallel Taxiway A (length 3200m, width 25m, offset z = 160m to North)
     const taxiGeo = new THREE.PlaneGeometry(this.runwayLength, 25);
     taxiGeo.rotateX(-Math.PI * 0.5);
+    setPavementUVs(taxiGeo);
     const taxiMesh = new THREE.Mesh(taxiGeo, asphaltMat);
     taxiMesh.position.set(0, this.elevation + 0.04, 160);
     taxiMesh.receiveShadow = true;
@@ -259,6 +273,7 @@ export class Airport {
     for (let x = -1200; x <= 1200; x += 600) {
       const connGeo = new THREE.PlaneGeometry(24, 160);
       connGeo.rotateX(-Math.PI * 0.5);
+      setPavementUVs(connGeo);
       const conn = new THREE.Mesh(connGeo, asphaltMat);
       conn.position.set(x, this.elevation + 0.04, 80);
       conn.receiveShadow = true;
@@ -268,7 +283,8 @@ export class Airport {
     // Apron / Ramp Area (z = 240m to 420m)
     const apronGeo = new THREE.PlaneGeometry(1400, 180);
     apronGeo.rotateX(-Math.PI * 0.5);
-    const apron = new THREE.Mesh(apronGeo, asphaltMat);
+    setPavementUVs(apronGeo);
+    const apron = new THREE.Mesh(apronGeo, apronMat);
     apron.position.set(0, this.elevation + 0.03, 270);
     apron.receiveShadow = true;
     taxiGroup.add(apron);

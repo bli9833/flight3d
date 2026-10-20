@@ -164,9 +164,9 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
     const sin58 = Math.sin(THREE.MathUtils.degToRad(58.0));
     const cos58 = Math.cos(THREE.MathUtils.degToRad(58.0));
 
-    // 1. Safe on runway 06 threshold with gear down (groundH ~2811.3m + 2.15m gear = 2813.45m)
+    // 1. Safe on runway 06 threshold with gear down (groundH plus 3.5m wheel geometry)
     const groundH = terrain.getHeight(-210 * sin58, 210 * cos58);
-    const pos = new THREE.Vector3(-210 * sin58, groundH + 2.15, 210 * cos58);
+    const pos = new THREE.Vector3(-210 * sin58, groundH + 3.5, 210 * cos58);
     const quat = new THREE.Quaternion().setFromEuler(
       new THREE.Euler(THREE.MathUtils.degToRad(6.71), -THREE.MathUtils.degToRad(58.0), 0, 'YXZ')
     );

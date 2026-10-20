@@ -464,109 +464,19 @@ export class CollisionDetector {
   checkTerrain(aircraftPos, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity = null) {
     if (!this.terrain) return null;
 
-    const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
-    const isAirportRunway = (this.airport && typeof this.airport.isOnRunway === 'function')
-      ? this.airport.isOnRunway(aircraftPos.x, aircraftPos.z)
-      : (Math.abs(aircraftPos.x) < 1950 && Math.abs(aircraftPos.z) < 450);
-    const isGearDeployed = gearState > 0.75;
-    const isPitchSafe = pitchDeg >= -9.5 && pitchDeg <= 16.5;
-    const isRollSafe = Math.abs(rollDeg) <= 16.5;
-
-    // 1. Runway operations (Takeoff roll, rotation, flare, touchdown, and braking)
-    if (isAirportRunway) {
-      // Hard landing: only checked when wheels actually contact ground (y <= groundH + 2.15m)
-      if (aircraftPos.y <= groundH + 2.15 && speedMs > 25.0) {
-        // Compute impact velocity normal to the local runway surface
-        const normal = (typeof this.terrain.getNormal === 'function')
-          ? this.terrain.getNormal(aircraftPos.x, aircraftPos.z)
-          : new THREE.Vector3(0, 1, 0);
-        const normalImpactSpeed = linearVelocity ? -linearVelocity.dot(normal) : -vsiMs;
-
-        // Gear collapse / belly impact onto runway concrete
-        if (aircraftPos.y < groundH + 2.1) {
-          return {
-            name: '하드 랜딩 기체 파손 (HARD LANDING CRASH)',
-            point: aircraftPos.clone(),
-            description: `과도한 충격으로 랜딩기어가 파손되며 동체가 활주로에 격돌했습니다.`
-          };
-        }
-        // Catastrophic extreme vertical or surface-normal slam (> 12.5 m/s or > 2400 FPM)
-        if (normalImpactSpeed > 12.5 || vsiMs < -12.5) {
-          const impactFpm = Math.max(normalImpactSpeed, -vsiMs) * 196.85;
-          return {
-            name: '하드 랜딩 기체 파손 (HARD LANDING CRASH)',
-            point: aircraftPos.clone(),
-            description: `과도한 접지 충격율(${impactFpm.toFixed(0)} FPM)로 인해 활주로에 격돌했습니다.`
-          };
-        }
-        // Severe wingtip scrape on runway
-        if (!isRollSafe) {
-          return {
-            name: '주익단 지면 접촉 (WINGTIP STRIKE CRASH)',
-            point: aircraftPos.clone(),
-            description: `과도한 뱅크각(${rollDeg.toFixed(1)}°)으로 주익이 활주로에 접촉했습니다.`
-          };
-        }
-        // Severe nose dive into runway
-        if (pitchDeg < -7.5) {
-          return {
-            name: '기수 노즈기어 파손 격돌 (NOSE DIVE CRASH)',
-            point: aircraftPos.clone(),
-            description: `음성 피치(${pitchDeg.toFixed(1)}°)로 기수가 활주로에 격돌했습니다.`
-          };
-        }
-        // Severe tail strike beyond rotation envelope (> 14.5 deg at low altitude)
-        if (pitchDeg > 14.5 && aircraftPos.y < groundH + 3.1) {
-          return {
-            name: '테일 스트라이크 (TAIL STRIKE CRASH)',
-            point: aircraftPos.clone(),
-            description: `과도한 기수 상승각(${pitchDeg.toFixed(1)}°)으로 후방 동체가 활주로에 격돌했습니다.`
-          };
-        }
-      }
-      // With gear retracted, use body contact rather than the deployed wheel height.
-      // Engine probes are centers; their radii locate the nacelle bottoms.
-      if (gearState < 0.25 && speedMs > 25.0) {
-        const bodyContact = worldProbes.find(probe => {
-          const bottomY = probe.pos.y - (probe.id === 'engineL' || probe.id === 'engineR' ? probe.radius : 0);
-          return bottomY < this.terrain.getHeight(probe.pos.x, probe.pos.z) + 0.1;
-        });
-        if (bodyContact) {
-          return {
-            name: '동체 착륙 폭발 (GEAR-UP BELLY CRASH)',
-            point: bodyContact.pos.clone(),
-            description: `랜딩기어 미전개 상태에서 고속(${(speedMs * 1.94384).toFixed(0)} KT)으로 동체가 활주로와 충돌했습니다.`
-          };
-        }
-      }
-      // On the airport runway with gear deployed and normal attitude: safe operations!
-      if (isGearDeployed && isPitchSafe && isRollSafe) {
-        return null;
-      }
-    }
-
-    // 2. Off-runway terrain, mountain ridges, and steep hills collision
+    // Body contact is evaluated on every surface, including the runway. Gear
+    // deployment and nominal attitude never exempt nacelles or wings from contact.
     for (const probe of worldProbes) {
-      const probeGroundH = this.terrain.getHeight(probe.pos.x, probe.pos.z);
-
-      // On runway plateau with gear deployed, ignore belly/engine/tail ground clearance only if probe itself is within runway bounds
-      const probeOnRunway = (this.airport && typeof this.airport.isOnRunway === 'function')
-        ? this.airport.isOnRunway(probe.pos.x, probe.pos.z)
-        : isAirportRunway;
-      if (isAirportRunway && isGearDeployed && probeOnRunway) {
-        continue;
-      }
-
-      // If probe penetrates into ground/mountain slope
-      if (probe.pos.y < probeGroundH + 0.1) {
+      const ground = this.terrain.getHeight(probe.pos.x, probe.pos.z);
+      const radius = probe.id === 'engineL' || probe.id === 'engineR' ? probe.radius : 0;
+      if (probe.pos.y - radius < ground + 0.1) {
         return {
-          name: '산악 지형 충돌 (TERRAIN / MOUNTAIN COLLISION)',
+          name: gearState < 0.25 ? '동체 착륙 (GEAR-UP BELLY CRASH)' : '기체 지면 접촉 (TERRAIN / BODY STRIKE)',
           point: probe.pos.clone(),
-          description: `구릉 지형 또는 산악 지면에 ${probe.desc} 부위가 격돌했습니다.`
+          description: `${probe.desc} 부위가 지면에 접촉했습니다.`
         };
       }
     }
-
     return null;
   }
 }

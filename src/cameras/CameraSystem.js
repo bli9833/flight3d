@@ -47,6 +47,7 @@ export class CameraSystem {
     this.chasePitch = 0;
     this.chasePos = new THREE.Vector3();
     this.chaseTarget = new THREE.Vector3();
+    this.chaseTargetInitialized = false;
 
     // Wing View Parameters
     this.wingLookYaw = 0;
@@ -567,9 +568,16 @@ export class CameraSystem {
     behindLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.chasePitch);
     behindLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.chaseYaw);
     this.chasePos.copy(behindLocal.applyMatrix4(aircraftMesh.matrixWorld));
+    this.chaseTarget.copy(aircraftMesh.position);
+    this.chaseTargetInitialized = true;
 
     if (this.mode === CameraSystem.MODES.COCKPIT) {
-      const eyeWorld = this.cockpitHeadOffset.clone().applyMatrix4(aircraftMesh.matrixWorld);
+      const eyeLocal = this.cockpitHeadOffset.clone();
+      if (this.camera && this.camera.aspect < 1.0) {
+        eyeLocal.x = -0.34;
+        eyeLocal.y += 0.03;
+      }
+      const eyeWorld = eyeLocal.applyMatrix4(aircraftMesh.matrixWorld);
       this.camera.position.copy(eyeWorld);
       const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraftMesh.quaternion);
       this.camera.up.copy(upWorld);
@@ -746,6 +754,15 @@ export class CameraSystem {
     const planePos = aircraftMesh.position;
     const planeQuat = aircraftMesh.quaternion;
 
+    // Carry translation through immediately, even while another view is active.
+    // Damp only changes in orbit/attitude, so variable frame times cannot change
+    // the aircraft distance and pitch the horizon during a steady approach.
+    if (this.chaseTargetInitialized) {
+      this.chasePos.add(planePos).sub(this.chaseTarget);
+    }
+    this.chaseTarget.copy(planePos);
+    this.chaseTargetInitialized = true;
+
     // Smooth Touchdown Jolt with exponential decay (affects cockpit and exterior suspension reaction)
     this.touchJoltOffset = (this.touchJoltOffset || 0) * Math.max(0.0, 1.0 - dt * 6.0);
     if (flightState.touchdown) {
@@ -785,6 +802,10 @@ export class CameraSystem {
         }
 
         const eyeLocal = this.cockpitHeadOffset.clone();
+        if (this.camera && this.camera.aspect < 1.0) {
+          eyeLocal.x = -0.34;
+          eyeLocal.y += 0.03;
+        }
         if (this.photoCockpit) {
           eyeLocal.set(-0.48, 0.88, -12.02);
         }
@@ -837,7 +858,10 @@ export class CameraSystem {
         }
 
         // Damped interpolation to smooth camera motion
-        this.chasePos.lerp(targetBehindWorld, Math.min(1.0, dt * 6.5));
+        this.chasePos.lerp(targetBehindWorld, 1 - Math.exp(-Math.max(0, dt) * 6.5));
+        // Clamp the final smoothed position too, especially along steep terrain.
+        this.chasePos.y = Math.max(this.chasePos.y,
+          this.queryGroundHeight(this.chasePos.x, this.chasePos.z) + 1.8);
         this.camera.position.copy(this.chasePos);
 
         const lookTarget = planePos.clone().add(new THREE.Vector3(0, 1.5, 0));

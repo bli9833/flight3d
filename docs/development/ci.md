@@ -27,6 +27,10 @@ ports and paths before running it. Some capture tools have machine-specific
 output paths; test-flight-agent.js accepts ARTIFACT_DIR. Use a writable output
 directory and preserve evidence relevant to the change.
 
+For loaded-DEM Lukla contact, damage, and full-circuit acceptance, see
+[lukla-physics.md](lukla-physics.md). `test:lukla` now fails incomplete flights
+and checks three complete circuits plus a 10-second parking hold.
+
 ### Hardware GPU acceleration & performance
 
 Hardware GPU acceleration is enabled for user accounts in the `render` (991) and `video` (44) groups with read/write access to `/dev/dri/renderD128`:
@@ -74,3 +78,41 @@ preserve. Browser acceptance must be made portable before adding it to CI.
 The original package.json declared Vite 6 while the existing lockfile and local
 installation used Vite 8. The declaration now matches the existing lockfile
 (^8.3.4), allowing npm ci without replacing the resolved dependency graph.
+
+### Exterior control surfaces (issue #59)
+
+`node --test tests/gltfControlSurfaces.test.js` loads the actual exterior GLB's
+geometry without image decoding. It checks triangle-area conservation, neutral
+bounds, material/UV retention, left/right deflection signs and hold/reverse/release.
+The exterior asset stays unchanged: `GltfControlSurfaces.js` clips its batched
+triangles into seven moving surfaces in the `B737` mesh's local coordinates.
+Hinge measurements are specific to `public/models/b737-800.glb`; remeasure them
+and rerun the geometry and browser checks if that asset changes. Landing gear
+and the procedural fallback remain independent. The cockpit shadow proxy retains
+the original neutral geometry, so its silhouette does not animate with controls.
+
+For rendering/input evidence, start the Vite server as above and launch Chromium:
+
+```sh
+chromium --headless --no-sandbox --use-gl=angle --use-angle=swiftshader \
+  --enable-unsafe-swiftshader --remote-debugging-port=9447 \
+  --user-data-dir=/tmp/flight3d-controls-chromium http://127.0.0.1:5173/
+```
+
+In another shell, run `node scripts/verify-control-surfaces.mjs`. This uses native
+CDP D-key input, deterministic physics stepping, and the loaded aircraft's update
+method to assert seven nonempty surfaces, held input, reversal and release. It
+also renders a clone of the loaded exterior in neutral and deflected poses for
+visual inspection. Output goes to `.cache/control-surfaces/` (override with
+`ARTIFACT_DIR`); inspect both PNGs and `browser-results.json`. This bounded check
+is not a complete flight, gear, spoiler, cockpit-shadow or performance acceptance
+suite. Stop only the browser/server you started afterward.
+### Landing gear geometry acceptance
+
+`node scripts/test-gear-retraction.mjs --gpu` renders the loaded airframe and
+procedural fallback from above, directly below, the side, and close-up at five gear states.
+It checks full cycles, reversal, and main-strut coaxiality through compression
+and release, and writes captures/results to
+`.tmp/gear-retraction`. Add `--animation` with an installed FFmpeg (or
+`FFMPEG_PATH`) for synchronized above/below full-cycle WebM evidence.
+See [gear fit evidence](../../review-artifacts/gear-fit/README.md).

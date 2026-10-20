@@ -48,8 +48,8 @@ test('CollisionDetector (Multi-Obstacle & Crash Detection System)', async (t) =>
   const detector = new CollisionDetector(mockTerrain, mockAirport, mockFoliage, mockShips, null);
 
   await t.test('should permit safe runway operations with gear down (no false crash)', () => {
-    // Aircraft on Runway 09L at 14.15m (12m ground + 2.15m gear), rolling at 70 m/s (136 KT)
-    const pos = new THREE.Vector3(-1000, 14.15, 0);
+    // Aircraft on Runway 09L at 15.5m (12m ground + 3.5m wheel geometry), rolling at 70 m/s (136 KT)
+    const pos = new THREE.Vector3(-1000, 15.5, 0);
     const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.5);
     const vel = new THREE.Vector3(70, -0.5, 0); // Gentle 100 FPM descent
     const gearState = 1.0;

@@ -117,6 +117,23 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     assert.strictEqual(camSys.isLookingAwayFromCenter(), true);
   });
 
+  it('should adapt cockpit eye offset when in portrait mode (aspect < 1.0)', () => {
+    const portraitCamera = new THREE.PerspectiveCamera(60, 390 / 844, 0.08, 1000);
+    const camSys = new CameraSystem(portraitCamera, mockDom);
+    camSys.setMode(CameraSystem.MODES.COCKPIT);
+
+    const aircraft = new THREE.Object3D();
+    aircraft.position.set(0, 50, 0);
+    aircraft.updateMatrixWorld(true);
+
+    camSys.snapToTarget(aircraft);
+    camSys.update(0.016, aircraft, { onGround: false });
+
+    // In portrait mode, eyeLocal.x is shifted to -0.34 and y to 0.88 to center windshield
+    assert.strictEqual(portraitCamera.position.x, -0.34);
+    assert.strictEqual(Math.round(portraitCamera.position.y * 100) / 100, 50.88);
+  });
+
   it('should update wing view look angles on mouse delta in WING mode', () => {
     const camera = new THREE.PerspectiveCamera();
     const camSys = new CameraSystem(camera, mockDom);

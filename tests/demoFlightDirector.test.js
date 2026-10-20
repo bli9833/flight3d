@@ -95,44 +95,15 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
     assert.strictEqual(sim.controls.getVirtualInput('brakes'), 0.0);
   });
 
-  it('should transition through Lukla demo stages in sequence', () => {
+  it('does not infer Lukla takeoff from elapsed time or radio altitude while grounded', () => {
     const sim = createMockSimulator('lukla');
     const director = new DemoFlightDirector(sim);
-
     director.start('lukla');
-    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
-
-    // 1. Advance to Canyon Climb when reaching cliff / timer
-    director.stageTimer = 9.0;
+    director.stageTimer = 60;
     sim.telemetry.iasKnots = 130;
     sim.telemetry.radioAltFt = 100;
     director.update(0.1);
-    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.CANYON_CLIMB);
-
-    // 2. Advance to Himalayan Cruise
-    director.stageTimer = 10.0;
-    director.update(0.1);
-    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.HIMALAYAN_CRUISE);
-
-    // 3. Advance to Canyon Approach
-    director.stageTimer = 9.5;
-    director.update(0.1);
-    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.CANYON_APPROACH);
-
-    // 4. Advance to Uphill Touchdown
-    // Position aircraft over Threshold 06: s >= -263.5m, onGround = true
-    sim.position.set(-200 * 0.848048, 2810, 200 * 0.529919); // s ≈ -200m
-    sim.telemetry.onGround = true;
-    director.update(0.1);
-    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.UPHILL_TOUCHDOWN);
-    assert.strictEqual(sim.aero.spoilers, 1.0);
-    assert.strictEqual(sim.controls.getVirtualInput('brakes'), 1.0);
-
-    // 5. Complete rollout when stopped
-    sim.telemetry.iasKnots = 2;
-    director.stageTimer = 8.5;
-    director.update(0.1);
-    assert.strictEqual(director.isActive, false);
+    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
   });
 
   it('should support Coastal demo flight when coastal airport is explicitly targeted', () => {

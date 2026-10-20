@@ -8,6 +8,9 @@ import * as THREE from 'three';
  */
 export class LandingGear {
   constructor() {
+    this.failure = null;
+    this.maxImpactSpeed = 0;
+    this.lastMomentBody = new THREE.Vector3();
     this.gearState = 1.0; // 0.0 (UP) to 1.0 (DOWN & LOCKED)
     this.targetGearState = 1.0;
     this.gearTransitSpeed = 0.12; // ~8 seconds for full transit
@@ -69,6 +72,20 @@ export class LandingGear {
     this.onGround = false;
     this.totalWeightOnWheels = 0;
     this.touchdownEvent = false;
+  }
+
+  resetContacts() {
+    this.failure = null;
+    this.maxImpactSpeed = 0;
+    this.lastMomentBody.set(0, 0, 0);
+    this.touchdownEvent = false;
+    this.totalWeightOnWheels = 0;
+    for (const c of this.contacts) {
+      c.isGrounded = false;
+      c.compression = 0;
+      c.touchdownThisFrame = false;
+    }
+    this.onGround = false;
   }
 
   toggleGear() {
@@ -189,10 +206,16 @@ export class LandingGear {
         const angVelWorld = angularVelocity.clone().applyQuaternion(worldQuat);
         const contactVel = linearVelocity.clone().add(angVelWorld.clone().cross(rWorld));
         const groundSpeed = Math.sqrt(linearVelocity.x * linearVelocity.x + linearVelocity.z * linearVelocity.z);
-        const sinkRate = -contactVel.y;
+        const sinkRate = Math.max(0, -contactVel.dot(groundNormal));
+        const impactLimit = c.isSteerable ? 2.8 : 3.8;
+        if (!wasGrounded) this.maxImpactSpeed = Math.max(this.maxImpactSpeed, sinkRate);
+        // Conservative simulation envelope, not a certified aircraft limit.
+        if ((!wasGrounded && sinkRate > impactLimit) || penetration > c.restLength + 0.08) {
+          this.failure ??= { contact: c.id, sinkRate, penetration, reason: sinkRate > impactLimit ? 'impact' : 'bottom-out' };
+        }
 
         // Touchdown impact requires descending from the air into the runway surface (sinkRate > 0.25 m/s)
-        if (!wasGrounded && penetration > 0.03 && sinkRate > 0.25) {
+        if (!wasGrounded && sinkRate > 0.25) {
           c.touchdownThisFrame = true;
           this.touchdownEvent = true;
           touchdownContacts.push({
@@ -242,7 +265,10 @@ export class LandingGear {
         if (this.brakes > 0.01) {
           muBrake += this.brakes * 0.58; // Boeing 737 anti-skid carbon brake friction
         }
-        const fForwardMag = -Math.sign(vForward) * Math.min(Math.abs(vForward) * 25000.0, normalForceMag * muBrake);
+        // Brake impulse approaches static friction at taxi speed instead of
+        // viscous drag that permits endless downhill creep. Coulomb cap stays.
+        const stoppingGain = this.brakes > 0.5 ? normalForceMag / (9.80665 * Math.max(dt, 0.001)) : 25000;
+        const fForwardMag = -Math.sign(vForward) * Math.min(Math.abs(vForward) * stoppingGain, normalForceMag * muBrake);
         const fForward = wheelForwardWorld.clone().multiplyScalar(fForwardMag);
 
         // Lateral scrub resistance (prevents skidding sideways)
@@ -265,6 +291,7 @@ export class LandingGear {
       }
     }
 
+    this.lastMomentBody.copy(netMomentBody);
     return {
       forces: netForceWorld,
       moments: netMomentBody,
@@ -274,6 +301,8 @@ export class LandingGear {
       isTransit: this.isTransit,
       weightOnWheels: this.totalWeightOnWheels,
       touchdownContacts,
+      failure: this.failure,
+      maxImpactSpeed: this.maxImpactSpeed,
       compressions: {
         nose: this.contacts[0].compression,
         mainLeft: this.contacts[1].compression,
