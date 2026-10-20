@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Atmosphere } from './physics/Atmosphere.js';
+import { BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics } from './physics/Aerodynamics.js';
 import { EngineModel } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
@@ -155,6 +156,7 @@ class FlightSimulator {
     this.lastGearTarget = true;
     this.airborneTime = 0.0;
     this.hasTouchedDownThisFlight = false;
+    this.gear.resetContacts();
 
     // 8. Rigid Body Physics State
     // Linear state
@@ -284,6 +286,7 @@ class FlightSimulator {
   }
 
   setPreset(type, isDemoInternal = false) {
+    if (!isDemoInternal) this.aero.loadConfig(BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
     }
@@ -298,6 +301,7 @@ class FlightSimulator {
     this.lastGearTarget = (type !== 'cruise');
     this.airborneTime = (type === 'runway') ? 0.0 : 15.0;
     this.hasTouchedDownThisFlight = false;
+    this.gear.resetContacts();
 
     if (this.isCrashed) {
       this.isCrashed = false;
@@ -314,8 +318,8 @@ class FlightSimulator {
 
       if (type === 'runway') {
         // Aligned on Lukla Runway 06 Threshold (Elevation 2,805m, Heading 058°, 11.7% uphill slope)
-        // At s = -210m: x = s*sin58, z = -s*cos58, groundH = 2811.3m (+2.15m gear = 2813.45m)
-        this.position.set(-210.0 * sin58, 2813.45, 210.0 * cos58);
+        // Spawn above the current wheel geometry, allowing suspension settling.
+        this.position.set(-210.0 * sin58, 2814.8, 210.0 * cos58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
 
@@ -368,8 +372,9 @@ class FlightSimulator {
         this.showToast('Preset: 루클라 협곡 착륙 챌린지 (고도 10,070 FT, Rwy 06)');
       } else if (type === 'cliff') {
         // Lukla Runway 24 Downhill Cliff Dive Takeoff!
-        // Starts at upper threshold 24 (s = +210m, groundH = 2860.7m + 2.15m gear = 2862.85m)
-        this.position.set(210.0 * sin58, 2862.85, -210.0 * cos58);
+        // Start near the upper threshold with wheel clearance; a 5m lateral
+        // offset keeps the wide wing clear of the raised apron.
+        this.position.set(240.0 * sin58 - 5 * cos58, 2867.72, -240.0 * cos58 - 5 * sin58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
         // Pitch nose down -6.71° along 11.7% downhill slope, Heading 238° (yaw -238°)
@@ -413,7 +418,7 @@ class FlightSimulator {
       // Coastal International Airport Presets
       if (type === 'runway') {
         // Aligned on Runway 09L Threshold (Heading 090° East)
-        this.position.set(-1350, 14.15, 0);
+        this.position.set(-1350, 15.5, 0);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
         this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.5); // Face East (+X)
@@ -635,6 +640,15 @@ class FlightSimulator {
       (x, z) => (this.currentTerrain.getNormal ? this.currentTerrain.getNormal(x, z) : null)
     );
 
+    if (gearResult.failure) {
+      this.triggerCrash({
+        collided: true, type: 'TERRAIN', name: '랜딩기어 파손 (HARD LANDING CRASH)',
+        point: this.position.clone(), speedKnots: groundSpeed * 1.94384,
+        description: `${gearResult.failure.contact}: 접지 충격 ${gearResult.failure.sinkRate.toFixed(1)} m/s / 스트럿 한계 초과`
+      });
+      return;
+    }
+
     // 5. Aerodynamic Forces & Moments
     const aeroResult = this.aero.computeAero(
       dt,
@@ -670,13 +684,6 @@ class FlightSimulator {
     }
 
     this.position.addScaledVector(this.linearVelocity, dt);
-
-    // Crash terrain penetration prevention (allow dynamic suspension stroke of up to 0.65m)
-    const minSafeY = groundHeight + (gearResult.gearState > 0.5 ? 2.80 : 1.80);
-    if (this.position.y < minSafeY) {
-      this.position.y = minSafeY;
-      if (this.linearVelocity.y < 0) this.linearVelocity.y = 0;
-    }
 
     // 9. Total Moments Integration: M = I * alpha
     // Moment in body frame: aero moment + landing gear moment

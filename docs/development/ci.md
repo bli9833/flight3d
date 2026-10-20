@@ -27,6 +27,10 @@ ports and paths before running it. Some capture tools have machine-specific
 output paths; test-flight-agent.js accepts ARTIFACT_DIR. Use a writable output
 directory and preserve evidence relevant to the change.
 
+For loaded-DEM Lukla contact, damage, and full-circuit acceptance, see
+[lukla-physics.md](lukla-physics.md). `test:lukla` now fails incomplete flights
+and checks three complete circuits plus a 10-second parking hold.
+
 ### Hardware GPU acceleration & performance
 
 Hardware GPU acceleration is enabled for user accounts in the `render` (991) and `video` (44) groups with read/write access to `/dev/dri/renderD128`:

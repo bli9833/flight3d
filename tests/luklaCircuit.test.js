@@ -1,146 +1,116 @@
 import { describe, it } from 'node:test';
-import assert from 'node:assert';
+import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { LuklaCircuitScenario } from '../src/director/scenarios/LuklaCircuitScenario.js';
-import { CameraSystem } from '../src/cameras/CameraSystem.js';
+import { Aerodynamics } from '../src/physics/Aerodynamics.js';
+import { LandingGear } from '../src/physics/LandingGear.js';
+import { EngineModel } from '../src/physics/EngineModel.js';
 
-function createMockSimulator() {
-  const virtualInputs = {};
-  let presetCalled = false;
-  return {
-    activeAirport: 'lukla',
-    position: new THREE.Vector3(0, 2800, 0),
-    angularVelocity: new THREE.Vector3(0, 0, 0),
-    telemetry: {
-      altitudeFt: 9300,
-      radioAltFt: 0,
-      iasKnots: 0,
-      pitchDeg: -6.71,
-      rollDeg: 0,
-      headingDeg: 238,
-      onGround: true,
-      gearState: 1.0,
-      isTransit: false
-    },
-    controls: {
-      brakes: 0.0,
-      parkingBrake: false,
-      setParkingBrake: function(v) {
-        this.parkingBrake = Boolean(v);
-        if (this.parkingBrake) this.brakes = 1.0;
-      },
-      setVirtualInput: (k, v) => { virtualInputs[k] = v; },
-      clearVirtualInputs: () => {
-        for (const k of Object.keys(virtualInputs)) delete virtualInputs[k];
-      },
-      getVirtualInput: (k) => virtualInputs[k]
-    },
-    engines: {
-      setThrottle: () => {},
-      setReverser: () => {}
-    },
-    gear: {
-      brakes: 0.0,
-      setBrakes: function(v) { this.brakes = v; },
-      setGearTarget: () => {}
-    },
-    aero: {
-      spoilers: 0,
-      setFlapPosition: () => {}
-    },
-    sky: {
-      setTimeOfDay: () => {},
-      getSunDirection: () => new THREE.Vector3(0, 1, 0)
-    },
-    cameraSystem: {
-      mode: CameraSystem.MODES.COCKPIT,
-      setMode: function(m) { this.mode = m; },
-      lookPitch: 0,
-      lookYaw: 0
-    },
-    setAirport: function(id) { this.activeAirport = id; },
-    setPreset: () => { presetCalled = true; },
-    getPresetCalled: () => presetCalled,
-    showToast: () => {}
+const STAGES = LuklaCircuitScenario.STAGES;
+function setup() {
+  const inputs = {};
+  const sim = {
+    activeAirport: 'lukla', position: new THREE.Vector3(),
+    linearVelocity: new THREE.Vector3(), angularVelocity: new THREE.Vector3(),
+    telemetry: { pitchDeg: 7, rollDeg: 0, headingDeg: 58, iasKnots: 110,
+      radioAltFt: 0, onGround: true, gearState: 1, isTransit: false },
+    aero: new Aerodynamics(), gear: new LandingGear(), engines: new EngineModel(),
+    controls: { setVirtualInput: (k, v) => { assert.ok(Number.isFinite(v)); inputs[k] = v; },
+      clearVirtualInputs: () => {}, setParkingBrake(v) { this.parkingBrake = v; } },
+    cameraSystem: { setMode() {} }, sky: { setTimeOfDay() {} }, showToast() {},
+    setPreset() { this.presetCalls = (this.presetCalls || 0) + 1; }
   };
+  const director = new DemoFlightDirector(sim);
+  director.start('lukla');
+  const place = (s, y = 2950, w = 0) => sim.position.set(s * 0.848048 + w * 0.529919, y, -s * 0.529919 + w * 0.848048);
+  return { sim, director, scenario: director.luklaScenario, inputs, place };
 }
 
-describe('LuklaCircuitScenario (Continuous Circuit Flight without Teleportation)', () => {
-  it('should initialize and execute Lukla circuit without ever teleporting during flight', () => {
-    const sim = createMockSimulator();
-    const director = new DemoFlightDirector(sim);
-
-    director.start('lukla');
-    assert.strictEqual(director.isActive, true);
-    assert.strictEqual(director.currentStage, LuklaCircuitScenario.STAGES.CLIFF_TAKEOFF);
-    assert.strictEqual(sim.getPresetCalled(), true, 'Takeoff positions at Runway 24 cliff threshold');
-
-    // Reset preset tracker to ensure no mid-flight teleportation occurs
-    let midflightPresetCalled = false;
-    sim.setPreset = () => { midflightPresetCalled = true; };
-
-    // 1. Advance to Canyon Climb
-    director.stageTimer = 9.0;
-    sim.telemetry.iasKnots = 130;
+describe('Lukla continuous circuit and truthful completion', () => {
+  it('uses explicit light loading and physical transitions without midflight preset changes', () => {
+    const { sim, director, scenario, place } = setup();
+    assert.equal(sim.aero.mass, 43000);
+    director.stageTimer = 60;
+    director.update(0.1);
+    assert.equal(director.currentStage, STAGES.CLIFF_TAKEOFF);
+    place(-400, 2850);
+    sim.telemetry.onGround = false;
     sim.telemetry.radioAltFt = 100;
     director.update(0.1);
-    assert.strictEqual(director.currentStage, LuklaCircuitScenario.STAGES.CANYON_CLIMB);
-    assert.strictEqual(midflightPresetCalled, false, 'Canyon climb stage must not teleport');
-
-    // 2. Advance to 180° Canyon Turnaround (Himalayan Cruise)
-    director.stageTimer = 10.0;
+    assert.equal(director.currentStage, STAGES.CANYON_CLIMB);
+    director.stageTimer = 60;
     director.update(0.1);
-    assert.strictEqual(director.currentStage, LuklaCircuitScenario.STAGES.HIMALAYAN_CRUISE);
-    assert.strictEqual(midflightPresetCalled, false, '180° turnaround stage must NEVER teleport');
-
-    // 3. Advance to Canyon Approach
-    director.stageTimer = 9.5;
+    assert.equal(director.currentStage, STAGES.CANYON_CLIMB);
+    place(-2700);
     director.update(0.1);
-    assert.strictEqual(director.currentStage, LuklaCircuitScenario.STAGES.CANYON_APPROACH);
-    assert.strictEqual(midflightPresetCalled, false, 'Final approach stage must NEVER teleport');
-
-    // 4. Advance to Uphill Touchdown
-    // Position aircraft over Threshold 06: s = -200m
-    sim.position.set(-200 * 0.848048, 2810, 200 * 0.529919);
+    assert.equal(director.currentStage, STAGES.HIMALAYAN_CRUISE);
+    director.stageTimer = 20;
+    sim.telemetry.headingDeg = 238;
+    director.update(0.1);
+    assert.equal(director.currentStage, STAGES.HIMALAYAN_CRUISE);
+    sim.telemetry.headingDeg = 58;
+    director.update(0.1);
+    assert.equal(director.currentStage, STAGES.CANYON_APPROACH);
+    place(-210, 2815, -5);
+    sim.telemetry.radioAltFt = 0;
+    director.update(0.1);
+    assert.equal(director.currentStage, STAGES.CANYON_APPROACH, 'Height alone is not contact');
     sim.telemetry.onGround = true;
+    for (const c of sim.gear.contacts) c.isGrounded = true;
     director.update(0.1);
-    assert.strictEqual(director.currentStage, LuklaCircuitScenario.STAGES.UPHILL_TOUCHDOWN);
-    assert.strictEqual(midflightPresetCalled, false, 'Touchdown stage must not teleport');
-
-    // 5. Complete rollout when stopped
-    sim.telemetry.iasKnots = 2;
-    director.stageTimer = 8.5;
-    director.update(0.1);
-    assert.strictEqual(director.isActive, false);
-    assert.strictEqual(sim.controls.parkingBrake, true, 'Parking brake must be set upon Lukla rollout completion to prevent backward slope rollback');
-    assert.strictEqual(sim.controls.brakes, 1.0);
-    assert.strictEqual(sim.gear.brakes, 1.0);
-    assert.strictEqual(midflightPresetCalled, false, 'The entire circuit must complete with zero mid-flight teleportation');
+    assert.equal(director.currentStage, STAGES.UPHILL_TOUCHDOWN);
+    assert.equal(scenario.result.airborne, true);
+    assert.equal(sim.presetCalls, 1);
   });
 
-  it('should guide a coordinated 180° left turn during canyon turnaround stage', () => {
-    const sim = createMockSimulator();
-    const director = new DemoFlightDirector(sim);
-
-    director.start('lukla');
-    director.setStage(LuklaCircuitScenario.STAGES.HIMALAYAN_CRUISE);
-
-    // Initial heading 228° (South-West)
-    sim.telemetry.headingDeg = 228;
-    sim.telemetry.rollDeg = 0;
-    sim.telemetry.iasKnots = 138;
-    sim.position.set(-2200 * 0.848048, 3010, 2200 * 0.529919);
-    director.stageTimer = 4.0;
-
+  it('requires actual ground speed, runway position and two continuous seconds of wheel support', () => {
+    const { sim, director, scenario, place } = setup();
+    scenario.result.airborne = true;
+    director.touchdownConfirmed = true;
+    director.setStage(STAGES.UPHILL_TOUCHDOWN);
+    for (const c of sim.gear.contacts) c.isGrounded = true;
+    place(100, 2851, -5);
+    sim.linearVelocity.set(20, 0, 0);
+    sim.telemetry.iasKnots = 0; // Wind/telemetry cannot substitute for stopped wheels.
+    director.stageTimer = 100;
+    director.update(3);
+    assert.equal(director.isActive, true);
+    sim.linearVelocity.set(0, 0, 0);
+    place(250, 2868, -5);
+    director.update(3);
+    assert.equal(director.isActive, true, 'Past the safe stop envelope');
+    place(100, 2851, -5);
+    director.update(1);
+    sim.gear.contacts[0].isGrounded = false;
     director.update(0.1);
+    sim.gear.contacts[0].isGrounded = true;
+    director.update(1);
+    assert.equal(director.isActive, true, 'Loss of support resets the stop timer');
+    director.update(1.01);
+    assert.equal(director.isActive, false);
+    assert.equal(scenario.result.status, 'completed');
+    assert.equal(sim.controls.parkingBrake, true);
+    assert.equal(sim.gear.brakes, 1);
+  });
 
-    // Should command negative aileron (left bank) to sweep heading towards 058°
-    const aileronCmd = sim.controls.getVirtualInput('aileron');
-    assert.ok(aileronCmd < -0.05, `Expected negative aileron for left bank, got ${aileronCmd}`);
+  it('cannot start a circuit against the unloaded terrain fallback', () => {
+    const { sim, director, scenario } = setup();
+    sim.currentTerrain = { isLoaded: false };
+    director.start('lukla');
+    assert.equal(director.isActive, false);
+    assert.equal(scenario.result.status, 'failed');
+    assert.equal(scenario.result.reason, 'DEM not loaded');
+    assert.equal(sim.presetCalls, 1, 'Rejected start must not spawn another flight');
+  });
 
-    // Throttle should be held active (~0.65) to maintain ~140 knots in turn
-    const throttleCmd = sim.controls.getVirtualInput('throttle');
-    assert.ok(throttleCmd >= 0.55 && throttleCmd <= 0.85, `Expected cruise throttle ~0.65, got ${throttleCmd}`);
+  it('reports a crash as failure even if stopped with an expired stage timer', () => {
+    const { sim, director, scenario } = setup();
+    director.setStage(STAGES.UPHILL_TOUCHDOWN);
+    director.stageTimer = 100;
+    sim.isCrashed = true;
+    director.update(3);
+    assert.equal(director.isActive, false);
+    assert.equal(scenario.result.status, 'failed');
   });
 });

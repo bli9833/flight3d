@@ -1,0 +1,235 @@
+{
+  "renderer": "ANGLE (Intel, Vulkan 1.4.335 (Intel(R) Graphics (ADL-N) (0x000046D2)), Intel open-source Mesa driver)",
+  "reports": [
+    {
+      "stallFrames": 0,
+      "maxAlpha": 10.136166468461168,
+      "stages": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        -1
+      ],
+      "touchdowns": [
+        {
+          "speedKt": 107.86252709220832,
+          "contacts": [
+            "mainLeft"
+          ]
+        },
+        {
+          "speedKt": 107.88428576178565,
+          "contacts": [
+            "mainRight"
+          ]
+        },
+        {
+          "speedKt": 103.61882730366426,
+          "contacts": [
+            "mainRight"
+          ]
+        },
+        {
+          "speedKt": 103.48613955136223,
+          "contacts": [
+            "mainLeft"
+          ]
+        },
+        {
+          "speedKt": 100.85768934601623,
+          "contacts": [
+            "nose"
+          ]
+        }
+      ],
+      "finite": true,
+      "result": {
+        "status": "completed",
+        "massKg": 43000,
+        "airborne": true,
+        "touchdown": {
+          "alongRunwayM": -228.79346961903056,
+          "crossTrackM": -9.141736800949133,
+          "iasKnots": 107.88428576178565
+        },
+        "elapsedSeconds": 138.27500000003857,
+        "stopPosition": {
+          "x": 146.17724345602247,
+          "y": 2860.3743187104524,
+          "z": -99.50923379648331
+        }
+      },
+      "maxImpact": 1.618457995077312,
+      "remainingRunwayM": 86.8028473774084,
+      "holdDriftM": 0,
+      "speedMs": 0,
+      "gearFailure": null,
+      "crashed": false,
+      "parkingBrake": true
+    },
+    {
+      "stallFrames": 0,
+      "maxAlpha": 10.227286760927726,
+      "stages": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        -1
+      ],
+      "touchdowns": [
+        {
+          "speedKt": 107.86626189300642,
+          "contacts": [
+            "mainLeft"
+          ]
+        },
+        {
+          "speedKt": 107.88425886643384,
+          "contacts": [
+            "mainRight"
+          ]
+        },
+        {
+          "speedKt": 103.59065137999737,
+          "contacts": [
+            "mainRight"
+          ]
+        },
+        {
+          "speedKt": 103.48453864609029,
+          "contacts": [
+            "mainLeft"
+          ]
+        },
+        {
+          "speedKt": 100.856363845809,
+          "contacts": [
+            "nose"
+          ]
+        }
+      ],
+      "finite": true,
+      "result": {
+        "status": "completed",
+        "massKg": 43000,
+        "airborne": true,
+        "touchdown": {
+          "alongRunwayM": -229.0167916223901,
+          "crossTrackM": -9.15346141508094,
+          "iasKnots": 107.88425886643384
+        },
+        "elapsedSeconds": 138.52500000003835,
+        "stopPosition": {
+          "x": 146.0076552999828,
+          "y": 2860.3501326716105,
+          "z": -99.3925256367761
+        }
+      },
+      "maxImpact": 1.6125771136447913,
+      "remainingRunwayM": 87.00851214524545,
+      "holdDriftM": 0,
+      "speedMs": 0,
+      "gearFailure": null,
+      "crashed": false,
+      "parkingBrake": true
+    },
+    {
+      "stallFrames": 0,
+      "maxAlpha": 10.227286732264819,
+      "stages": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        -1
+      ],
+      "touchdowns": [
+        {
+          "speedKt": 107.86626189398739,
+          "contacts": [
+            "mainLeft"
+          ]
+        },
+        {
+          "speedKt": 107.88425886728662,
+          "contacts": [
+            "mainRight"
+          ]
+        },
+        {
+          "speedKt": 103.59065137972456,
+          "contacts": [
+            "mainRight"
+          ]
+        },
+        {
+          "speedKt": 103.48453864589023,
+          "contacts": [
+            "mainLeft"
+          ]
+        },
+        {
+          "speedKt": 100.85636384597007,
+          "contacts": [
+            "nose"
+          ]
+        }
+      ],
+      "finite": true,
+      "result": {
+        "status": "completed",
+        "massKg": 43000,
+        "airborne": true,
+        "touchdown": {
+          "alongRunwayM": -229.01679154793152,
+          "crossTrackM": -9.153461415219326,
+          "iasKnots": 107.88425886728662
+        },
+        "elapsedSeconds": 138.52500000003835,
+        "stopPosition": {
+          "x": 146.00765536554567,
+          "y": 2860.3501326812902,
+          "z": -99.39252568718163
+        }
+      },
+      "maxImpact": 1.6125771116017038,
+      "remainingRunwayM": 87.00851206293413,
+      "holdDriftM": 0,
+      "speedMs": 0,
+      "gearFailure": null,
+      "crashed": false,
+      "parkingBrake": true
+    }
+  ],
+  "rejectedImpacts": [
+    {
+      "uphill": false,
+      "crashed": true,
+      "failure": {
+        "contact": "mainLeft",
+        "sinkRate": 20,
+        "penetration": 0.030000000000001137,
+        "reason": "impact"
+      },
+      "yChanged": false,
+      "massKg": 66000
+    },
+    {
+      "uphill": true,
+      "crashed": true,
+      "failure": {
+        "contact": "mainLeft",
+        "sinkRate": 7.591683008437138,
+        "penetration": 0.05274072058728052,
+        "reason": "impact"
+      },
+      "yChanged": false,
+      "massKg": 66000
+    }
+  ]
+}
