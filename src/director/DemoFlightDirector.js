@@ -34,6 +34,7 @@ export class DemoFlightDirector {
   constructor(simulator) {
     this.sim = simulator;
     this.isActive = false;
+    this.waitingForTerrain = false;
     this.activeDemoAirport = this.sim?.activeAirport || 'coastal';
     this.currentStage = DemoFlightDirector.STAGES.IDLE;
     this.stageTimer = 0;
@@ -183,6 +184,19 @@ export class DemoFlightDirector {
       this.demoBtn.classList.add('active');
     }
 
+    // Keep the constructor's auto-start request alive while the asynchronous
+    // DEM loads. isActive lets Esc, presets and airport changes cancel it.
+    this.waitingForTerrain = airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false;
+    if (this.waitingForTerrain) {
+      this.currentStage = DemoFlightDirector.STAGES.IDLE;
+      this.luklaScenario.result = { status: 'pending', airborne: false };
+      this.updateBanner('루클라 지형 로딩 중', '지형 데이터를 불러오면 데모 비행이 자동으로 시작됩니다. [Esc: 취소]');
+      this.sim.controls?.setParkingBrake?.(true);
+      this.sim.gear?.setBrakes(1);
+      return;
+    }
+    this.sim.controls?.setParkingBrake?.(false);
+
     // Ensure audio starts on first user interaction or when allowed
     if (!this.audioInitiated && this.sim.audio) {
       this.sim.audio.init();
@@ -202,8 +216,18 @@ export class DemoFlightDirector {
     }
   }
 
+  stopForCrash(crashResult) {
+    if (!this.isActive) return;
+    this.getActiveScenario().recordFailure?.(crashResult);
+    this.stop();
+  }
+
   stop(message = null, keepParkingBrake = false) {
     if (!this.isActive) return;
+    if (this.waitingForTerrain && this.luklaScenario.result.status === 'pending') {
+      this.luklaScenario.result.status = 'cancelled';
+    }
+    this.waitingForTerrain = false;
     this.isActive = false;
     this.currentStage = DemoFlightDirector.STAGES.IDLE;
     this.isBannerMinimized = false;
@@ -274,6 +298,10 @@ export class DemoFlightDirector {
 
   update(dt) {
     if (!this.isActive) return;
+    if (this.waitingForTerrain) {
+      if (this.sim.currentTerrain?.isLoaded === true) this.start(this.activeDemoAirport);
+      return;
+    }
 
     this.stageTimer += dt;
     this.totalTimer += dt;
