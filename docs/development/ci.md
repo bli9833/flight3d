@@ -103,3 +103,11 @@ visual inspection. Output goes to `.cache/control-surfaces/` (override with
 `ARTIFACT_DIR`); inspect both PNGs and `browser-results.json`. This bounded check
 is not a complete flight, gear, spoiler, cockpit-shadow or performance acceptance
 suite. Stop only the browser/server you started afterward.
+### Landing gear geometry acceptance
+
+`node scripts/test-gear-retraction.mjs --gpu` renders the loaded airframe and
+procedural fallback from above, below, the side, and close-up at five gear states.
+It checks full cycles and reversal and writes captures/results to
+`.tmp/gear-retraction`. Add `--animation` with an installed FFmpeg (or
+`FFMPEG_PATH`) for synchronized above/below full-cycle WebM evidence.
+See [gear fit evidence](../../review-artifacts/gear-fit/README.md).

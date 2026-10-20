@@ -1,0 +1,19 @@
+{
+  "setup": {
+    "loaded": true,
+    "fallback": false
+  },
+  "results": [
+    {
+      "model": "loaded",
+      "poses": 205,
+      "maxMainY": -1.5299999982118608
+    },
+    {
+      "model": "fallback",
+      "poses": 205,
+      "maxMainY": -1.5299999982118608
+    }
+  ],
+  "exceptions": []
+}

@@ -1,4 +1,4 @@
-import { bindGltfYokes, updateGltfYokes } from './GltfCockpitControls.js';
+import { bindGltfYokes, updateGltfYokes, bindGltfEngineControls, updateGltfEngineControls } from './GltfCockpitControls.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
@@ -888,6 +888,7 @@ export class Cockpit {
   /** Animate cockpit controls from the applied flight inputs. */
   updateControls(flightState) {
     updateGltfYokes(this.gltfYokes, flightState);
+    updateGltfEngineControls(this.gltfEngineControls, flightState);
     // 1. Dual Control Yokes
     const pitchDeflect = (flightState.elevator || 0) * 0.18;
     if (this.captainYoke && this.captainYoke.pitchGroup) {
@@ -907,11 +908,11 @@ export class Cockpit {
 
     // 2. Rudder Pedals
     const rudderDeflect = (flightState.rudder || 0) * 0.05;
-    if (this.pedalLeft) this.pedalLeft.position.z = -rudderDeflect;
-    if (this.pedalRight) this.pedalRight.position.z = rudderDeflect;
+    if (this.pedalLeft) this.pedalLeft.position.z = rudderDeflect;
+    if (this.pedalRight) this.pedalRight.position.z = -rudderDeflect;
 
     // 3. Throttle Levers
-    const throttleAngle = -0.35 + (flightState.throttle || 0) * 0.70;
+    const throttleAngle = 0.35 - (flightState.throttle || 0) * 0.70;
     if (this.throttle1) this.throttle1.rotation.x = throttleAngle;
     if (this.throttle2) this.throttle2.rotation.x = throttleAngle;
 
@@ -997,14 +998,14 @@ export class Cockpit {
             color: 0x343d49, // Authentic Boeing Cockpit Grey / Charcoal
             roughness: 0.86,
             metalness: 0.16,
-            side: THREE.FrontSide
+            side: THREE.DoubleSide
           });
 
           const boeingLiningMat = new THREE.MeshStandardMaterial({
             color: 0x586270, // Boeing interior lining slate
             roughness: 0.90,
             metalness: 0.10,
-            side: THREE.FrontSide
+            side: THREE.DoubleSide
           });
 
           model.traverse((child) => {
@@ -1022,17 +1023,11 @@ export class Cockpit {
                 child.material = boeingLiningMat;
                 return;
               }
-              if (child.name.startsWith('Body')) {
-                // Hide exterior nose fuselage skin (Body018)
-                child.visible = false;
-                return;
-              }
               if (child.material) {
-                if (child.name.includes('Cube567') || child.name.includes('Cube106')) {
-                  child.material.side = THREE.FrontSide;
-                } else {
-                  child.material.side = THREE.DoubleSide;
-                }
+                // Single-layer shell and console surfaces must render inward too.
+                // Body018 closes the native enclosure; keep it visible as well.
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                for (const material of materials) material.side = THREE.DoubleSide;
 
                 if (child.name.includes('Cube1061') || child.name.includes('Cube1060')) {
                   // Captain and FO side consoles
@@ -1046,6 +1041,7 @@ export class Cockpit {
           });
 
           this.gltfYokes = bindGltfYokes(model);
+          this.gltfEngineControls = bindGltfEngineControls(model);
           for (const yoke of this.gltfYokes) yoke.visible = this.yokesVisible;
           this.gltfCockpitGroup.add(model);
 

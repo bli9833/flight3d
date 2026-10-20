@@ -111,6 +111,13 @@ describe('Airport & Aircraft Runway Shadow System', () => {
     assert.strictEqual(rwyMesh.receiveShadow, true, 'Lukla runway must receive shadows');
 
     assert.ok(markMesh, 'Lukla runway markings mesh must exist');
+    assert.notStrictEqual(markMesh.geometry, rwyMesh.geometry,
+      'Pavement tiling must not change the shared marking overlay');
+    const markingUVs = markMesh.geometry.getAttribute('uv');
+    for (let i = 0; i < markingUVs.count; i++) {
+      assert.ok(markingUVs.getX(i) >= 0 && markingUVs.getX(i) <= 1);
+      assert.ok(markingUVs.getY(i) >= 0 && markingUVs.getY(i) <= 1);
+    }
     assert.strictEqual(markMesh.receiveShadow, true, 'Lukla runway markings must receive shadows');
     assert.strictEqual(markMesh.material.depthWrite, false, 'Markings must not write depth to avoid transparent z-fighting');
     assert.ok(markMesh.material instanceof THREE.MeshStandardMaterial, 'Markings must use MeshStandardMaterial to respond to light/shadow');

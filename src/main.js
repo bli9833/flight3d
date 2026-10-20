@@ -287,6 +287,9 @@ class FlightSimulator {
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
     }
+    if (!isDemoInternal && this.cameraSystem) {
+      this.cameraSystem.userLookOverridden = false;
+    }
 
     if (this.tireSmokeSystem) {
       this.tireSmokeSystem.clear();
@@ -792,7 +795,8 @@ class FlightSimulator {
     }
 
     // 12. Cinematic Camera Cuts: Automatic temporary gear view for Takeoff, Touchdown, and Gear Retract/Extend
-    const allowAutoCut = !(this.demoDirector && this.demoDirector.isActive && this.demoDirector.userCameraOverridden);
+    const allowAutoCut = !this.cameraSystem.userLookOverridden
+      && !(this.demoDirector && this.demoDirector.isActive && this.demoDirector.userCameraOverridden);
     if (allowAutoCut && this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
       // Takeoff liftoff
       this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
