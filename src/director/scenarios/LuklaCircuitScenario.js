@@ -45,8 +45,10 @@ export class LuklaCircuitScenario {
           this.sim.setPreset('cliff', true);
         }
         this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
-        this.sim.cameraSystem.lookPitch = -0.06;
-        this.sim.cameraSystem.lookYaw = 0.0;
+        if (!this.sim.cameraSystem.userLookOverridden) {
+          this.sim.cameraSystem.lookPitch = -0.06;
+          this.sim.cameraSystem.lookYaw = 0.0;
+        }
         this.sim.sky.setTimeOfDay(8.5); // Morning Himalayan sun
         if (this.sim.water && this.sim.water.setSunDirection) {
           this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
@@ -87,8 +89,10 @@ export class LuklaCircuitScenario {
         );
         // Continuous approach: NO TELEPORT!
         this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
-        this.sim.cameraSystem.lookPitch = -0.12;
-        this.sim.cameraSystem.lookYaw = 0.0;
+        if (!this.sim.cameraSystem.userLookOverridden) {
+          this.sim.cameraSystem.lookPitch = -0.12;
+          this.sim.cameraSystem.lookYaw = 0.0;
+        }
         this.sim.sky.setTimeOfDay(15.5); // Golden afternoon canyon shadows
         if (this.sim.gear && this.sim.gear.setGearTarget) {
           this.sim.gear.setGearTarget(true);
