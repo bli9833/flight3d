@@ -130,11 +130,11 @@ describe('Cockpit PBR & Real-Photo Texture Enhancement System', () => {
     assert.strictEqual(cockpit.captainYoke.pitchGroup.rotation.x, cockpit.foYoke.pitchGroup.rotation.x);
 
     // 2. Rudder pedals
-    assert.ok(cockpit.pedalLeft.position.z < 0);
-    assert.ok(cockpit.pedalRight.position.z > 0);
+    assert.ok(cockpit.pedalLeft.position.z > 0, 'Right rudder releases the left pedal aft');
+    assert.ok(cockpit.pedalRight.position.z < 0, 'Right rudder pushes the right pedal forward (-Z)');
 
     // 3. Throttle levers
-    assert.ok(cockpit.throttle1.rotation.x > 0.2, 'Throttle lever must rotate forward with throttle');
+    assert.ok(cockpit.throttle1.rotation.x < -0.2, 'Throttle lever must rotate forward with throttle');
     assert.strictEqual(cockpit.throttle1.rotation.x, cockpit.throttle2.rotation.x);
 
     // 4. Flap lever & flap dial needle

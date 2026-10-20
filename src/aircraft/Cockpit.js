@@ -1,4 +1,4 @@
-import { bindGltfYokes, updateGltfYokes } from './GltfCockpitControls.js';
+import { bindGltfYokes, updateGltfYokes, bindGltfEngineControls, updateGltfEngineControls } from './GltfCockpitControls.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
@@ -888,6 +888,7 @@ export class Cockpit {
   /** Animate cockpit controls from the applied flight inputs. */
   updateControls(flightState) {
     updateGltfYokes(this.gltfYokes, flightState);
+    updateGltfEngineControls(this.gltfEngineControls, flightState);
     // 1. Dual Control Yokes
     const pitchDeflect = (flightState.elevator || 0) * 0.18;
     if (this.captainYoke && this.captainYoke.pitchGroup) {
@@ -907,11 +908,11 @@ export class Cockpit {
 
     // 2. Rudder Pedals
     const rudderDeflect = (flightState.rudder || 0) * 0.05;
-    if (this.pedalLeft) this.pedalLeft.position.z = -rudderDeflect;
-    if (this.pedalRight) this.pedalRight.position.z = rudderDeflect;
+    if (this.pedalLeft) this.pedalLeft.position.z = rudderDeflect;
+    if (this.pedalRight) this.pedalRight.position.z = -rudderDeflect;
 
     // 3. Throttle Levers
-    const throttleAngle = -0.35 + (flightState.throttle || 0) * 0.70;
+    const throttleAngle = 0.35 - (flightState.throttle || 0) * 0.70;
     if (this.throttle1) this.throttle1.rotation.x = throttleAngle;
     if (this.throttle2) this.throttle2.rotation.x = throttleAngle;
 
@@ -1046,6 +1047,7 @@ export class Cockpit {
           });
 
           this.gltfYokes = bindGltfYokes(model);
+          this.gltfEngineControls = bindGltfEngineControls(model);
           for (const yoke of this.gltfYokes) yoke.visible = this.yokesVisible;
           this.gltfCockpitGroup.add(model);
 
