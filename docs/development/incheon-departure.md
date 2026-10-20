@@ -18,6 +18,9 @@ and updates heading, ground speed and engine telemetry. It bypasses aerodynamic
 integration only during ground service stages; cancellation immediately restores
 normal physics. Runway acceleration and rotation use normal flight physics.
 Rotation requires at least 132 KIAS; completion requires 500ft radio altitude.
+The completion handoff releases virtual controls while preserving climb throttle.
+Restarting boarding also resets the tug, bridge and passengers. The final taxi
+segment turns gradually to the hold-short heading before line-up.
 
 Validation:
 

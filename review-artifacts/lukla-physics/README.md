@@ -4,7 +4,7 @@ Validated on upstream main `3ca7119` plus this change, using Node 22.23.2 and
 Chrome's Intel Vulkan renderer (identity retained in report.json).
 
 - `npm run check`: pass.
-- `npm test`: 210 tests pass.
+- `npm test`: 222 tests pass.
 - `npm run build`: pass (existing bundle-size advisory).
 - `PORT=5181 npm run test:lukla -- --screenshots`: three full 120 Hz circuits,
   loaded DEM, zero stall frames, peak contact speed approximately 1.61 m/s,
@@ -27,3 +27,16 @@ on load without a test-injected start, and the real `triggerCrash()` call record
 negative contact cases pass in that run. The general-flight report and touchdown
 screenshot above are retained from the pre-review validation; flight physics and
 guidance are unchanged by this lifecycle follow-up.
+
+The next review follow-up is recorded in `review-followup.json`: HTTP 503 and
+network-rejection startup both terminate as failed with parking released; actual
+Esc, preset selection, and airport switching cancel the running demo. Three full
+circuits, impact rejection, and synchronous crash recording still pass.
+
+`root-flags-verification.json` records the UID-0 argument branch running the full
+harness successfully with `process.getuid` mocked to zero. Actual UID-0 execution
+was unavailable because sudo requires interactive authentication; this is launch-
+argument verification, not a claim of testing a root-owned container. Non-root
+launches retain the sandbox.
+
+After #68 merged, this follow-up was integrated with main `d069cdd` and revalidated: all 222 tests, build, and three browser circuits pass. `review-followup.json` records that final run.

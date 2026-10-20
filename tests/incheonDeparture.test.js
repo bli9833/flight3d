@@ -38,12 +38,15 @@ test('ground sequence waits for clearance, reaches runway continuously, then use
   const {sim,director,scenario,values} = fixture();
   director.setStage(0);
   let last = sim.position.clone();
+  const lastOrientation = sim.quaternion.clone();
   const visited = new Set();
   for(let i=0;i<20000 && director.currentStage<6;i++) {
     visited.add(director.currentStage);
     director.stageTimer += .01;
     scenario.update(.01);
     assert.ok(last.distanceTo(sim.position) < 1, 'ground path must not teleport');
+    assert.ok(lastOrientation.angleTo(sim.quaternion) < .03, 'heading must remain continuous across taxi, hold and lineup');
+    lastOrientation.copy(sim.quaternion);
     assert.equal(values.throttle, director.currentStage===6 ? 1 : 0);
     last.copy(sim.position);
   }
@@ -86,4 +89,16 @@ test('ground pose hands off without exceeding landing gear strut travel', () => 
   assert.equal(result.failure, null);
   assert.equal(result.onGround, true);
   assert.ok(gear.contacts.every(c => c.compression < c.restLength));
+});
+
+
+test('restarting directly from pushback hides the tug without requiring stop', () => {
+  const {sim,director,scenario} = fixture();
+  director.setStage(2);director.stageTimer=8;scenario.update(.1);
+  assert.equal(sim.incheonAirport.tug.visible,true);
+  director.setStage(0);
+  assert.equal(sim.incheonAirport.tug.visible,false);
+  director.stageTimer=10;scenario.update(.1);
+  assert.equal(director.currentStage,1);
+  assert.equal(sim.incheonAirport.tug.visible,false);
 });

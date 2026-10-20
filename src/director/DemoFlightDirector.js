@@ -227,10 +227,11 @@ export class DemoFlightDirector {
     this.stop();
   }
 
-  stop(message = null, keepParkingBrake = false) {
+  stop(message = null, keepParkingBrake = false, { preserveThrottle = false } = {}) {
     if (!this.isActive) return;
     this.getActiveScenario().stop?.();
-    if (this.waitingForTerrain && this.luklaScenario.result.status === 'pending') {
+    if (this.activeDemoAirport === 'lukla' &&
+        ['pending', 'running'].includes(this.luklaScenario.result.status)) {
       this.luklaScenario.result.status = 'cancelled';
     }
     this.waitingForTerrain = false;
@@ -243,13 +244,15 @@ export class DemoFlightDirector {
       this.sim.controls.clearVirtualInputs();
     }
 
-    // Reset reverse thrust, engine throttle, spoilers, and brakes so manual handover is safe
+    const handoffThrottle = preserveThrottle ? (this.sim.controls?.throttle ?? 0) : 0;
+
+    // Release automation while retaining climb thrust for an airborne handoff.
     if (this.sim.engines) {
       this.sim.engines.setReverser(false, true);
-      this.sim.engines.setThrottle(0.0);
+      this.sim.engines.setThrottle(handoffThrottle);
     }
     if (this.sim.controls) {
-      this.sim.controls.throttle = 0.0;
+      this.sim.controls.throttle = handoffThrottle;
       if (keepParkingBrake) {
         if (typeof this.sim.controls.setParkingBrake === 'function') {
           this.sim.controls.setParkingBrake(true);
@@ -305,6 +308,11 @@ export class DemoFlightDirector {
   update(dt) {
     if (!this.isActive) return;
     if (this.waitingForTerrain) {
+      if (this.sim.currentTerrain?.loadError) {
+        this.luklaScenario.recordFailure({ description: this.sim.currentTerrain.loadError });
+        this.stop('루클라 지형을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.');
+        return;
+      }
       if (this.sim.currentTerrain?.isLoaded === true) this.start(this.activeDemoAirport);
       return;
     }

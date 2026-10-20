@@ -37,6 +37,7 @@ export class LuklaTerrain {
       this.initProceduralFallback();
     }
     this.onLoaded = null;
+    this.loadError = null;
 
     // Three.js 3D Mesh
     this.geometry = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
@@ -104,21 +105,21 @@ export class LuklaTerrain {
    * Load real DEM binary file (lukla_dem.bin) and satellite texture (lukla_satellite.jpg)
    */
   async loadRealWorldAssets() {
+    this.loadError = null;
     try {
       if (typeof window !== 'undefined' && window.fetch) {
         // Browser environment: fetch binary DEM
         const res = await fetch('/terrain/lukla_dem.bin');
-        if (res.ok) {
-          const buf = await res.arrayBuffer();
-          const data = new Float32Array(buf);
-          if (data.length !== this.gridSize * this.gridSize || !data.every(Number.isFinite)) {
-            throw new Error('Invalid Lukla DEM grid');
-          }
-          this.elevations = data;
-          this.isLoaded = true;
-          this.updateGeometryElevations();
-          if (this.onLoaded) this.onLoaded();
+        if (!res.ok) throw new Error(`Lukla DEM request failed (HTTP ${res.status})`);
+        const buf = await res.arrayBuffer();
+        const data = new Float32Array(buf);
+        if (data.length !== this.gridSize * this.gridSize || !data.every(Number.isFinite)) {
+          throw new Error('Invalid Lukla DEM grid');
         }
+        this.elevations = data;
+        this.isLoaded = true;
+        this.updateGeometryElevations();
+        if (this.onLoaded) this.onLoaded();
 
         // Load satellite texture
         this.textureLoader.load('/terrain/lukla_satellite.jpg', (tex) => {
@@ -142,6 +143,7 @@ export class LuklaTerrain {
         });
       }
     } catch (e) {
+      if (!this.isLoaded) this.loadError = e.message || String(e);
       console.warn('Could not load real-world Lukla DEM, using procedural fallback:', e);
     }
   }

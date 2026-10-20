@@ -23,6 +23,7 @@ export class IncheonDepartureScenario {
       s.controls.clearVirtualInputs?.();
       s.apMaster = false;
       s.setPreset('runway', true);
+      s.incheonAirport.tug.visible = false;
       s.incheonAirport.setBridgeRetraction(0);
       s.incheonAirport.setBoardingProgress(0);
       s.cameraSystem.setMode(CameraSystem.MODES.DRONE);
@@ -39,7 +40,7 @@ export class IncheonDepartureScenario {
       s.controls.setVirtualInput('throttle', 1);
       s.engines.setThrottle(1);
     }
-    if (stage === 8) this.director.stop('인천 출발 완료 · 직접 조종으로 전환합니다.');
+    if (stage === 8) this.director.stop('인천 출발 완료 · 직접 조종으로 전환합니다.', false, { preserveThrottle: true });
   }
 
   pose(x, z, yaw, speed = 0) {
@@ -80,7 +81,12 @@ export class IncheonDepartureScenario {
         const yaw = Math.atan2(-(b[0]-a[0]), -(b[1]-a[1]));
         const previousYaw = i === 0 ? Math.PI/2 : Math.atan2(-(a[0]-points[i-1][0]), -(a[1]-points[i-1][1]));
         const turn = Math.atan2(Math.sin(yaw-previousYaw), Math.cos(yaw-previousYaw));
-        this.pose(a[0]+(b[0]-a[0])*q, a[1]+(b[1]-a[1])*q, previousYaw + turn*Math.min(1, distance/25), 15);
+        let taxiYaw = previousYaw + turn*Math.min(1, distance/25);
+        if (i === lengths.length - 1) {
+          const arrivalTurn = THREE.MathUtils.clamp((distance - (lengths[i]-25))/25, 0, 1);
+          taxiYaw *= 1-arrivalTurn;
+        }
+        this.pose(a[0]+(b[0]-a[0])*q, a[1]+(b[1]-a[1])*q, taxiYaw, 15);
         s.incheonAirport.tug.visible = false;
       }
       if (stage === 4) this.pose(-1350,70,0);

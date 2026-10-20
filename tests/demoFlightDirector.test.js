@@ -312,3 +312,28 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
   });
 });
 
+
+
+describe('Incheon airborne handoff', () => {
+  it('preserves climb throttle while releasing virtual controls at completion', () => {
+    const sim = createMockSimulator('incheon');
+    sim.incheonAirport = {tug:{visible:false}};
+    sim.controls.throttle = .92;
+    let engineThrottle;
+    sim.engines.setThrottle = value => {engineThrottle=value;};
+    sim.controls.setVirtualInput('elevator', .2);
+    const director = new DemoFlightDirector(sim);
+    director.isActive = true;
+    director.setStage(8);
+    assert.equal(director.isActive,false);
+    assert.equal(sim.controls.throttle,.92);
+    assert.equal(engineThrottle,.92);
+    assert.equal(sim.controls.getVirtualInput('elevator'),undefined);
+    assert.equal(sim.controls.parkingBrake,false);
+    // Ordinary stops retain the existing idle-throttle behavior.
+    director.isActive=true;
+    director.stop();
+    assert.equal(sim.controls.throttle,0);
+    assert.equal(engineThrottle,0);
+  });
+});
