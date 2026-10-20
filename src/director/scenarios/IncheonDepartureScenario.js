@@ -44,7 +44,7 @@ export class IncheonDepartureScenario {
 
   pose(x, z, yaw, speed = 0) {
     const s = this.sim;
-    s.position.set(x, s.currentTerrain.getHeight(x, z) + 2.8, z);
+    s.position.set(x, s.currentTerrain.getHeight(x, z) + 3.5, z);
     s.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
     s.linearVelocity.set(-Math.sin(yaw) * speed, 0, -Math.cos(yaw) * speed);
     s.angularVelocity.set(0, 0, 0);
