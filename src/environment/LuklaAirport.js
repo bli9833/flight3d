@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs } from './Pavement.js';
 
 /**
  * Nepal Tenzing-Hillary Airport (Lukla, ICAO: VNLK)
@@ -116,16 +117,11 @@ export class LuklaAirport {
     rwyGeom.rotateX(-Math.PI * 0.5);
 
     // Dark high-friction mountain asphalt
-    const rwyMat = new THREE.MeshStandardMaterial({
-      color: 0x24282e,
-      roughness: 0.85,
-      metalness: 0.1,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2
-    });
+    const rwyMat = createPavementMaterial('asphalt', -2);
 
-    const rwyMesh = new THREE.Mesh(rwyGeom, rwyMat);
+    // The marking overlay needs its original normalized UVs.
+    const rwyMesh = new THREE.Mesh(setPavementUVs(rwyGeom.clone()), rwyMat);
+    rwyMesh.name = 'runway-pavement';
     rwyMesh.receiveShadow = true;
 
     // Solid stone/rock embankment foundation beneath sloped runway to seal any cliff/canyon gaps
@@ -146,6 +142,20 @@ export class LuklaAirport {
     rwyGroup.quaternion.setFromEuler(euler);
     rwyGroup.add(skirtMesh);
     rwyGroup.add(rwyMesh);
+
+    rwyGroup.add(createRunwayRepairs(this.runwayWidth, this.runwayLength));
+    const wearMat = createRunwayWearMaterial();
+    if (wearMat) {
+      const wearGeo = new THREE.PlaneGeometry(14, 95);
+      wearGeo.rotateX(-Math.PI * 0.5);
+      for (const end of [-1, 1]) {
+        const wear = new THREE.Mesh(wearGeo, wearMat);
+        wear.position.set(0, 0.015, end * (this.runwayLength / 2 - 95));
+        wear.rotation.y = end < 0 ? Math.PI : 0;
+        wear.receiveShadow = true;
+        rwyGroup.add(wear);
+      }
+    }
 
     // Markings canvas texture (when running in browser DOM)
     if (typeof document !== 'undefined') {
@@ -239,15 +249,9 @@ export class LuklaAirport {
     const apronGeom = new THREE.PlaneGeometry(36, 80);
     apronGeom.rotateX(-Math.PI * 0.5);
 
-    const apronMat = new THREE.MeshStandardMaterial({
-      color: 0x484f59,
-      roughness: 0.8,
-      metalness: 0.1,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2
-    });
+    const apronMat = createPavementMaterial('concrete', -2);
 
+    setPavementUVs(apronGeom);
     const apronMesh = new THREE.Mesh(apronGeom, apronMat);
     apronMesh.receiveShadow = true;
 
