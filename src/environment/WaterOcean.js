@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 /**
  * Realistic Sunlight-Reflecting Ocean Water with Gerstner Waves
- * Features dynamic wave displacement, Fresnel reflections, intense sun specular glitter,
+ * Features broad swell displacement, filtered per-pixel ripples, Fresnel reflections,
  * deep oceanic color absorption, and wave height query for floating ships.
  */
 export class WaterOcean {
@@ -21,14 +21,13 @@ export class WaterOcean {
     const geom = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
     geom.rotateX(-Math.PI * 0.5);
 
-    // Custom Water Shader Material with Gerstner Waves & Sunlight Specular Glint
+    // Broad geometry swell and filtered fragment detail share world-space coordinates.
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
         uSunDir: { value: this.sunDirection },
         uDeepColor: { value: new THREE.Color(0x0a284a) },   // Deep ocean navy
         uShallowColor: { value: new THREE.Color(0x136a8a) },// Shallow coastal turquoise
-        uFoamColor: { value: new THREE.Color(0xdcebf5) },
         uSunColor: { value: new THREE.Color(0xffeedd) },
         uFogColor: { value: new THREE.Color(0xc8def4) },
         uFogDensity: { value: 0.00020 },
@@ -43,8 +42,6 @@ export class WaterOcean {
 
         uniform float uTime;
         varying vec3 vWorldPos;
-        varying vec3 vNormal;
-        varying float vWaveHeight;
         varying vec2 vLocalPos;
 
         // Gerstner Wave function
@@ -69,29 +66,10 @@ export class WaterOcean {
           vec4 baseWorldPos = modelMatrix * vec4(pos, 1.0);
           vec2 worldXZ = baseWorldPos.xz;
 
-          // 3 Octaves of Gerstner Waves
-          vec3 w1 = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.18, 48.0, 1.0, worldXZ, uTime);
-          vec3 w2 = gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.14, 26.0, 1.2, worldXZ, uTime);
-          vec3 w3 = gerstnerWave(normalize(vec2(0.2, -1.0)), 0.10, 12.0, 1.5, worldXZ, uTime);
-
-          vec3 totalDisplacement = w1 + w2 + w3;
+          // Only broad swell belongs on the 200m grid. Short waves are shaded per pixel.
+          vec3 totalDisplacement = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.0024, 1600.0, 1.0, worldXZ, uTime)
+                                 + gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.0024, 900.0, 1.2, worldXZ, uTime);
           vec3 displacedWorld = baseWorldPos.xyz + totalDisplacement;
-          vWaveHeight = totalDisplacement.y;
-
-          // Compute analytical normal from wave gradients in world coordinates
-          float eps = 0.8;
-          vec2 pXCoord = worldXZ + vec2(eps, 0.0);
-          vec2 pZCoord = worldXZ + vec2(0.0, eps);
-          vec3 pXDisp = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.18, 48.0, 1.0, pXCoord, uTime)
-                      + gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.14, 26.0, 1.2, pXCoord, uTime)
-                      + gerstnerWave(normalize(vec2(0.2, -1.0)), 0.10, 12.0, 1.5, pXCoord, uTime);
-          vec3 pZDisp = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.18, 48.0, 1.0, pZCoord, uTime)
-                      + gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.14, 26.0, 1.2, pZCoord, uTime)
-                      + gerstnerWave(normalize(vec2(0.2, -1.0)), 0.10, 12.0, 1.5, pZCoord, uTime);
-          vec3 pX = baseWorldPos.xyz + vec3(eps, 0.0, 0.0) + pXDisp;
-          vec3 pZ = baseWorldPos.xyz + vec3(0.0, 0.0, eps) + pZDisp;
-          vec3 n = normalize(cross(pZ - displacedWorld, pX - displacedWorld));
-          vNormal = n;
 
           vWorldPos = displacedWorld;
           gl_Position = projectionMatrix * viewMatrix * vec4(displacedWorld, 1.0);
@@ -105,7 +83,6 @@ export class WaterOcean {
         uniform vec3 uSunDir;
         uniform vec3 uDeepColor;
         uniform vec3 uShallowColor;
-        uniform vec3 uFoamColor;
         uniform vec3 uSunColor;
         uniform vec3 uFogColor;
         uniform float uFogDensity;
@@ -116,49 +93,54 @@ export class WaterOcean {
         uniform float uEdgeFadeEnd;
 
         varying vec3 vWorldPos;
-        varying vec3 vNormal;
-        varying float vWaveHeight;
         varying vec2 vLocalPos;
+
+        // Analytic wave slopes, filtered by pixel footprint to avoid distant shimmer.
+        vec2 waveSlope(vec2 direction, float steepness, float wavelength, float speed, float footprint) {
+          vec2 dir = normalize(direction);
+          float k = 6.2831853 / wavelength;
+          vec2 p = vWorldPos.xz;
+          // Cross-wave phase modulation breaks up long parallel sine bands.
+          float modulation = wavelength < 100.0 ?
+            2.2 * sin(dot(p, vec2(-dir.y, dir.x)) * k * 0.43 + uTime * 0.13)
+            + 1.4 * sin(dot(p, vec2(0.37, 0.93)) * k * 0.71 - uTime * 0.09) : 0.0;
+          float phase = k * (dot(dir, p) - sqrt(9.8 / k) * speed * uTime) + modulation;
+          float resolved = 1.0 - smoothstep(wavelength * 0.12, wavelength * 0.5, footprint);
+          return dir * steepness * cos(phase) * resolved;
+        }
 
         void main() {
           #include <logdepthbuf_fragment>
 
           vec3 viewDir = normalize(cameraPosition - vWorldPos);
-          vec3 normal = normalize(vNormal);
+          float footprint = max(length(dFdx(vWorldPos.xz)), length(dFdy(vWorldPos.xz)));
+          vec2 slope = waveSlope(vec2(1.0, 0.4), 0.0024, 1600.0, 1.0, footprint)
+                     + waveSlope(vec2(-0.6, 0.8), 0.0024, 900.0, 1.2, footprint)
+                     + waveSlope(vec2(1.0, 0.4), 0.18, 48.0, 1.0, footprint)
+                     + waveSlope(vec2(-0.6, 0.8), 0.14, 26.0, 1.2, footprint)
+                     + waveSlope(vec2(0.2, -1.0), 0.10, 12.0, 1.5, footprint)
+                     + waveSlope(vec2(0.8, 0.6), 0.06, 3.5, 0.8, footprint);
+          vec3 normal = normalize(vec3(-slope.x, 1.0, -slope.y));
 
-          // Fresnel reflectance: Schlick's approximation
+          // Water is a dielectric (F0 ~ 0.02), with stronger sky reflection at grazing angles.
           float cosTheta = clamp(dot(viewDir, normal), 0.0, 1.0);
-          float fresnel = 0.04 + (1.0 - 0.04) * pow(1.0 - cosTheta, 5.0);
-
-          // Sunlight Specular Reflection (Blazing Sun Glint)
+          float fresnel = 0.02 + 0.98 * pow(1.0 - cosTheta, 5.0);
           vec3 lightDir = normalize(uSunDir);
           vec3 halfVector = normalize(lightDir + viewDir);
           float nDotH = max(0.0, dot(normal, halfVector));
-
-          // Sharp microfacet specular highlight
-          float specular = pow(nDotH, 180.0) * 4.2;
-          // Secondary softer sun lobe
-          float specularSoft = pow(nDotH, 24.0) * 0.8;
-
-          // Water base color gradient based on wave height
-          float waveGradient = smoothstep(-1.2, 1.5, vWaveHeight);
-          vec3 waterColor = mix(uDeepColor, uShallowColor, waveGradient * 0.65);
-
-          // Synchronized atmospheric sky reflection adapting to time of day
-          vec3 skyReflection = mix(uFogColor * 0.70, uFogColor * 1.15, fresnel);
-
-          // Blend water color with sky reflection via Fresnel
-          vec3 finalColor = mix(waterColor, skyReflection, fresnel * 0.75);
-
-          // Add Sun Glint (Sun specular reflection)
-          finalColor += uSunColor * (specular + specularSoft);
-
-          // Wave crest foam
-          float foamThreshold = 0.75;
-          if (vWaveHeight > foamThreshold) {
-            float foamFactor = smoothstep(foamThreshold, 1.2, vWaveHeight) * 0.45;
-            finalColor = mix(finalColor, uFoamColor, foamFactor);
-          }
+          float daylight = smoothstep(-0.04, 0.15, lightDir.y);
+          // Unresolved ripples broaden the sun reflection instead of sparkling at subpixel scale.
+          float roughness = mix(0.16, 0.28, smoothstep(1.0, 20.0, footprint));
+          float alpha2 = pow(roughness, 4.0);
+          float denominator = nDotH * nDotH * (alpha2 - 1.0) + 1.0;
+          float distribution = alpha2 / max(0.00001, PI * denominator * denominator);
+          float sunGlint = min(8.0, distribution * 0.02) * daylight;
+          vec3 reflected = reflect(-viewDir, normal);
+          float skyHeight = clamp(reflected.y, 0.0, 1.0);
+          vec3 skyReflection = mix(uFogColor, uFogColor * vec3(0.42, 0.62, 0.85), sqrt(skyHeight));
+          vec3 waterColor = mix(uDeepColor, uShallowColor, 0.12) * mix(0.08, 0.7, daylight);
+          vec3 finalColor = mix(waterColor, skyReflection, fresnel);
+          finalColor += uSunColor * sunGlint;
 
           // Synchronized atmospheric aerial perspective fog
           float dist = length(cameraPosition - vWorldPos);
@@ -184,6 +166,8 @@ export class WaterOcean {
           finalColor = mix(finalColor, uFogColor, fogFactor);
 
           gl_FragColor = vec4(finalColor, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
         }
       `,
       transparent: false,
@@ -198,17 +182,13 @@ export class WaterOcean {
    * Analytical wave height query at (x, z) for ship buoyancy
    */
   getWaveHeight(x, z, time) {
-    const k1 = 6.283 / 48.0;
-    const c1 = Math.sqrt(9.8 / k1);
-    const f1 = k1 * (x * 0.92 + z * 0.38 - c1 * time);
-    const a1 = 0.18 / k1;
-
-    const k2 = 6.283 / 26.0;
-    const c2 = Math.sqrt(9.8 / k2) * 1.2;
-    const f2 = k2 * (-x * 0.6 + z * 0.8 - c2 * time);
-    const a2 = 0.14 / k2;
-
-    return this.waterLevel + a1 * Math.sin(f1) + a2 * Math.sin(f2);
+    const wave = (dx, dz, wavelength, speed) => {
+      const length = Math.hypot(dx, dz);
+      const k = 2 * Math.PI / wavelength;
+      const phase = k * (x * dx / length + z * dz / length - Math.sqrt(9.8 / k) * speed * time);
+      return 0.0024 / k * Math.sin(phase);
+    };
+    return this.waterLevel + wave(1, 0.4, 1600, 1) + wave(-0.6, 0.8, 900, 1.2);
   }
 
   setSunDirection(dir) {

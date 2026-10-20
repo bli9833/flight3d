@@ -250,7 +250,7 @@ export class Terrain {
 
     const terrainMat = new THREE.MeshStandardMaterial({
       roughness: 0.88,
-      metalness: 0.05,
+      metalness: 0.0,
       flatShading: false,
       defines: {
         QUALITY_LOW: this.quality === 'low' ? 1 : 0
@@ -336,7 +336,34 @@ export class Terrain {
 
         uniform float uNormalStrength;
         uniform float uMicroStrength;
-        uniform float uTriplanarSharpness;`
+        uniform float uTriplanarSharpness;
+
+        float terrainNoise(vec2 p) {
+          vec2 cell = floor(p);
+          vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          vec4 h = fract(sin(vec4(dot(cell, vec2(127.1, 311.7)),
+            dot(cell + vec2(1,0), vec2(127.1,311.7)),
+            dot(cell + vec2(0,1), vec2(127.1,311.7)),
+            dot(cell + vec2(1,1), vec2(127.1,311.7)))) * 43758.5453);
+          return mix(mix(h.x,h.y,f.x),mix(h.z,h.w,f.x),f.y);
+        }
+
+        // Blend offset tiles with spatially varying weights; no texture or geometry additions.
+        vec4 terrainSample(sampler2D tex, vec2 uv) {
+          #if defined(QUALITY_LOW) && QUALITY_LOW == 1
+            return texture2D(tex, uv);
+          #else
+          float selector = terrainNoise(uv * 0.7) * 8.0;
+          float index = floor(selector);
+          vec2 offsetA = sin(vec2(3.0, 7.0) * index) * 13.0;
+          vec2 offsetB = sin(vec2(3.0, 7.0) * (index + 1.0)) * 13.0;
+          // Explicit derivatives prevent offset changes from selecting an excessively blurry mip.
+          vec2 dx = dFdx(uv), dy = dFdy(uv);
+          return mix(textureGrad(tex, uv + offsetA, dx, dy),
+                     textureGrad(tex, uv + offsetB, dx, dy),
+                     smoothstep(0.2, 0.8, fract(selector)));
+          #endif
+        }`
       );
 
       shader.fragmentShader = shader.fragmentShader.replace(
@@ -377,16 +404,16 @@ export class Terrain {
           float runwayWeight = airportWeight;
           rockWeight *= (1.0 - airportWeight);
 
-          vec4 grassSamp = texture2D(uGrassMap, wPos.xz * uGrassScale);
-          vec4 rockSamp = texture2D(uRockMap, wPos.xz * uRockScale);
-          vec4 runwaySamp = texture2D(uRunwayMap, wPos.xz * uRunwayScale);
+          vec4 grassSamp = terrainSample(uGrassMap, wPos.xz * uGrassScale);
+          vec4 rockSamp = terrainSample(uRockMap, wPos.xz * uRockScale);
+          vec4 runwaySamp = terrainSample(uRunwayMap, wPos.xz * uRunwayScale);
 
           tFinalAlbedo = grassSamp.rgb * grassWeight + rockSamp.rgb * rockWeight + runwaySamp.rgb * runwayWeight;
           tFinalRoughness = grassSamp.a * grassWeight + rockSamp.a * rockWeight + runwaySamp.a * runwayWeight;
-          tFinalMetalness = 0.02 * (1.0 - runwayWeight) + 0.12 * runwayWeight;
+          tFinalMetalness = 0.0;
 
-          vec3 normGrass = texture2D(uGrassNormal, wPos.xz * uGrassScale).xyz * 2.0 - 1.0;
-          vec3 normRock = texture2D(uRockNormal, wPos.xz * uRockScale).xyz * 2.0 - 1.0;
+          vec3 normGrass = terrainSample(uGrassNormal, wPos.xz * uGrassScale).xyz * 2.0 - 1.0;
+          vec3 normRock = terrainSample(uRockNormal, wPos.xz * uRockScale).xyz * 2.0 - 1.0;
           vec2 blendPlanarN = normGrass.xy * grassWeight + normRock.xy * rockWeight;
           tFinalWorldNormal = normalize(wNorm + vec3(blendPlanarN.x * uNormalStrength, 0.0, blendPlanarN.y * uNormalStrength));
         #else
@@ -422,18 +449,18 @@ export class Terrain {
           float runwayWeight = airportWeight;
 
           // Planar horizontal layers (world-space XZ)
-          vec4 grassSamp = texture2D(uGrassMap, wPos.xz * uGrassScale);
-          vec4 sandSamp = texture2D(uSandMap, wPos.xz * uSandScale);
-          vec4 snowSamp = texture2D(uSnowMap, wPos.xz * uSnowScale);
-          vec4 runwaySamp = texture2D(uRunwayMap, wPos.xz * uRunwayScale);
+          vec4 grassSamp = terrainSample(uGrassMap, wPos.xz * uGrassScale);
+          vec4 sandSamp = terrainSample(uSandMap, wPos.xz * uSandScale);
+          vec4 snowSamp = terrainSample(uSnowMap, wPos.xz * uSnowScale);
+          vec4 runwaySamp = terrainSample(uRunwayMap, wPos.xz * uRunwayScale);
 
           // Triplanar mapping for rock cliffs (eliminates vertical stretching on steep walls)
           vec3 triWeight = pow(abs(wNorm), vec3(uTriplanarSharpness));
           triWeight /= (triWeight.x + triWeight.y + triWeight.z + 0.0001);
 
-          vec4 rockX = texture2D(uRockMap, wPos.zy * uRockScale);
-          vec4 rockY = texture2D(uRockMap, wPos.xz * uRockScale);
-          vec4 rockZ = texture2D(uRockMap, wPos.xy * uRockScale);
+          vec4 rockX = terrainSample(uRockMap, wPos.zy * uRockScale);
+          vec4 rockY = terrainSample(uRockMap, wPos.xz * uRockScale);
+          vec4 rockZ = terrainSample(uRockMap, wPos.xy * uRockScale);
           vec4 rockSamp = rockX * triWeight.x + rockY * triWeight.y + rockZ * triWeight.z;
 
           // Final Albedo & Roughness
@@ -449,13 +476,13 @@ export class Terrain {
                            snowSamp.a * snowWeight +
                            runwaySamp.a * runwayWeight;
 
-          tFinalMetalness = 0.02 * (1.0 - runwayWeight) + 0.12 * runwayWeight;
+          tFinalMetalness = 0.0;
 
           // Planar normal sampling
-          vec3 normGrass = texture2D(uGrassNormal, wPos.xz * uGrassScale).xyz * 2.0 - 1.0;
-          vec3 normSand = texture2D(uSandNormal, wPos.xz * uSandScale).xyz * 2.0 - 1.0;
-          vec3 normSnow = texture2D(uSnowNormal, wPos.xz * uSnowScale).xyz * 2.0 - 1.0;
-          vec3 normRunway = texture2D(uRunwayNormal, wPos.xz * uRunwayScale).xyz * 2.0 - 1.0;
+          vec3 normGrass = terrainSample(uGrassNormal, wPos.xz * uGrassScale).xyz * 2.0 - 1.0;
+          vec3 normSand = terrainSample(uSandNormal, wPos.xz * uSandScale).xyz * 2.0 - 1.0;
+          vec3 normSnow = terrainSample(uSnowNormal, wPos.xz * uSnowScale).xyz * 2.0 - 1.0;
+          vec3 normRunway = terrainSample(uRunwayNormal, wPos.xz * uRunwayScale).xyz * 2.0 - 1.0;
 
           vec2 blendPlanarN = normGrass.xy * grassWeight +
                               normSand.xy * sandWeight +
@@ -464,9 +491,9 @@ export class Terrain {
           vec3 planarNormal = normalize(wNorm + vec3(blendPlanarN.x * uNormalStrength, 0.0, blendPlanarN.y * uNormalStrength));
 
           // Triplanar rock normal
-          vec3 tNormX = texture2D(uRockNormal, wPos.zy * uRockScale).xyz * 2.0 - 1.0;
-          vec3 tNormY = texture2D(uRockNormal, wPos.xz * uRockScale).xyz * 2.0 - 1.0;
-          vec3 tNormZ = texture2D(uRockNormal, wPos.xy * uRockScale).xyz * 2.0 - 1.0;
+          vec3 tNormX = terrainSample(uRockNormal, wPos.zy * uRockScale).xyz * 2.0 - 1.0;
+          vec3 tNormY = terrainSample(uRockNormal, wPos.xz * uRockScale).xyz * 2.0 - 1.0;
+          vec3 tNormZ = terrainSample(uRockNormal, wPos.xy * uRockScale).xyz * 2.0 - 1.0;
 
           float signX = wNorm.x >= 0.0 ? 1.0 : -1.0;
           float signZ = wNorm.z >= 0.0 ? 1.0 : -1.0;
@@ -483,11 +510,15 @@ export class Terrain {
           float camDist = length(cameraPosition - wPos);
           float microFade = 1.0 - smoothstep(12.0, 240.0, camDist);
           if (microFade > 0.01) {
-            vec3 microSample = texture2D(uMicroNormal, wPos.xz * uMicroScale).xyz * 2.0 - 1.0;
+            vec3 microSample = terrainSample(uMicroNormal, wPos.xz * uMicroScale).xyz * 2.0 - 1.0;
             tFinalWorldNormal = normalize(tFinalWorldNormal + vec3(microSample.x, 0.0, microSample.y) * (uMicroStrength * microFade));
           }
         #endif
 
+        // Broad nonperiodic patches break up the small repeating material tiles from altitude.
+        float macroPatch = terrainNoise(wPos.xz * 0.003);
+        float detailPatch = terrainNoise(wPos.xz * 0.019 + vec2(31.0, 17.0));
+        tFinalAlbedo *= 0.78 + 0.28 * macroPatch + 0.12 * detailPatch;
         diffuseColor.rgb = tFinalAlbedo;`
       );
 

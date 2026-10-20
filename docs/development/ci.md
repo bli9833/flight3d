@@ -123,3 +123,8 @@ and release, and writes captures/results to
 `.tmp/gear-retraction`. Add `--animation` with an installed FFmpeg (or
 `FFMPEG_PATH`) for synchronized above/below full-cycle WebM evidence.
 See [gear fit evidence](../../review-artifacts/gear-fit/README.md).
+
+### Water and ground materials (issue #66)
+
+See [material surface acceptance](material-surfaces.md) for controlled water,
+terrain high/low, sunset and night captures with shader/error checks.
