@@ -1,3 +1,4 @@
+import { IncheonDepartureScenario } from './scenarios/IncheonDepartureScenario.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { LuklaCircuitScenario } from './scenarios/LuklaCircuitScenario.js';
 import { CoastalDemoScenario } from './scenarios/CoastalDemoScenario.js';
@@ -42,6 +43,7 @@ export class DemoFlightDirector {
 
     // Scenarios
     this.luklaScenario = new LuklaCircuitScenario(this, simulator);
+    this.incheonScenario = new IncheonDepartureScenario(this, simulator);
     this.coastalScenario = new CoastalDemoScenario(this, simulator);
 
     // UI element references
@@ -68,6 +70,7 @@ export class DemoFlightDirector {
   }
 
   getActiveScenario() {
+    if (this.activeDemoAirport === 'incheon') return this.incheonScenario;
     return this.activeDemoAirport === 'lukla' ? this.luklaScenario : this.coastalScenario;
   }
 
@@ -204,14 +207,16 @@ export class DemoFlightDirector {
       this.audioInitiated = true;
     }
 
-    if (this.activeDemoAirport === 'lukla') {
+    if (this.activeDemoAirport === 'incheon') {
+      this.setStage(IncheonDepartureScenario.STAGES.BOARDING);
+    } else if (this.activeDemoAirport === 'lukla') {
       this.setStage(DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
     } else {
       this.setStage(DemoFlightDirector.COASTAL_STAGES.PREFLIGHT_ORBIT);
     }
 
     if (this.sim.showToast) {
-      const airportName = this.activeDemoAirport === 'lukla' ? '루클라 (VNLK)' : '국제공항 (09L)';
+      const airportName = this.activeDemoAirport === 'incheon' ? '인천 (간략화)' : this.activeDemoAirport === 'lukla' ? '루클라 (VNLK)' : '국제공항 (09L)';
       this.sim.showToast(`🎬 ${airportName} 자율 시네마틱 데모 비행 시작`);
     }
   }
@@ -222,8 +227,9 @@ export class DemoFlightDirector {
     this.stop();
   }
 
-  stop(message = null, keepParkingBrake = false) {
+  stop(message = null, keepParkingBrake = false, { preserveThrottle = false } = {}) {
     if (!this.isActive) return;
+    this.getActiveScenario().stop?.();
     if (this.activeDemoAirport === 'lukla' &&
         ['pending', 'running'].includes(this.luklaScenario.result.status)) {
       this.luklaScenario.result.status = 'cancelled';
@@ -238,13 +244,15 @@ export class DemoFlightDirector {
       this.sim.controls.clearVirtualInputs();
     }
 
-    // Reset reverse thrust, engine throttle, spoilers, and brakes so manual handover is safe
+    const handoffThrottle = preserveThrottle ? (this.sim.controls?.throttle ?? 0) : 0;
+
+    // Release automation while retaining climb thrust for an airborne handoff.
     if (this.sim.engines) {
       this.sim.engines.setReverser(false, true);
-      this.sim.engines.setThrottle(0.0);
+      this.sim.engines.setThrottle(handoffThrottle);
     }
     if (this.sim.controls) {
-      this.sim.controls.throttle = 0.0;
+      this.sim.controls.throttle = handoffThrottle;
       if (keepParkingBrake) {
         if (typeof this.sim.controls.setParkingBrake === 'function') {
           this.sim.controls.setParkingBrake(true);
