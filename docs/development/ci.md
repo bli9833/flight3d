@@ -74,3 +74,12 @@ preserve. Browser acceptance must be made portable before adding it to CI.
 The original package.json declared Vite 6 while the existing lockfile and local
 installation used Vite 8. The declaration now matches the existing lockfile
 (^8.3.4), allowing npm ci without replacing the resolved dependency graph.
+
+### Landing gear geometry acceptance
+
+`node scripts/test-gear-retraction.mjs --gpu` renders the loaded airframe and
+procedural fallback from above, below, the side, and close-up at five gear states.
+It checks full cycles and reversal and writes captures/results to
+`.tmp/gear-retraction`. Add `--animation` with an installed FFmpeg (or
+`FFMPEG_PATH`) for synchronized above/below full-cycle WebM evidence.
+See [gear fit evidence](../../review-artifacts/gear-fit/README.md).
