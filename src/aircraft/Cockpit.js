@@ -997,14 +997,14 @@ export class Cockpit {
             color: 0x343d49, // Authentic Boeing Cockpit Grey / Charcoal
             roughness: 0.86,
             metalness: 0.16,
-            side: THREE.FrontSide
+            side: THREE.DoubleSide
           });
 
           const boeingLiningMat = new THREE.MeshStandardMaterial({
             color: 0x586270, // Boeing interior lining slate
             roughness: 0.90,
             metalness: 0.10,
-            side: THREE.FrontSide
+            side: THREE.DoubleSide
           });
 
           model.traverse((child) => {
@@ -1022,17 +1022,11 @@ export class Cockpit {
                 child.material = boeingLiningMat;
                 return;
               }
-              if (child.name.startsWith('Body')) {
-                // Hide exterior nose fuselage skin (Body018)
-                child.visible = false;
-                return;
-              }
               if (child.material) {
-                if (child.name.includes('Cube567') || child.name.includes('Cube106')) {
-                  child.material.side = THREE.FrontSide;
-                } else {
-                  child.material.side = THREE.DoubleSide;
-                }
+                // Single-layer shell and console surfaces must render inward too.
+                // Body018 closes the native enclosure; keep it visible as well.
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                for (const material of materials) material.side = THREE.DoubleSide;
 
                 if (child.name.includes('Cube1061') || child.name.includes('Cube1060')) {
                   // Captain and FO side consoles

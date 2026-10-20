@@ -1,8 +1,9 @@
+import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const PORT = 5195;
+const PORT = Number(process.env.PORT || 5195);
 const CDP_PORT = 9465;
 const SIM_URL = `http://localhost:${PORT}/`;
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR || path.join(process.cwd(), 'screenshots');
@@ -38,6 +39,7 @@ async function main() {
       } catch (e) {}
     }
 
+    assert.ok(pageTarget?.webSocketDebuggerUrl, 'Chrome page must be available');
     const ws = new WebSocket(pageTarget.webSocketDebuggerUrl);
     await new Promise((resolve, reject) => {
       ws.onopen = resolve;
@@ -90,6 +92,16 @@ async function main() {
       if (ready) break;
     }
 
+    // Freeze physics so screenshots and ray intersections share the same pose.
+    await evalCode(`(() => {
+      const s = window.simulator;
+      s.demoDirector?.stop();
+      s.integratePhysics = () => {};
+      s.cameraSystem.setMode(0);
+      s.cameraSystem.enableCursorTrack = false;
+      s.cameraSystem.photoCockpit = false;
+    })()`);
+
     // Verify framing elements exist natively in the simulator
     const framingState = await evalCode(`(() => {
       const cp = window.simulator.aircraft.cockpit;
@@ -103,6 +115,22 @@ async function main() {
       };
     })()`);
     console.log('Native framing state:', framingState);
+    assert.equal(framingState.loaded, true, 'Cockpit GLB must load');
+    const shell = await evalCode(`(() => {
+      const rows = [];
+      window.simulator.aircraft.cockpit.gltfCockpitModel.traverse(o => {
+        if (o.isMesh && o.name.startsWith('Body')) rows.push({
+          name: o.name, visible: o.visible,
+          sides: (Array.isArray(o.material) ? o.material : [o.material]).map(m => m.side)
+        });
+      });
+      return rows;
+    })()`);
+    assert.ok(shell.length >= 6, 'Medium model must retain all six shell meshes');
+    for (const mesh of shell) {
+      assert.equal(mesh.visible, true, `${mesh.name} must remain visible`);
+      assert.ok(mesh.sides.every(side => side === 2), `${mesh.name} must render inward faces`);
+    }
 
     // 1. Captain Seated Default View
     await capture('verified_cockpit_window_framing_default.png');
@@ -121,11 +149,36 @@ async function main() {
     })()`);
     await capture('verified_cockpit_window_framing_right.png');
 
-    // 4. Return to forward view
+    // 4. Look through the lower left side window toward its solid wall.
     await evalCode(`(() => {
-      window.simulator.cameraSystem.lookYaw = 0;
-      window.simulator.cameraSystem.lookPitch = -0.25;
+      window.simulator.cameraSystem.lookYaw = 1.3;
+      window.simulator.cameraSystem.lookPitch = -0.12;
     })()`);
+    await capture('verified_cockpit_enclosure_left.png');
+    const wallHits = await evalCode(`(async () => {
+      const THREE = await import('/node_modules/three/build/three.module.js');
+      const s = window.simulator;
+      s.camera.updateMatrixWorld(true);
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(new THREE.Vector2(0, -0.65), s.camera);
+      return ray.intersectObject(s.aircraft.cockpit.gltfCockpitModel, true)
+        .filter(h => h.object.visible && h.object.name.startsWith('Body'))
+        .map(h => ({name: h.object.name, distance: h.distance}));
+    })()`);
+    assert.ok(wallHits.some(hit => hit.distance > framingState.cameraNear && hit.distance < 2),
+      'A solid native sidewall must intercept the view below the window');
+    for (const [name, yaw, pitch] of [
+      ['right', -1.3, -0.12], ['rear', Math.PI, -0.12],
+      ['roof', 0, 1.1], ['floor', 0, -1.1]
+    ]) {
+      await evalCode(`(() => {
+        window.simulator.cameraSystem.lookYaw = ${yaw};
+        window.simulator.cameraSystem.lookPitch = ${pitch};
+      })()`);
+      await capture(`verified_cockpit_enclosure_${name}.png`);
+    }
+    fs.writeFileSync(path.join(ARTIFACT_DIR, 'cockpit-enclosure.json'),
+      JSON.stringify({framingState, shell, wallHits}, null, 2));
 
     ws.close();
   } finally {
@@ -133,4 +186,4 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+main().catch(error => { console.error(error); process.exitCode = 1; });
