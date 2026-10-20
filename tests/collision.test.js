@@ -127,8 +127,8 @@ test('CollisionDetector (Multi-Obstacle & Crash Detection System)', async (t) =>
     assert.equal(result.type, 'WATER');
   });
 
-  await t.test('should detect catastrophic hard landing slam (> 6.0 m/s vertical descent)', () => {
-    // Touchdown with excessive sink rate of -7.5 m/s (~1500 FPM)
+  await t.test('detection-only caller detects deeply penetrating body probes', () => {
+    // Body geometry fixture: starts deeply inside the runway, not at first wheel contact.
     const pos = new THREE.Vector3(0, 12.5, 0);
     const quat = new THREE.Quaternion();
     const vel = new THREE.Vector3(65, -7.5, 0);

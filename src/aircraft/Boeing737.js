@@ -805,6 +805,16 @@ export class Boeing737 {
       leg.rotation.z = side * (this.mainDeployAngle * legExtension - this.mainStowAngle * (1 - legExtension));
       truck.userData.axle.rotation.z = -side * Math.PI / 2 * (1 - legExtension) - leg.rotation.z;
     }
+    // Failed legs hinge independently; keep the existing rigid wheel/strut geometry.
+    const damage = flightState.gearDamage || {};
+    for (const [id, group, axis, sign] of [
+      ['nose', this.noseGearGroup, 'x', 1],
+      ['mainLeft', this.mainGearLGroup, 'z', -1],
+      ['mainRight', this.mainGearRGroup, 'z', 1],
+    ]) {
+      if (!group || !damage[id] || damage[id] === 'normal') continue;
+      group.rotation[axis] += sign * (damage[id] === 'collapsed' ? 1.1 : 0.15);
+    }
     const doorOpen = THREE.MathUtils.smoothstep(extension, 0, 0.18);
     for (const item of this.gearDoors) item.obj.rotation[item.axis] = item.side * doorOpen * item.maxAngle;
 

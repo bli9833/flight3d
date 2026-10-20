@@ -100,7 +100,7 @@ export class CollisionDetector {
    * Main collision evaluation called every physics step
    * Returns null if no collision, or a collision result object
    */
-  checkCollision(position, quaternion, linearVelocity, gearState, pitchDeg, rollDeg) {
+  checkCollision(position, quaternion, linearVelocity, gearState, pitchDeg, rollDeg, groundContact = null) {
     const speedMs = linearVelocity.length();
     const speedKnots = speedMs * 1.94384;
     const vsiMs = linearVelocity.y;
@@ -198,7 +198,7 @@ export class CollisionDetector {
     }
 
     // 7. Terrain & Hills Collision Check
-    const terrainResult = this.checkTerrain(position, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity);
+    const terrainResult = this.checkTerrain(position, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity, groundContact);
     if (terrainResult) {
       return {
         collided: true,
@@ -461,12 +461,25 @@ export class CollisionDetector {
     return null;
   }
 
-  checkTerrain(aircraftPos, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity = null) {
+  checkTerrain(aircraftPos, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity = null, groundContact = null) {
     if (!this.terrain) return null;
 
+    const onRunway = this.airport?.isOnRunway?.(aircraftPos.x, aircraftPos.z)
+      ?? (Math.abs(aircraftPos.x) < 1950 && Math.abs(aircraftPos.z) < 450);
+    if (onRunway && groundContact?.catastrophicImpact) {
+      return {
+        name: '치명적 착륙 충격 (CATASTROPHIC LANDING IMPACT)',
+        point: groundContact.bodyContacts[0]?.worldPos.clone() || aircraftPos.clone(),
+        description: '기체 하부의 과도한 충격 또는 누적 구조 손상으로 기체가 파손되었습니다.'
+      };
+    }
     // Body contact is evaluated on every surface, including the runway. Gear
     // deployment and nominal attitude never exempt nacelles or wings from contact.
     for (const probe of worldProbes) {
+      const probeOnRunway = this.airport?.isOnRunway?.(probe.pos.x, probe.pos.z) ?? onRunway;
+      // The contact solver owns supported lower surfaces on the runway. A fin
+      // strike or any probe outside the runway still uses fatal terrain detection.
+      if (groundContact && onRunway && probeOnRunway && probe.id !== 'fin') continue;
       const ground = this.terrain.getHeight(probe.pos.x, probe.pos.z);
       const radius = probe.id === 'engineL' || probe.id === 'engineR' ? probe.radius : 0;
       if (probe.pos.y - radius < ground + 0.1) {
