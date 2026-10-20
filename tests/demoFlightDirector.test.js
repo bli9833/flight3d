@@ -56,7 +56,13 @@ function createMockSimulator(activeAirport = 'lukla') {
     },
     cameraSystem: {
       mode: CameraSystem.MODES.COCKPIT,
+      onCycleMode: null,
       setMode: function(m) { this.mode = m; },
+      cycleMode: function() {
+        this.mode = (this.mode + 1) % 7;
+        if (this.onCycleMode) this.onCycleMode(this.mode);
+        return 'MODE_' + this.mode;
+      },
       resetDroneOrbit: () => {},
       lookPitch: 0,
       lookYaw: 0
@@ -240,6 +246,98 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
 
     delete globalThis.window;
     delete globalThis.document;
+  });
+
+  it('should allow user to cycle camera during ROTATION_CLIMB without mid-stage cut reverting user choice', () => {
+    const sim = createMockSimulator('coastal');
+    const director = new DemoFlightDirector(sim);
+
+    director.start('coastal');
+    director.setStage(DemoFlightDirector.COASTAL_STAGES.ROTATION_CLIMB);
+    sim.cameraSystem.mode = CameraSystem.MODES.COCKPIT;
+
+    // Simulate flight progressing past 6.0s (the mid-stage cut time)
+    director.stageTimer = 7.0;
+
+    // User cycles camera to WING (2)
+    sim.cameraSystem.cycleMode();
+    sim.cameraSystem.cycleMode();
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.WING);
+    assert.strictEqual(director.userCameraOverridden, true);
+
+    // Multi-frame update should NOT revert camera mode to CHASE
+    for (let i = 0; i < 10; i++) {
+      director.update(0.016);
+    }
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.WING, 'Camera mode must remain WING and not be forced to CHASE');
+  });
+
+  it('should perform scheduled mid-stage camera cut once when user has not changed camera', () => {
+    const sim = createMockSimulator('coastal');
+    const director = new DemoFlightDirector(sim);
+
+    director.start('coastal');
+    sim.telemetry.altitudeFt = 150;
+    director.setStage(DemoFlightDirector.COASTAL_STAGES.ROTATION_CLIMB);
+    sim.cameraSystem.mode = CameraSystem.MODES.COCKPIT;
+
+    // Before 6.0s, mode remains COCKPIT
+    director.stageTimer = 5.0;
+    director.update(0.1);
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.COCKPIT);
+
+    // Reaching 6.0s triggers scheduled one-shot cut to CHASE
+    director.stageTimer = 6.1;
+    director.update(0.1);
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.CHASE);
+
+    // Subsequent updates do not re-run cut
+    director.stageTimer = 8.0;
+    director.update(0.1);
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.CHASE);
+
+    // User can now change camera at 8.0s and it sticks
+    sim.cameraSystem.cycleMode(); // to WING
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.WING);
+    director.update(0.1);
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.WING);
+  });
+
+  it('should allow user to cycle camera in Lukla demo flight without being overridden in cliff takeoff or climb', () => {
+    const sim = createMockSimulator('lukla');
+    const director = new DemoFlightDirector(sim);
+
+    director.start('lukla');
+    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
+
+    // Advance past 4.5s
+    director.stageTimer = 5.0;
+
+    // User cycles camera to FLYBY (4)
+    sim.cameraSystem.mode = CameraSystem.MODES.FLYBY;
+    director.onUserCameraChange();
+
+    for (let i = 0; i < 5; i++) {
+      director.update(0.016);
+    }
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.FLYBY, 'Camera mode must stay FLYBY during cliff takeoff');
+  });
+
+  it('should reset userCameraOverridden on stage transition so each stage begins with intended showcase view', () => {
+    const sim = createMockSimulator('coastal');
+    const director = new DemoFlightDirector(sim);
+
+    director.start('coastal');
+    director.setStage(DemoFlightDirector.COASTAL_STAGES.ROTATION_CLIMB);
+
+    // User overrides camera in rotation climb
+    sim.cameraSystem.cycleMode();
+    assert.strictEqual(director.userCameraOverridden, true);
+
+    // Transition to next stage (COASTAL_BANK)
+    director.setStage(DemoFlightDirector.COASTAL_STAGES.COASTAL_BANK);
+    assert.strictEqual(director.userCameraOverridden, false, 'userCameraOverridden should be reset on entering new stage');
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.WING, 'Should initialize with COASTAL_BANK showcase view (WING)');
   });
 });
 
