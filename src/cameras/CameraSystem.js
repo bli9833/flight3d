@@ -569,7 +569,12 @@ export class CameraSystem {
     this.chasePos.copy(behindLocal.applyMatrix4(aircraftMesh.matrixWorld));
 
     if (this.mode === CameraSystem.MODES.COCKPIT) {
-      const eyeWorld = this.cockpitHeadOffset.clone().applyMatrix4(aircraftMesh.matrixWorld);
+      const eyeLocal = this.cockpitHeadOffset.clone();
+      if (this.camera && this.camera.aspect < 1.0) {
+        eyeLocal.x = -0.34;
+        eyeLocal.y += 0.03;
+      }
+      const eyeWorld = eyeLocal.applyMatrix4(aircraftMesh.matrixWorld);
       this.camera.position.copy(eyeWorld);
       const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraftMesh.quaternion);
       this.camera.up.copy(upWorld);
@@ -785,6 +790,10 @@ export class CameraSystem {
         }
 
         const eyeLocal = this.cockpitHeadOffset.clone();
+        if (this.camera && this.camera.aspect < 1.0) {
+          eyeLocal.x = -0.34;
+          eyeLocal.y += 0.03;
+        }
         if (this.photoCockpit) {
           eyeLocal.set(-0.48, 0.88, -12.02);
         }

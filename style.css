@@ -1384,14 +1384,31 @@ body.touch-mode .action-panel {
   .presets-bar {
     top: 50px;
     left: 8px;
+    right: 8px;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 5px;
     max-width: calc(100vw - 16px);
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     padding-bottom: 4px;
+    scrollbar-width: none;
+    z-index: 20;
+  }
+  .presets-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .presets-bar .airport-group {
+    flex-shrink: 0;
+    margin-bottom: 0;
+    padding: 3px 6px;
   }
   .presets-bar .btn-preset {
     padding: 5px 8px;
     font-size: 10px;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
   .action-panel {
     display: none !important;

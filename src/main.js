@@ -1007,7 +1007,16 @@ class FlightSimulator {
     this.audio.update(frameDelta, this.telemetry, isCockpit);
 
     // 6. Update Camera System & Dynamic FOV (60° in cockpit eliminates fisheye speed distortion)
-    const targetFov = isCockpit ? 60 : 54;
+    let targetFov = isCockpit ? 60 : 54;
+    const aspect = this.camera.aspect || (window.innerWidth / (window.innerHeight || 1));
+    if (aspect < 1.0) {
+      // In portrait orientation, standard vertical FOV yields a very narrow horizontal FOV:
+      // hFOV = 2 * atan(tan(vFOV / 2) * aspect). At aspect = 0.46, vFOV = 60° => hFOV ≈ 29.8° (tunnel vision).
+      // Dynamically expand vFOV to preserve a comfortable horizontal field of view (~76° cockpit, ~64° chase).
+      const targetHFov = (isCockpit ? 76 : 64) * (Math.PI / 180);
+      const vFovRad = 2 * Math.atan(Math.tan(targetHFov / 2) / aspect);
+      targetFov = Math.min(100, Math.max(54, vFovRad * (180 / Math.PI)));
+    }
     if (Math.abs(this.camera.fov - targetFov) > 0.1) {
       this.camera.fov = targetFov;
       this.camera.updateProjectionMatrix();
@@ -1201,6 +1210,14 @@ class FlightSimulator {
 
   handleResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
+    const isCockpit = this.cameraSystem && this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
+    let targetFov = isCockpit ? 60 : 54;
+    if (this.camera.aspect < 1.0) {
+      const targetHFov = (isCockpit ? 76 : 64) * (Math.PI / 180);
+      const vFovRad = 2 * Math.atan(Math.tan(targetHFov / 2) / this.camera.aspect);
+      targetFov = Math.min(100, Math.max(54, vFovRad * (180 / Math.PI)));
+    }
+    this.camera.fov = targetFov;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     if (this.cockpitPhotoOverlay) {
