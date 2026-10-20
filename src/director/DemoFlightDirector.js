@@ -1,3 +1,4 @@
+import { IncheonDepartureScenario } from './scenarios/IncheonDepartureScenario.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { LuklaCircuitScenario } from './scenarios/LuklaCircuitScenario.js';
 import { CoastalDemoScenario } from './scenarios/CoastalDemoScenario.js';
@@ -41,6 +42,7 @@ export class DemoFlightDirector {
 
     // Scenarios
     this.luklaScenario = new LuklaCircuitScenario(this, simulator);
+    this.incheonScenario = new IncheonDepartureScenario(this, simulator);
     this.coastalScenario = new CoastalDemoScenario(this, simulator);
 
     // UI element references
@@ -67,6 +69,7 @@ export class DemoFlightDirector {
   }
 
   getActiveScenario() {
+    if (this.activeDemoAirport === 'incheon') return this.incheonScenario;
     return this.activeDemoAirport === 'lukla' ? this.luklaScenario : this.coastalScenario;
   }
 
@@ -190,20 +193,23 @@ export class DemoFlightDirector {
       this.audioInitiated = true;
     }
 
-    if (this.activeDemoAirport === 'lukla') {
+    if (this.activeDemoAirport === 'incheon') {
+      this.setStage(IncheonDepartureScenario.STAGES.BOARDING);
+    } else if (this.activeDemoAirport === 'lukla') {
       this.setStage(DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
     } else {
       this.setStage(DemoFlightDirector.COASTAL_STAGES.PREFLIGHT_ORBIT);
     }
 
     if (this.sim.showToast) {
-      const airportName = this.activeDemoAirport === 'lukla' ? '루클라 (VNLK)' : '국제공항 (09L)';
+      const airportName = this.activeDemoAirport === 'incheon' ? '인천 (간략화)' : this.activeDemoAirport === 'lukla' ? '루클라 (VNLK)' : '국제공항 (09L)';
       this.sim.showToast(`🎬 ${airportName} 자율 시네마틱 데모 비행 시작`);
     }
   }
 
   stop(message = null, keepParkingBrake = false) {
     if (!this.isActive) return;
+    this.getActiveScenario().stop?.();
     this.isActive = false;
     this.currentStage = DemoFlightDirector.STAGES.IDLE;
     this.isBannerMinimized = false;

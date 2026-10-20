@@ -12,6 +12,7 @@ import { CDUCanvas } from './aircraft/CDUCanvas.js';
 import { Boeing737 } from './aircraft/Boeing737.js';
 import { Terrain } from './environment/Terrain.js';
 import { WaterOcean } from './environment/WaterOcean.js';
+import { IncheonAirport } from './environment/IncheonAirport.js';
 import { Airport } from './environment/Airport.js';
 import { FoliageAndCities } from './environment/FoliageAndCities.js';
 import { Ships } from './environment/Ships.js';
@@ -119,6 +120,10 @@ class FlightSimulator {
     this.luklaAirport = new LuklaAirport();
     this.luklaAirport.group.visible = false;
     this.scene.add(this.luklaAirport.group);
+
+    this.incheonAirport = new IncheonAirport();
+    this.incheonAirport.group.visible = false;
+    this.scene.add(this.incheonAirport.group);
 
     this.activeAirport = 'coastal'; // 'coastal' | 'lukla'
     this.currentTerrain = this.terrain;
@@ -489,7 +494,8 @@ class FlightSimulator {
 
     // Toggle 3D mesh visibility
     this.terrain.mesh.visible = !isLukla;
-    this.airport.group.visible = !isLukla;
+    this.airport.group.visible = !isLukla && id !== 'incheon';
+    this.incheonAirport.group.visible = id === 'incheon';
     this.water.mesh.visible = !isLukla;
     this.ships.group.visible = !isLukla;
     this.foliage.group.visible = !isLukla;
@@ -498,13 +504,13 @@ class FlightSimulator {
     this.luklaAirport.group.visible = isLukla;
 
     this.currentTerrain = isLukla ? this.luklaTerrain : this.terrain;
-    this.currentAirport = isLukla ? this.luklaAirport : this.airport;
+    this.currentAirport = isLukla ? this.luklaAirport : (id === 'incheon' ? this.incheonAirport : this.airport);
 
     if (this.collisionDetector) {
       if (isLukla) {
         this.collisionDetector.setEnvironment(this.luklaTerrain, this.luklaAirport, null, null, null);
       } else {
-        this.collisionDetector.setEnvironment(this.terrain, this.airport, this.foliage, this.ships, this.water);
+        this.collisionDetector.setEnvironment(this.terrain, this.currentAirport, this.foliage, this.ships, this.water);
       }
     }
 
@@ -558,7 +564,8 @@ class FlightSimulator {
       if (btnCliff) btnCliff.style.display = 'none';
     }
 
-    document.getElementById('btn-airport-coastal')?.classList.toggle('active', !isLukla);
+    document.getElementById('btn-airport-coastal')?.classList.toggle('active', id === 'coastal');
+    document.getElementById('btn-airport-incheon')?.classList.toggle('active', id === 'incheon');
     document.getElementById('btn-airport-lukla')?.classList.toggle('active', isLukla);
 
     if (this.demoDirector && this.demoDirector.isActive) {
@@ -570,13 +577,19 @@ class FlightSimulator {
     const desc = isLukla
       ? '네팔 텐징-힐러리 공항 (VNLK 06번 활주로, 해발 2,805m, 11.7% 급경사)'
       : '태평양 해안 국제공항 (Runway 09L, 해발 12m)';
-    this.showToast(`공항 변경: ${desc}`);
+    this.showToast(`공항 변경: ${id === 'incheon' ? '인천공항 간략화 훈련장 · AUTO DEMO로 탑승부터 출발' : desc}`);
   }
 
   /**
    * Physics Integration Substep (120 Hz)
    */
   integratePhysics(dt) {
+    // Ground service motion is authored by the scenario; takeoff uses normal physics.
+    if (this.demoDirector?.activeDemoAirport === 'incheon' && this.demoDirector.incheonScenario.controlsGround) {
+      const engineData = this.engines.update(dt, this.position.y, 0, 1);
+      Object.assign(this.telemetry, { engine1: engineData.engine1, engine2: engineData.engine2 });
+      return;
+    }
     // If crashed, damp out velocities and rest on terrain
     if (this.isCrashed) {
       this.linearVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 2.8));
@@ -1107,6 +1120,7 @@ class FlightSimulator {
   initUI() {
     // Airport Selector UI buttons
     document.getElementById('btn-airport-coastal')?.addEventListener('click', () => this.setAirport('coastal'));
+    document.getElementById('btn-airport-incheon')?.addEventListener('click', () => { this.setAirport('incheon'); this.demoDirector.start('incheon'); });
     document.getElementById('btn-airport-lukla')?.addEventListener('click', () => this.setAirport('lukla'));
 
     // Quick clickable UI buttons
