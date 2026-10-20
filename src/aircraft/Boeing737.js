@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Cockpit } from './Cockpit.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
 
 /**
  * Boeing 737-800 Airliner 3D Model
@@ -23,6 +24,7 @@ export class Boeing737 {
     this.gltfGroup.visible = false;
     this.group.add(this.gltfGroup);
     this.gltfFans = [];
+    this.gltfControlSurfaces = [];
     this.useGltf = false;
     this.loadingGltf = false;
     this.modelLoaded = false;
@@ -674,6 +676,7 @@ export class Boeing737 {
     if (this.fanR) this.fanR.rotation.z += rotSpeedR;
 
     // 2. Control Surface Deflections
+    updateGltfControlSurfaces(this.gltfControlSurfaces, flightState);
     // Ailerons (Roll)
     const aileronVal = flightState.aileron || 0;
     if (this.aileronL) this.aileronL.rotation.x = aileronVal * 0.35;
@@ -829,6 +832,10 @@ export class Boeing737 {
             }
           });
 
+          // Preserve the complete neutral airframe for the cockpit shadow proxy.
+          const originalAirframeGeometry = this.gltfModel.getObjectByName('B737')?.geometry;
+          this.gltfControlSurfaces = bindGltfControlSurfaces(this.gltfModel);
+
           // Turbine fan blades
           this.gltfFans = [];
           const fan1 = this.gltfModel.getObjectByName('tur_01');
@@ -849,7 +856,7 @@ export class Boeing737 {
               colorWrite: false,
               depthWrite: false
             });
-            const shadowProxy = new THREE.Mesh(b737Mesh.geometry, shadowMat);
+            const shadowProxy = new THREE.Mesh(originalAirframeGeometry, shadowMat);
             shadowProxy.name = 'Airframe_Shadow_Proxy';
             shadowProxy.rotation.copy(this.gltfModel.rotation);
             shadowProxy.position.copy(this.gltfModel.position);
