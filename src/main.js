@@ -865,10 +865,8 @@ class FlightSimulator {
     // 4. Catastrophic Camera Trauma Shake
     this.cameraSystem.addTrauma(1.0);
 
-    // 5. Halt Demo Flight if active
-    if (this.demoDirector && this.demoDirector.isActive) {
-      this.demoDirector.stop();
-    }
+    // Record the outcome before stop() makes scenario.update unreachable.
+    this.demoDirector?.stopForCrash(crashResult);
 
     // 6. Kill Engines and Damp Kinetic Energy
     this.engines.setThrottle(0.0);

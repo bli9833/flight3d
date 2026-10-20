@@ -19,7 +19,7 @@ async function main() {
   const chrome = spawn('google-chrome-stable', [
     '--headless=new', `--user-data-dir=${profile}`, `--remote-debugging-port=${CDP_PORT}`,
     '--window-size=1280,720', '--use-gl=angle', '--use-angle=vulkan',
-    '--disable-dev-shm-usage', '--no-first-run', SIM_URL
+    '--disable-dev-shm-usage', '--no-first-run', 'about:blank'
   ], { stdio: 'ignore' });
   let ws;
   try {
@@ -28,7 +28,7 @@ async function main() {
       await new Promise(r => setTimeout(r, 100));
       try {
         page = (await (await fetch(`http://127.0.0.1:${CDP_PORT}/json`)).json())
-          .find(t => t.type === 'page' && t.url.includes(String(PORT)));
+          .find(t => t.type === 'page' && t.url === 'about:blank');
       } catch { /* Chrome may still be starting. */ }
     }
     assert.ok(page, 'Chrome CDP page must be available');
@@ -36,8 +36,13 @@ async function main() {
     await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
     let nextId = 0;
     const pending = new Map();
+    let heldDemRequest;
     ws.onmessage = ev => {
       const msg = JSON.parse(ev.data);
+      if (msg.method === 'Fetch.requestPaused') {
+        heldDemRequest = msg.params.requestId;
+        return;
+      }
       const request = pending.get(msg.id);
       if (!request) return;
       pending.delete(msg.id);
@@ -56,12 +61,33 @@ async function main() {
       if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
       return result.result.value;
     };
+    // Exercise the real constructor auto-start with a deliberately delayed DEM.
+    // A test-only second start() after loading would hide a broken startup path.
+    await send('Fetch.enable', { patterns: [{ urlPattern: '*/terrain/lukla_dem.bin', requestStage: 'Request' }] });
+    await send('Page.navigate', { url: SIM_URL });
+    let startupPending;
+    for (let i = 0; i < 100 && !startupPending; i++) {
+      startupPending = await evaluate(`(() => {
+        const sim = window.simulator;
+        if (!sim) return null;
+        return { loaded: sim.luklaTerrain.isLoaded, active: sim.demoDirector.isActive,
+          waiting: sim.demoDirector.waitingForTerrain, outcome: sim.demoDirector.luklaScenario.result.status };
+      })()`);
+      if (!startupPending) await new Promise(r => setTimeout(r, 100));
+    }
+    assert.ok(heldDemRequest, 'The DEM must actually be delayed by request interception');
+    assert.deepEqual(startupPending, { loaded: false, active: true, waiting: true, outcome: 'pending' });
+    await send('Fetch.continueRequest', { requestId: heldDemRequest });
+    await send('Fetch.disable');
     let ready = false;
     for (let i = 0; i < 100 && !ready; i++) {
-      ready = await evaluate('!!window.simulator?.luklaTerrain?.isLoaded');
+      ready = await evaluate(`!!(window.simulator?.luklaTerrain?.isLoaded &&
+        window.simulator.demoDirector.isActive && !window.simulator.demoDirector.waitingForTerrain &&
+        window.simulator.demoDirector.luklaScenario.result.status === 'running')`);
       if (!ready) await new Promise(r => setTimeout(r, 100));
     }
-    assert.ok(ready, 'Measured DEM must load; an unloaded fallback cannot pass');
+    assert.ok(ready, 'Constructor auto-start must resume after the measured DEM loads');
+    const startup = { pending: startupPending, resumed: ready };
     const renderer = await evaluate(`(() => {
       const gl = window.simulator.renderer.getContext();
       const ext = gl.getExtension('WEBGL_debug_renderer_info');
@@ -124,7 +150,7 @@ async function main() {
       })()`);
       await evaluate('window.restoreLuklaIntegration()');
       reports.push(report);
-      fs.writeFileSync(path.join(ARTIFACT_DIR, 'report.json'), JSON.stringify({ renderer, reports }, null, 2));
+      fs.writeFileSync(path.join(ARTIFACT_DIR, 'report.json'), JSON.stringify({ renderer, startup, reports }, null, 2));
       assert.ok(final, 'Circuit timed out; screenshots or stage changes cannot count as success');
       assert.equal(report.result.status, 'completed', JSON.stringify(report));
       assert.equal(report.crashed, false);
@@ -138,6 +164,22 @@ async function main() {
       assert.ok(report.holdDriftM < 0.1, 'Parking brake must hold on the slope for 10s');
       console.log(`Run ${run + 1}: ${report.result.elapsedSeconds.toFixed(1)}s; max impact ${report.maxImpact.toFixed(2)}m/s; runway remaining ${report.remainingRunwayM.toFixed(1)}m; hold drift ${report.holdDriftM.toFixed(3)}m`);
     }
+    const crashStop = await evaluate(`(() => {
+      const sim = window.simulator;
+      sim.demoDirector.start('lukla');
+      const description = 'Review regression: actual triggerCrash lifecycle';
+      sim.triggerCrash({ collided: true, type: 'TERRAIN', name: 'Lifecycle regression',
+        point: sim.position.clone(), speedKnots: 0, description });
+      const immediate = structuredClone(sim.demoDirector.luklaScenario.result);
+      sim.demoDirector.update(1 / 120);
+      return { active: sim.demoDirector.isActive, crashed: sim.isCrashed,
+        immediate, afterUpdate: structuredClone(sim.demoDirector.luklaScenario.result) };
+    })()`);
+    assert.equal(crashStop.active, false);
+    assert.equal(crashStop.crashed, true);
+    assert.equal(crashStop.immediate.status, 'failed');
+    assert.equal(crashStop.immediate.reason, 'Review regression: actual triggerCrash lifecycle');
+    assert.deepEqual(crashStop.afterUpdate, crashStop.immediate, 'No extra active scenario update is needed to record failure');
     const rejectedImpacts = await evaluate(`(() => {
       const sim = window.simulator;
       const cases = [];
@@ -169,7 +211,7 @@ async function main() {
       assert.equal(impact.yChanged, false, 'Impact must be detected before correcting position');
       assert.equal(impact.massKg, 66000, 'Manual presets must restore default aircraft loading');
     }
-    fs.writeFileSync(path.join(ARTIFACT_DIR, 'report.json'), JSON.stringify({ renderer, reports, rejectedImpacts }, null, 2));
+    fs.writeFileSync(path.join(ARTIFACT_DIR, 'report.json'), JSON.stringify({ renderer, startup, reports, crashStop, rejectedImpacts }, null, 2));
     console.log(`PASS: ${reports.length} complete circuits. ${path.join(ARTIFACT_DIR, 'report.json')}`);
   } finally {
     ws?.close();

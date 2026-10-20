@@ -187,11 +187,15 @@ export class LuklaCircuitScenario {
     if (groundPitch === null) this.sim.controls.setVirtualInput('throttle', THREE.MathUtils.clamp(0.50 + (targetIas - tel.iasKnots) * 0.035 + targetVz * 0.02, 0.05, 0.95));
   }
 
+  recordFailure(crashResult) {
+    this.result.status = 'failed';
+    this.result.reason = crashResult?.description || 'Aircraft damage';
+  }
+
   update(dt) {
     const tel = this.sim.telemetry;
     if (this.sim.isCrashed) {
-      this.result.status = 'failed';
-      this.result.reason = this.sim.crashResult?.description || 'Aircraft damage';
+      this.recordFailure(this.sim.crashResult);
       this.director.stop('루클라 데모 실패: 기체 손상');
       return;
     }

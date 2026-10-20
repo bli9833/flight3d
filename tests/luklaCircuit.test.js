@@ -94,14 +94,63 @@ describe('Lukla continuous circuit and truthful completion', () => {
     assert.equal(sim.gear.brakes, 1);
   });
 
-  it('cannot start a circuit against the unloaded terrain fallback', () => {
+  it('defers auto-start until loaded terrain is observed, then starts exactly once', () => {
     const { sim, director, scenario } = setup();
     sim.currentTerrain = { isLoaded: false };
     director.start('lukla');
+    assert.equal(director.isActive, true);
+    assert.equal(director.waitingForTerrain, true);
+    assert.equal(scenario.result.status, 'pending');
+    for (let i = 0; i < 10; i++) director.update(1);
+    assert.equal(sim.presetCalls, 1, 'No flight is spawned on the fallback');
+    assert.equal(director.totalTimer, 0);
+    sim.currentTerrain.isLoaded = true;
+    director.update(0.1);
+    assert.equal(director.waitingForTerrain, false);
+    assert.equal(director.currentStage, STAGES.CLIFF_TAKEOFF);
+    assert.equal(scenario.result.status, 'running');
+    director.update(0.1);
+    assert.equal(sim.presetCalls, 2, 'Loading completion must not repeatedly reset the flight');
+    assert.equal(sim.controls.parkingBrake, false);
+  });
+
+  it('does not resurrect a cancelled pending demo when the terrain finishes loading', () => {
+    const { sim, director, scenario } = setup();
+    sim.currentTerrain = { isLoaded: false };
+    director.start('lukla');
+    director.stop();
+    sim.currentTerrain.isLoaded = true;
+    director.update(1);
+    assert.equal(director.isActive, false);
+    assert.equal(director.waitingForTerrain, false);
+    assert.equal(scenario.result.status, 'cancelled');
+    assert.equal(sim.presetCalls, 1);
+  });
+
+  it('does not overwrite a pending demo crash with cancellation', () => {
+    const { sim, director, scenario } = setup();
+    sim.currentTerrain = { isLoaded: false };
+    director.start('lukla');
+    director.stopForCrash({ description: 'Ground collision during terrain wait' });
     assert.equal(director.isActive, false);
     assert.equal(scenario.result.status, 'failed');
-    assert.equal(scenario.result.reason, 'DEM not loaded');
-    assert.equal(sim.presetCalls, 1, 'Rejected start must not spawn another flight');
+    sim.currentTerrain.isLoaded = true;
+    director.update(1);
+    assert.equal(scenario.result.status, 'failed');
+  });
+
+  it('records failure synchronously on the crash-stop path and retains it while inactive', () => {
+    const { sim, director, scenario } = setup();
+    const crash = { description: 'Nose gear impact' };
+    sim.isCrashed = true;
+    sim.crashResult = crash;
+    director.stopForCrash(crash);
+    assert.equal(director.isActive, false);
+    assert.equal(scenario.result.status, 'failed');
+    assert.equal(scenario.result.reason, crash.description);
+    director.update(3);
+    assert.equal(scenario.result.status, 'failed');
+    assert.equal(scenario.result.reason, crash.description);
   });
 
   it('reports a crash as failure even if stopped with an expired stage timer', () => {
