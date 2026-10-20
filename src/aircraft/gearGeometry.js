@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-// Subtract axis-aligned bay volumes in aircraft space. Split crossing triangles
+// Subtract convex bay volumes in aircraft space. Split crossing triangles
 // rather than dropping them, preserving UVs, normals and material groups.
 export function cutGearBays(mesh, aircraft, bays) {
   aircraft.updateMatrixWorld(true);
@@ -9,10 +9,10 @@ export function cutGearBays(mesh, aircraft, bays) {
   const names = Object.keys(source.attributes);
   const output = Object.fromEntries(names.map(name => [name, []]));
   const position = new THREE.Vector3();
-  const planes = bays.map(box => [
-    [0, 1, box.min.x], [0, -1, -box.max.x],
-    [1, 1, box.min.y], [1, -1, -box.max.y],
-    [2, 1, box.min.z], [2, -1, -box.max.z]
+  const planes = bays.map(box => box.clipPlanes || [
+    [1, 0, 0, box.min.x], [-1, 0, 0, -box.max.x],
+    [0, 1, 0, box.min.y], [0, -1, 0, -box.max.y],
+    [0, 0, 1, box.min.z], [0, 0, -1, -box.max.z]
   ]);
   const vertex = index => {
     const attributes = {};
@@ -28,11 +28,12 @@ export function cutGearBays(mesh, aircraft, bays) {
     attributes: Object.fromEntries(names.map(name => [name,
       a.attributes[name].map((value, i) => THREE.MathUtils.lerp(value, b.attributes[name][i], t))]))
   });
-  const split = (polygon, [axis, sign, offset]) => {
+  const split = (polygon, [nx, ny, nz, offset]) => {
     const inside = [], outside = [];
     for (let i = 0; i < polygon.length; i++) {
       const a = polygon[i], b = polygon[(i + 1) % polygon.length];
-      const da = a.point[axis] * sign - offset, db = b.point[axis] * sign - offset;
+      const distance = v => v.point[0] * nx + v.point[1] * ny + v.point[2] * nz - offset;
+      const da = distance(a), db = distance(b);
       (da >= 0 ? inside : outside).push(a);
       if ((da >= 0) !== (db >= 0)) {
         const crossing = interpolate(a, b, da / (da - db));
@@ -46,9 +47,13 @@ export function cutGearBays(mesh, aircraft, bays) {
   let lastMaterial = -1, groupStart = 0, emitted = 0;
   for (let index = 0; index < count; index += 3) {
     let polygons = [[0, 1, 2].map(i => vertex(source.index ? source.index.getX(index + i) : index + i))];
-    for (const boxPlanes of planes) {
+    for (const [bayIndex, boxPlanes] of planes.entries()) {
       const kept = [];
       for (const polygon of polygons) {
+        const box = bays[bayIndex];
+        if ([0, 1, 2].some(axis => polygon.every(v => v.point[axis] < box.min.getComponent(axis)) || polygon.every(v => v.point[axis] > box.max.getComponent(axis)))) {
+          kept.push(polygon); continue;
+        }
         let remainder = polygon;
         for (const plane of boxPlanes) {
           if (remainder.length < 3) break;
@@ -56,7 +61,7 @@ export function cutGearBays(mesh, aircraft, bays) {
           if (parts.outside.length >= 3) kept.push(parts.outside);
           remainder = parts.inside;
         }
-        // The remainder is inside all six planes: remove it.
+        // The remainder is inside all boundary planes: remove it.
       }
       polygons = kept;
     }
