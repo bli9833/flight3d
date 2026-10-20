@@ -129,6 +129,31 @@ try {
       const screenshot = await send('Page.captureScreenshot', { format: 'png' });
       await writeFile(join(directory, `${model}-${view}-${Math.round((1 - state) * 100)}.png`), Buffer.from(screenshot.data, 'base64'));
     }
+    cycle.suspension = [];
+    for (const [step, compression] of [0, 0.25, 0.7, 0.9, 0.3, 0].entries()) {
+      const alignment = await evaluate(({ model, compression }) => {
+        const r = gearReview, a = r.models[model], T = THREE;
+        a.update(1 / 120, { gearState: 1, compressions: { mainLeft: compression, mainRight: compression } });
+        a.group.updateMatrixWorld(true);
+        let maxSeparation = 0, maxAxisError = 0;
+        for (const truck of [a.mainTruckL, a.mainTruckR]) {
+          const { housing, piston } = truck.userData;
+          const axis = new T.Vector3(0, 1, 0).transformDirection(housing.matrixWorld);
+          const other = new T.Vector3(0, 1, 0).transformDirection(piston.matrixWorld);
+          const offset = piston.getWorldPosition(new T.Vector3()).sub(housing.getWorldPosition(new T.Vector3()));
+          maxSeparation = Math.max(maxSeparation, offset.cross(axis).length());
+          maxAxisError = Math.max(maxAxisError, axis.distanceTo(other));
+        }
+        if (maxSeparation > 1e-7 || maxAxisError > 1e-7) throw new Error(`Detached piston at ${compression}m`);
+        r.camera.position.set(-6, -3, -1); r.camera.lookAt(-3, -1.8, 0.9); r.camera.updateProjectionMatrix();
+        simulator.renderer.render(r.scene, r.camera);
+        r.label.textContent = `${model.toUpperCase()} · SUSPENSION · ${compression.toFixed(2)} m compression`;
+        return { compression, maxSeparation, maxAxisError };
+      }, { model, compression });
+      cycle.suspension.push(alignment);
+      const screenshot = await send('Page.captureScreenshot', { format: 'png' });
+      await writeFile(join(directory, `${model}-compression-${step}-${Math.round(compression * 100)}.png`), Buffer.from(screenshot.data, 'base64'));
+    }
   }
   if (process.argv.includes('--animation')) {
     // JPEG frames stream directly into VP9; no temporary frame collection.
@@ -163,7 +188,7 @@ try {
   }
   assert.deepEqual(exceptions, [], 'No uncaught browser exceptions');
   await writeFile(join(directory, 'results.json'), JSON.stringify({ setup, results, exceptions }, null, 2));
-  console.log(JSON.stringify({ directory, results, screenshots: 60 }));
+  console.log(JSON.stringify({ directory, results, screenshots: 72 }));
 } finally {
   socket?.close(); chrome.kill();
   await new Promise(resolve => chrome.once('exit', resolve));

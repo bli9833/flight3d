@@ -588,8 +588,12 @@ export class Boeing737 {
         tube.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
         return tube;
       };
-      mainGear.add(makeLegTube(0.14, 0.62, 0.31, strutMat));
-      const truck = new THREE.Group(); truck.add(makeLegTube(0.10, 0.58, 0.71, chromePistonMat));
+      const housing = makeLegTube(0.14, 0.62, 0.31, strutMat);
+      mainGear.add(housing);
+      const truck = new THREE.Group();
+      const piston = makeLegTube(0.10, 0.58, 0.71, chromePistonMat); truck.add(piston);
+      truck.userData.housing = housing; truck.userData.piston = piston;
+      truck.userData.suspensionAxis = new THREE.Vector3();
       const axle = new THREE.Group(); axle.position.set(0, -length, 1.8);
       axle.rotation.z = -side * this.mainDeployAngle;
       const wheels = [-0.35, 0.35].map(x => {
@@ -600,14 +604,16 @@ export class Boeing737 {
         const brake = new THREE.Mesh(brakeGeometry, brakeMat); brake.position.x = x; axle.add(brake);
       }
       truck.add(axle); truck.userData.axle = axle; truck.userData.wheels = wheels;
-      makeScissorsPair(0.22, 0.08, truck, -length * 0.60, truck);
-      const links = this.gearScissors.at(-1); links.upper.position.z = 1.2; links.lower.position.z = 1.2;
+      const scissors = new THREE.Group(); truck.add(scissors); truck.userData.scissors = scissors;
+      makeScissorsPair(0.22, 0.08, scissors, 0, truck);
       mainGear.add(truck);
       return { root: mainGear, truck };
     };
     const mainL = makeMainBogie(-1), mainR = makeMainBogie(1);
     this.mainGearLGroup = mainL.root; this.mainTruckL = mainL.truck;
     this.mainGearRGroup = mainR.root; this.mainTruckR = mainR.truck;
+    this.updateMainGearSuspension(this.mainTruckL, -1, 0);
+    this.updateMainGearSuspension(this.mainTruckR, 1, 0);
 
     const bayMat = new THREE.MeshStandardMaterial({ color: 0x303b42, roughness: 0.85, side: THREE.DoubleSide });
     this.gearBayGroup = new THREE.Group();
@@ -638,6 +644,22 @@ export class Boeing737 {
     this.gearGroup.traverse(mesh => {
       if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
     });
+  }
+
+  updateMainGearSuspension(truck, side, compression) {
+    // Preserve the vertical physics contact displacement, then articulate both
+    // rigid tubes along the line from the fixed mount to the displaced axle.
+    // Translating the raked piston alone would pull it sideways out of its housing.
+    truck.position.set(side * Math.sin(this.mainDeployAngle) * compression, Math.cos(this.mainDeployAngle) * compression, 0);
+    const { axle, housing, piston, suspensionAxis: axis, scissors } = truck.userData;
+    axis.copy(truck.position).add(axle.position).normalize();
+    const up = new THREE.Vector3(0, 1, 0);
+    housing.quaternion.setFromUnitVectors(up, axis);
+    housing.position.copy(axis).multiplyScalar(housing.geometry.parameters.height / 2);
+    piston.quaternion.copy(housing.quaternion);
+    piston.position.copy(axle.position).addScaledVector(axis, -piston.geometry.parameters.height / 2);
+    scissors.position.copy(axle.position).addScaledVector(axis, -this.mainLegLength * 0.4);
+    scissors.quaternion.setFromUnitVectors(up, axis.clone().negate());
   }
 
   fitMainBaysToSkin(exterior) {
@@ -793,12 +815,12 @@ export class Boeing737 {
       const compR = Math.min(0.9, Math.max(0, flightState.compressions.mainRight || 0));
 
       if (this.noseTruck) this.noseTruck.position.y = compNose;
-      if (this.mainTruckL) this.mainTruckL.position.set(-Math.sin(this.mainDeployAngle) * compL, Math.cos(this.mainDeployAngle) * compL, 0);
-      if (this.mainTruckR) this.mainTruckR.position.set(Math.sin(this.mainDeployAngle) * compR, Math.cos(this.mainDeployAngle) * compR, 0);
+      if (this.mainTruckL) this.updateMainGearSuspension(this.mainTruckL, -1, compL);
+      if (this.mainTruckR) this.updateMainGearSuspension(this.mainTruckR, 1, compR);
     } else {
       if (this.noseTruck) this.noseTruck.position.y = 0;
-      if (this.mainTruckL) this.mainTruckL.position.set(0, 0, 0);
-      if (this.mainTruckR) this.mainTruckR.position.set(0, 0, 0);
+      if (this.mainTruckL) this.updateMainGearSuspension(this.mainTruckL, -1, 0);
+      if (this.mainTruckR) this.updateMainGearSuspension(this.mainTruckR, 1, 0);
     }
 
     // Dynamic Scissors torque link folding

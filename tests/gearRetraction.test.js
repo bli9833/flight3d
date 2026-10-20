@@ -86,6 +86,36 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
     }
   });
 
+  it('keeps piston and housing coaxial through compression and release without moving wheel contacts sideways', () => {
+    const aircraft = makeAircraft(profile), physics = new LandingGear();
+    aircraft.group.position.set(12, 34, -56); aircraft.group.rotation.set(0.1, 0.25, -0.15);
+    for (const compression of [0, 0.25, 0.7, 0.9, 0.3, 0]) {
+      aircraft.update(1 / 120, { gearState: 1, compressions: { mainLeft: compression, mainRight: compression } });
+      aircraft.group.updateMatrixWorld(true);
+      for (const [leg, truck, index] of [[aircraft.mainGearLGroup, aircraft.mainTruckL, 1], [aircraft.mainGearRGroup, aircraft.mainTruckR, 2]]) {
+        const housing = leg.children.find(child => child.isMesh && child.geometry.type === 'CylinderGeometry');
+        const piston = truck.children.find(child => child.isMesh && child.geometry.type === 'CylinderGeometry');
+        const axis = new THREE.Vector3(0, 1, 0).transformDirection(housing.matrixWorld);
+        const pistonAxis = new THREE.Vector3(0, 1, 0).transformDirection(piston.matrixWorld);
+        assert.ok(axis.distanceTo(pistonAxis) < 1e-9, 'tube axes must remain parallel');
+        const offset = piston.getWorldPosition(new THREE.Vector3()).sub(housing.getWorldPosition(new THREE.Vector3()));
+        assert.ok(offset.clone().cross(axis).length() < 1e-8, `piston must remain centered in housing at ${compression}m`);
+        const mount = leg.getWorldPosition(new THREE.Vector3());
+        const top = housing.getWorldPosition(new THREE.Vector3()).addScaledVector(axis, -housing.geometry.parameters.height / 2);
+        assert.ok(top.distanceTo(mount) < 1e-8, 'upper housing must stay attached to its mount');
+        const hub = wheelsOf(truck).reduce((sum, wheel) => sum.add(wheel.getWorldPosition(new THREE.Vector3())), new THREE.Vector3()).multiplyScalar(0.5);
+        const expected = physics.contacts[index].localPos.clone(); expected.y += compression; aircraft.group.localToWorld(expected);
+        assert.ok(hub.distanceTo(expected) < 1e-8, 'articulation must preserve wheel contact datum');
+        const bottom = piston.getWorldPosition(new THREE.Vector3()).addScaledVector(pistonAxis, piston.geometry.parameters.height / 2);
+        assert.ok(bottom.distanceTo(hub) < 1e-8, 'lower piston must remain attached to the axle');
+        const pistonTop = piston.getWorldPosition(new THREE.Vector3()).addScaledVector(pistonAxis, -piston.geometry.parameters.height / 2);
+        const insertion = pistonTop.sub(mount).dot(axis);
+        assert.ok(insertion > 0 && insertion < housing.geometry.parameters.height, 'piston must overlap the housing without emerging through the mount');
+        assert.deepEqual(housing.scale.toArray(), [1, 1, 1]); assert.deepEqual(piston.scale.toArray(), [1, 1, 1]);
+      }
+    }
+  });
+
   it('stows exposed tire faces without exterior main-gear covers', () => {
     const aircraft = makeAircraft(profile); pose(aircraft, 0);
     assert.equal(aircraft.gearDoors.length, 2, 'only nose doors remain');
