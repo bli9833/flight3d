@@ -56,6 +56,13 @@ ports and browser profiles with other sessions. Inspect assertions, browser
 errors, and produced images; a script exit code alone does not establish visual
 acceptance. Node tests and a successful build do not verify WebGL rendering.
 
+## Landing damage acceptance
+
+`npm run test:landing` checks normal landings, independent leg failures, partial
+extension, controlled runway scraping through rest, catastrophic body impact and
+repair. See [landing damage](landing-damage.md) for conditions, limitations and
+port/artifact options. It is separate from the default Node test gate.
+
 ## Selection and provenance
 
 Adapted from the sibling Keepory (historically Stash) repository at commit

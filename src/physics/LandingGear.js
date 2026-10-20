@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { GEAR_DAMAGE_LIMITS, updateGearDamage } from './gearDamage.js';
+import { BODY_CONTACTS } from './groundContacts.js';
 
 /**
  * Multi-contact Tricycle Landing Gear Physics (Boeing 737 class)
@@ -67,6 +69,7 @@ export class LandingGear {
       }
     ];
 
+    this.resetDamage();
     this.brakes = 0.0; // 0.0 to 1.0
     this.steerAngle = 0.0; // Radians
     this.onGround = false;
@@ -75,17 +78,25 @@ export class LandingGear {
   }
 
   resetContacts() {
+    this.resetDamage();
+  }
+
+  resetDamage() {
     this.failure = null;
     this.maxImpactSpeed = 0;
     this.lastMomentBody.set(0, 0, 0);
-    this.touchdownEvent = false;
-    this.totalWeightOnWheels = 0;
     for (const c of this.contacts) {
+      c.damage = 0;
+      c.damageState = 'normal';
       c.isGrounded = false;
       c.compression = 0;
       c.touchdownThisFrame = false;
     }
+    this.bodyGrounded = new Set();
+    this.structuralDamage = 0;
     this.onGround = false;
+    this.totalWeightOnWheels = 0;
+    this.touchdownEvent = false;
   }
 
   toggleGear() {
@@ -139,37 +150,22 @@ export class LandingGear {
     this.touchdownEvent = false;
     this.totalWeightOnWheels = 0;
 
-    // If gear is mostly retracted, check if belly touches terrain for crash/belly landing
     const gearDeploy = this.gearState;
-    if (gearDeploy < 0.1) {
-      // Belly contact check
-      const bellyWorld = new THREE.Vector3(0, -1.88, 0).applyMatrix4(aircraftMesh.matrixWorld);
-      const groundY = getTerrainHeight(bellyWorld.x, bellyWorld.z);
-      if (bellyWorld.y < groundY + 0.15) {
-        // High friction crash scrape
-        const depth = Math.max(0.05, groundY + 0.15 - bellyWorld.y);
-        netForceWorld.y += 2500000 * depth;
-        // Heavy drag
-        netForceWorld.x -= linearVelocity.x * 20000;
-        netForceWorld.z -= linearVelocity.z * 20000;
-        this.onGround = true;
-      }
-      return {
-        forces: netForceWorld,
-        moments: netMomentBody,
-        onGround: this.onGround,
-        touchdown: false,
-        gearState: this.gearState,
-        isTransit: this.isTransit
-      };
-    }
-
+    const damageEvents = [];
+    const bodyContacts = [];
+    let catastrophicImpact = false;
     // World transformation matrices
     const worldQuat = aircraftMesh.quaternion;
     const invWorldQuat = worldQuat.clone().invert();
     const touchdownContacts = [];
 
     for (const c of this.contacts) {
+      c.touchdownThisFrame = false;
+      if (gearDeploy < 0.1 || c.damageState === 'collapsed') {
+        c.isGrounded = false;
+        c.compression = 0;
+        continue;
+      }
       // Deployed position scaled by gear deployment
       const deployedLocal = c.localPos.clone();
       deployedLocal.y *= gearDeploy;
@@ -201,18 +197,16 @@ export class LandingGear {
           }
         }
 
+        const normalPenetration = penetration * groundNormal.y;
+        c.compression = Math.min(c.restLength, normalPenetration);
+
         // Contact point velocity in world space = linearVel + angularVel x r
-        const rWorld = hubWorld.clone().sub(aircraftMesh.position);
+        const rWorld = c.worldPos.clone().sub(aircraftMesh.position);
         const angVelWorld = angularVelocity.clone().applyQuaternion(worldQuat);
         const contactVel = linearVelocity.clone().add(angVelWorld.clone().cross(rWorld));
         const groundSpeed = Math.sqrt(linearVelocity.x * linearVelocity.x + linearVelocity.z * linearVelocity.z);
         const sinkRate = Math.max(0, -contactVel.dot(groundNormal));
-        const impactLimit = c.isSteerable ? 2.8 : 3.8;
         if (!wasGrounded) this.maxImpactSpeed = Math.max(this.maxImpactSpeed, sinkRate);
-        // Conservative simulation envelope, not a certified aircraft limit.
-        if ((!wasGrounded && sinkRate > impactLimit) || penetration > c.restLength + 0.08) {
-          this.failure ??= { contact: c.id, sinkRate, penetration, reason: sinkRate > impactLimit ? 'impact' : 'bottom-out' };
-        }
 
         // Touchdown impact requires descending from the air into the runway surface (sinkRate > 0.25 m/s)
         if (!wasGrounded && sinkRate > 0.25) {
@@ -234,14 +228,9 @@ export class LandingGear {
         let normalForceMag = c.kSpring * c.compression - c.cDamper * vNormal;
         if (normalForceMag < 0) normalForceMag = 0; // Strut can only push away
 
-        this.totalWeightOnWheels += normalForceMag;
-
-        // Normal force pushes upwards perpendicular to the surface
-        const fNormal = groundNormal.clone().multiplyScalar(normalForceMag);
-
         // Wheel forward and lateral vectors in world space tangent to surface
         let wheelForwardLocal = new THREE.Vector3(0, 0, -1);
-        if (c.isSteerable) {
+        if (c.isSteerable && c.damageState === 'normal') {
           wheelForwardLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.steerAngle);
         }
         const wheelForwardRaw = wheelForwardLocal.clone().applyQuaternion(worldQuat);
@@ -260,13 +249,41 @@ export class LandingGear {
         const vForward = contactVel.dot(wheelForwardWorld);
         const vLateral = contactVel.dot(wheelLateralWorld);
 
+        // Evaluate demand before friction saturation; a sliding tire still loads the strut.
+        const limits = GEAR_DAMAGE_LIMITS[c.id === 'nose' ? 'nose' : 'main'];
+        const stateBefore = c.damageState;
+        updateGearDamage(c, {
+          sinkRate,
+          firstContact: !wasGrounded,
+          normalLoad: normalForceMag,
+          lateralLoad: Math.abs(vLateral) * 35000,
+          longitudinalLoad: Math.min(Math.abs(vForward) * 25000, normalForceMag * (0.02 + this.brakes * 0.58)),
+          overtravel: Math.max(0, normalPenetration - c.restLength),
+          locked: gearDeploy >= 0.99 && this.targetGearState === 1,
+        }, dt, limits);
+        if (stateBefore !== c.damageState) {
+          this.failure ??= { contact: c.id, sinkRate, penetration,
+            reason: sinkRate > limits.impact ? 'impact' : normalPenetration > c.restLength + 0.08 ? 'bottom-out' : gearDeploy < 0.99 || this.targetGearState !== 1 ? 'unlocked' : 'overload' };
+          damageEvents.push({ id: c.id, state: c.damageState, damage: c.damage });
+        }
+        if (c.damageState === 'collapsed') {
+          c.isGrounded = false;
+          c.touchdownThisFrame = false;
+          c.compression = 0;
+          continue;
+        }
+        normalForceMag *= c.damageState === 'damaged' ? 0.65 : 1;
+        this.totalWeightOnWheels += normalForceMag;
+
+        // Normal force pushes perpendicular to the surface.
+        const fNormal = groundNormal.clone().multiplyScalar(normalForceMag);
+
         // Rolling resistance & Brakes along forward axis
         let muBrake = 0.02; // Baseline rolling resistance
         if (this.brakes > 0.01) {
           muBrake += this.brakes * 0.58; // Boeing 737 anti-skid carbon brake friction
         }
-        // Brake impulse approaches static friction at taxi speed instead of
-        // viscous drag that permits endless downhill creep. Coulomb cap stays.
+        // Preserve static braking on sloped taxiways/runways.
         const stoppingGain = this.brakes > 0.5 ? normalForceMag / (9.80665 * Math.max(dt, 0.001)) : 25000;
         const fForwardMag = -Math.sign(vForward) * Math.min(Math.abs(vForward) * stoppingGain, normalForceMag * muBrake);
         const fForward = wheelForwardWorld.clone().multiplyScalar(fForwardMag);
@@ -282,7 +299,7 @@ export class LandingGear {
 
         // Calculate moment produced around CG: M = r x F
         const fWheelBody = fWheelWorld.clone().applyQuaternion(invWorldQuat);
-        const momentBody = c.localPos.clone().cross(fWheelBody);
+        const momentBody = rWorld.clone().applyQuaternion(invWorldQuat).cross(fWheelBody);
         netMomentBody.add(momentBody);
       } else {
         c.isGrounded = false;
@@ -291,8 +308,45 @@ export class LandingGear {
       }
     }
 
+    // Body support is always active, including a single collapsed leg with gear DOWN.
+    const groundedNow = new Set();
+    for (const probe of BODY_CONTACTS) {
+      const local = new THREE.Vector3(...probe.position);
+      const point = local.clone().applyMatrix4(aircraftMesh.matrixWorld);
+      const groundH = getTerrainHeight(point.x, point.z);
+      const normal = getTerrainNormal?.(point.x, point.z)?.clone() || new THREE.Vector3(0, 1, 0);
+      if (normal.lengthSq() < 0.0001) normal.set(0, 1, 0);
+      normal.normalize();
+      const depth = (groundH - point.y) * normal.y;
+      if (depth <= 0) continue;
+      const arm = point.clone().sub(aircraftMesh.position);
+      const velocity = angularVelocity.clone().applyQuaternion(worldQuat).cross(arm).add(linearVelocity);
+      const vNormal = velocity.dot(normal);
+      const tangent = velocity.clone().addScaledVector(normal, -vNormal);
+      const speed = tangent.length();
+      const load = Math.max(0, 1800000 * Math.min(depth, 0.75) - 160000 * vNormal);
+      const force = normal.clone().multiplyScalar(load);
+      if (speed > 0) force.addScaledVector(tangent, -Math.min(18000, load * 0.45 / speed));
+      netForceWorld.add(force);
+      netMomentBody.add(local.clone().cross(force.clone().applyQuaternion(invWorldQuat)));
+      groundedNow.add(probe.id);
+      this.onGround = true;
+      if (!this.bodyGrounded.has(probe.id) && -vNormal > 12.5) catastrophicImpact = true;
+      this.structuralDamage = Math.min(1, this.structuralDamage + speed * dt / 100000);
+      bodyContacts.push({ id: probe.id, worldPos: point, sinkRate: -vNormal, speed });
+    }
+    this.bodyGrounded = groundedNow;
+    catastrophicImpact ||= this.structuralDamage >= 1;
+    // Recompute after collapse; a failed contact must not report weight on wheels.
+    this.onGround = bodyContacts.length > 0 || this.contacts.some(c => c.isGrounded);
+
+    const supportedTouchdowns = touchdownContacts.filter(event =>
+      this.contacts.find(c => c.id === event.id).damageState !== 'collapsed');
+    this.touchdownEvent = supportedTouchdowns.length > 0;
     this.lastMomentBody.copy(netMomentBody);
     return {
+      failure: this.failure,
+      maxImpactSpeed: this.maxImpactSpeed,
       forces: netForceWorld,
       moments: netMomentBody,
       onGround: this.onGround,
@@ -300,9 +354,12 @@ export class LandingGear {
       gearState: this.gearState,
       isTransit: this.isTransit,
       weightOnWheels: this.totalWeightOnWheels,
-      touchdownContacts,
-      failure: this.failure,
-      maxImpactSpeed: this.maxImpactSpeed,
+      damageEvents,
+      gearDamage: Object.fromEntries(this.contacts.map(c => [c.id, c.damageState])),
+      bodyContacts,
+      structuralDamage: this.structuralDamage,
+      catastrophicImpact,
+      touchdownContacts: supportedTouchdowns,
       compressions: {
         nose: this.contacts[0].compression,
         mainLeft: this.contacts[1].compression,

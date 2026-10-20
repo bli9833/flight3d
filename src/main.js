@@ -307,6 +307,9 @@ class FlightSimulator {
     this.airborneTime = (type === 'runway') ? 0.0 : 15.0;
     this.hasTouchedDownThisFlight = false;
     this.gear.resetContacts();
+    this.landingIncident = false;
+    this.landingStopped = false;
+    this.bodyContactStarted = false;
 
     if (this.isCrashed) {
       this.isCrashed = false;
@@ -653,13 +656,21 @@ class FlightSimulator {
       (x, z) => (this.currentTerrain.getNormal ? this.currentTerrain.getNormal(x, z) : null)
     );
 
-    if (gearResult.failure) {
-      this.triggerCrash({
-        collided: true, type: 'TERRAIN', name: '랜딩기어 파손 (HARD LANDING CRASH)',
-        point: this.position.clone(), speedKnots: groundSpeed * 1.94384,
-        description: `${gearResult.failure.contact}: 접지 충격 ${gearResult.failure.sinkRate.toFixed(1)} m/s / 스트럿 한계 초과`
-      });
-      return;
+    if (gearResult.damageEvents.length || (gearResult.bodyContacts.length && !this.bodyContactStarted)) {
+      this.landingIncident = true;
+      if (this.demoDirector?.isActive) this.demoDirector.stop();
+      const labels = { nose: '전륜', mainLeft: '좌측 주기어', mainRight: '우측 주기어' };
+      for (const event of gearResult.damageEvents) {
+        this.showToast(`${labels[event.id]} ${event.state === 'collapsed' ? '붕괴' : '손상'} — 지지·조향 성능 저하`);
+      }
+      if (gearResult.bodyContacts.length) {
+        this.bodyContactStarted = true;
+        this.showToast('기체 하부 접촉 — 활주 중');
+      }
+    }
+    if (this.landingIncident && gearResult.onGround && !this.landingStopped && groundSpeed < 0.5 && Math.abs(this.linearVelocity.y) < 0.2) {
+      this.landingStopped = true;
+      this.showToast('비상착륙 정지 — 프리셋을 선택하면 기체가 복구됩니다');
     }
 
     // 5. Aerodynamic Forces & Moments
@@ -772,6 +783,9 @@ class FlightSimulator {
       gearState: gearResult.gearState,
       isTransit: gearResult.isTransit,
       compressions: gearResult.compressions,
+      gearDamage: gearResult.gearDamage,
+      bodyContacts: gearResult.bodyContacts.map(c => c.id),
+      structuralDamage: gearResult.structuralDamage,
       flapDegree: this.aero.currentFlapAngle,
       flapIndex: this.aero.flapsIndex,
       spoilers: this.aero.spoilers,
@@ -817,11 +831,11 @@ class FlightSimulator {
     // 12. Cinematic Camera Cuts: Automatic temporary gear view for Takeoff, Touchdown, and Gear Retract/Extend
     const allowAutoCut = !this.cameraSystem.userLookOverridden
       && !(this.demoDirector && this.demoDirector.isActive && this.demoDirector.userCameraOverridden);
-    if (allowAutoCut && this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
+    if (allowAutoCut && !this.landingIncident && this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
       // Takeoff liftoff
       this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
       this.showToast('🎥 랜딩 기어 뷰: 이륙 상승 (Takeoff Climb)');
-    } else if (allowAutoCut && genuineLandingTouchdown && this.totalSimTime > 2.0) {
+    } else if (allowAutoCut && !this.landingIncident && genuineLandingTouchdown && this.totalSimTime > 2.0) {
       // Touchdown landing (only on genuine landing touchdown)
       this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 5.0);
       this.showToast('🎥 랜딩 기어 뷰: 활주로 접지 & 서스펜션 완충 (Touchdown)');
@@ -852,7 +866,8 @@ class FlightSimulator {
         this.linearVelocity,
         gearResult.gearState,
         pitchDeg,
-        rollDeg
+        rollDeg,
+        gearResult
       );
 
       if (crash) {
@@ -1075,8 +1090,11 @@ class FlightSimulator {
     if (elN1) elN1.textContent = `${Math.round(this.telemetry.engine1 ? this.telemetry.engine1.n1 : 22)}%`;
     if (elFlaps) elFlaps.textContent = `${Math.round(this.telemetry.flapDegree)}°`;
     if (elGear) {
-      elGear.textContent = this.telemetry.gearState > 0.95 ? 'DOWN' : (this.telemetry.gearState < 0.05 ? 'UP' : 'TRANS');
-      elGear.className = this.telemetry.gearState > 0.95 ? 'status-green' : (this.telemetry.gearState < 0.05 ? 'status-dim' : 'status-amber');
+      const states = Object.values(this.telemetry.gearDamage || {});
+      const failed = states.includes('collapsed');
+      const damaged = states.includes('damaged');
+      elGear.textContent = failed ? 'FAIL' : damaged ? 'DMG' : this.telemetry.gearState > 0.95 ? 'DOWN' : (this.telemetry.gearState < 0.05 ? 'UP' : 'TRANS');
+      elGear.className = failed ? 'status-danger' : damaged ? 'status-amber' : this.telemetry.gearState > 0.95 ? 'status-green' : (this.telemetry.gearState < 0.05 ? 'status-dim' : 'status-amber');
     }
     if (elSpoilers) {
       elSpoilers.textContent = this.telemetry.spoilers > 0.1 ? 'EXT' : 'ARM';
