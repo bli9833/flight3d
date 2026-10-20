@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { cutGearBays } from './gearGeometry.js';
 import { Cockpit } from './Cockpit.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -123,6 +124,13 @@ export class Boeing737 {
 
     // 5. Tricycle Landing Gear
     this.buildLandingGear();
+    this.group.updateMatrixWorld(true);
+    this.fitNoseDoorsToSkin(this.fuselageGroup);
+    // Open the same bays in the procedural fallback; the loaded exterior is
+    // cut separately once its aircraft-space transform has been established.
+    for (const root of [this.fuselageGroup, this.wingGroup]) {
+      root.traverse(mesh => { if (mesh.isMesh) cutGearBays(mesh, this.group, this.gearBayVolumes); });
+    }
 
     // 6. Navigation, Strobe & Landing Lights
     this.buildLights();
@@ -160,6 +168,7 @@ export class Boeing737 {
     this.proceduralShadowProxy.receiveShadow = false;
     this.proceduralShadowProxy.visible = false;
     this.group.add(this.proceduralShadowProxy);
+    cutGearBays(this.proceduralShadowProxy, this.group, this.gearBayVolumes);
 
     // 7. Asynchronous High-Detail GLTF PBR Model Loading with Procedural Fallback
     this.loadGltfModel('/models/b737-800.glb');
@@ -445,16 +454,29 @@ export class Boeing737 {
     this.group.add(this.enginesGroup);
   }
 
-  buildLandingGear() {
+  buildLandingGear(profile = 'fallback') {
+    this.gearProfile = profile;
+    const loaded = profile === 'loaded';
+    const noseY = loaded ? -1.75 : -0.80;
+    const noseLength = -3.27 - noseY;
+    const noseMinZ = loaded ? -14.55 : -13.0;
+    const noseMaxZ = loaded ? -11.95 : -9.30;
+    const noseCenterZ = (noseMinZ + noseMaxZ) / 2;
     this.gearGroup = new THREE.Group();
+    this.gearGroup.name = 'LandingGear';
     this.gearDoors = [];
+    this.gearBayVolumes = [
+      new THREE.Box3(new THREE.Vector3(-0.54, -4, noseMinZ), new THREE.Vector3(0.54, loaded ? -1.30 : -0.30, noseMaxZ)),
+      new THREE.Box3(new THREE.Vector3(-3.65, -4, 1.08), new THREE.Vector3(-0.80, -1.48, 2.52)),
+      new THREE.Box3(new THREE.Vector3(0.80, -4, 1.08), new THREE.Vector3(3.65, -1.48, 2.52))
+    ];
     this.gearScissors = [];
 
     const strutMat = new THREE.MeshStandardMaterial({ color: 0x88929e, metalness: 0.8, roughness: 0.3 });
     const chromePistonMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.95, roughness: 0.1 });
     const tireMat = new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.9, metalness: 0.1 });
     const rimMat = new THREE.MeshStandardMaterial({ color: 0xdde3ea, metalness: 0.7, roughness: 0.3 });
-    const doorMat = new THREE.MeshStandardMaterial({ color: 0xf4f7fa, roughness: 0.28, metalness: 0.18 });
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0xc8d1dc, roughness: 0.28, metalness: 0.18, side: THREE.DoubleSide });
     const brakeMat = new THREE.MeshStandardMaterial({ color: 0x2b2e34, metalness: 0.85, roughness: 0.5 });
 
     const makeWheel = (radius, width) => {
@@ -489,105 +511,89 @@ export class Boeing737 {
       this.gearScissors.push({ truck: truckRef, upper: upperPivot, lower: lowerPivot });
     };
 
-    // 1. Nose Gear Assembly (Center forward: x=0, y=-0.85m, z=-12.5m)
+    // 1. Nose mount sits inside the belly; hub stays at the physics datum.
     this.noseGearGroup = new THREE.Group();
-    this.noseGearGroup.position.set(0, -0.85, -12.5);
+    this.noseGearGroup.position.set(0, noseY, -12.5);
+    const noseRatio = -noseLength / 2.42;
 
     // Outer stationary strut housing cylinder
-    const nStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.5, 12), strutMat);
-    nStrut.position.y = -0.75;
+    const nStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.5 * noseRatio, 12), strutMat);
+    nStrut.position.y = -0.75 * noseRatio;
     this.noseGearGroup.add(nStrut);
 
     // Movable Nose Truck (Sliding oleo chrome piston + dual wheels)
     this.noseTruck = new THREE.Group();
-    const nPiston = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 1.5, 12), chromePistonMat);
-    nPiston.position.y = -1.65;
+    const nPiston = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 1.5 * noseRatio, 12), chromePistonMat);
+    nPiston.position.y = -1.65 * noseRatio;
     this.noseTruck.add(nPiston);
 
     // Dual Nose Wheels
     const nWheelL = makeWheel(0.38, 0.22);
-    nWheelL.position.set(-0.24, -2.42, 0);
+    nWheelL.position.set(-0.24, noseLength, 0);
     const nWheelR = makeWheel(0.38, 0.22);
-    nWheelR.position.set(0.24, -2.42, 0);
+    nWheelR.position.set(0.24, noseLength, 0);
     this.noseTruck.add(nWheelL, nWheelR);
 
     // Nose Scissors
-    makeScissorsPair(0.35, 0.06, this.noseTruck, -1.6, this.noseTruck);
+    makeScissorsPair(0.22, 0.06, this.noseTruck, -0.90, this.noseTruck);
 
     this.noseGearGroup.add(this.noseTruck);
 
-    // Nose Gear Doors (Left & Right)
-    const nDoorGeo = new THREE.BoxGeometry(0.03, 0.28, 1.8);
-    const noseDoorL = new THREE.Group();
-    noseDoorL.position.set(-0.35, -0.95, 0);
-    const nDoorMeshL = new THREE.Mesh(nDoorGeo, doorMat);
-    nDoorMeshL.position.set(-0.14, 0, 0);
-    noseDoorL.add(nDoorMeshL);
-
-    const noseDoorR = new THREE.Group();
-    noseDoorR.position.set(0.35, -0.95, 0);
-    const nDoorMeshR = new THREE.Mesh(nDoorGeo, doorMat);
-    nDoorMeshR.position.set(0.14, 0, 0);
-    noseDoorR.add(nDoorMeshR);
-
-    this.noseGearGroup.add(noseDoorL, noseDoorR);
-    this.gearDoors.push(
-      { obj: noseDoorL, axis: 'z', side: -1, maxAngle: Math.PI * 0.45 },
-      { obj: noseDoorR, axis: 'z', side: 1, maxAngle: Math.PI * 0.45 }
-    );
+    // Bay doors hinge on the airframe, independently of the folding leg.
+    const nDoorGeo = new THREE.BoxGeometry(0.54, 0.035, noseMaxZ - noseMinZ);
+    for (const side of [-1, 1]) {
+      const hinge = new THREE.Group();
+      hinge.position.set(side * 0.54, -2.18, noseCenterZ);
+      const panel = new THREE.Mesh(nDoorGeo, doorMat);
+      panel.position.x = -side * 0.27;
+      hinge.add(panel); this.gearGroup.add(hinge);
+      this.gearDoors.push({ obj: hinge, axis: 'z', side, maxAngle: Math.PI * 0.48 });
+    }
 
     // 2. Main Gear Assembly (Left: x=-3.2, Right: x=3.2, z=1.8)
     const makeMainBogie = (xPos, isLeft) => {
       const mainGear = new THREE.Group();
-      mainGear.position.set(xPos, -0.9, 1.8);
+      mainGear.position.set(xPos, -2.05, 1.8);
+      const mainRatio = 1.25 / 2.40;
 
       // Outer stationary strut housing cylinder
-      const mStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.5, 12), strutMat);
-      mStrut.position.y = -0.75;
+      const mStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.5 * mainRatio, 12), strutMat);
+      mStrut.position.y = -0.75 * mainRatio;
       mainGear.add(mStrut);
 
       // Movable Main Truck (Sliding oleo chrome piston + 2-wheel bogie)
       const truck = new THREE.Group();
-      const mPiston = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 1.5, 12), chromePistonMat);
-      mPiston.position.y = -1.65;
+      const mPiston = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 1.5 * mainRatio, 12), chromePistonMat);
+      mPiston.position.y = -1.65 * mainRatio;
       truck.add(mPiston);
 
       const wL = makeWheel(0.48, 0.32);
-      wL.position.set(-0.35, -2.40, 0);
+      wL.position.set(-0.35, -1.25, 0);
       const wR = makeWheel(0.48, 0.32);
-      wR.position.set(0.35, -2.40, 0);
+      wR.position.set(0.35, -1.25, 0);
 
       // Brake calipers on wheels
       const brakeGeo = new THREE.CylinderGeometry(0.30, 0.30, 0.08, 12);
       brakeGeo.rotateZ(Math.PI * 0.5);
       const bL = new THREE.Mesh(brakeGeo, brakeMat);
-      bL.position.set(-0.18, -2.40, 0);
+      bL.position.set(-0.18, -1.25, 0);
       const bR = new THREE.Mesh(brakeGeo, brakeMat);
-      bR.position.set(0.18, -2.40, 0);
+      bR.position.set(0.18, -1.25, 0);
 
       truck.add(wL, wR, bL, bR);
 
       // Main Scissors
-      makeScissorsPair(0.42, 0.08, truck, -1.5, truck);
+      makeScissorsPair(0.22, 0.08, truck, -0.76, truck);
 
       mainGear.add(truck);
 
-      // Inboard Keel Gear Door
-      const mDoorGeo = new THREE.BoxGeometry(0.85, 0.04, 1.6);
-      const sideSign = isLeft ? -1 : 1;
-      const mainDoor = new THREE.Group();
-      mainDoor.position.set(-sideSign * 1.0, -0.95, 0);
-      const mDoorMesh = new THREE.Mesh(mDoorGeo, doorMat);
-      mDoorMesh.position.set(sideSign * 0.42, 0, 0);
-      mainDoor.add(mDoorMesh);
-      mainGear.add(mainDoor);
-
-      this.gearDoors.push({
-        obj: mainDoor,
-        axis: 'z',
-        side: sideSign,
-        maxAngle: Math.PI * 0.42
-      });
+      // The 737 main wheels remain exposed in their recesses when stowed.
+      // Only the slim strut cover is carried by the leg; it cannot swing a
+      // wheel-sized panel through the wing or below the loaded tires.
+      const side = isLeft ? -1 : 1;
+      const strutDoor = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.78, 1.05), doorMat);
+      strutDoor.position.set(side * 0.22, -0.39, 0);
+      mainGear.add(strutDoor);
 
       return { root: mainGear, truck };
     };
@@ -601,8 +607,92 @@ export class Boeing737 {
     this.mainGearRGroup = mainR.root;
     this.mainTruckR = mainR.truck;
 
+    const bayMat = new THREE.MeshStandardMaterial({ color: 0x303b42, roughness: 0.85, side: THREE.DoubleSide });
+    this.gearBayGroup = new THREE.Group();
+    this.gearBayGroup.name = 'FixedGearBays';
+    this.noseBayWalls = [];
+    for (const [index, volume] of this.gearBayVolumes.entries()) {
+      const bottom = index === 0 ? -2.15 : -2.45;
+      const width = volume.max.x - volume.min.x, depth = volume.max.z - volume.min.z;
+      const height = volume.max.y - bottom;
+      const cx = (volume.min.x + volume.max.x) / 2, cz = (volume.min.z + volume.max.z) / 2;
+      const addWall = (size, at) => {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(...size), bayMat);
+        wall.position.set(...at); wall.castShadow = true; wall.receiveShadow = true;
+        this.gearBayGroup.add(wall);
+        if (index === 0 && size[1] > 0.1) this.noseBayWalls.push(wall);
+      };
+      if (index === 0) {
+        addWall([width, 0.035, depth], [cx, volume.max.y + 0.02, cz]);
+        for (const side of [-1, 1]) {
+          addWall([0.035, height, depth], [cx + side * width / 2, bottom + height / 2, cz]);
+          addWall([width, height, 0.035], [cx, bottom + height / 2, cz + side * depth / 2]);
+        }
+      } else {
+        this.buildMainBayFairing(index === 1 ? -1 : 1, doorMat);
+      }
+    }
+    this.gearGroup.add(this.gearBayGroup);
     this.gearGroup.add(this.noseGearGroup, this.mainGearLGroup, this.mainGearRGroup);
     this.group.add(this.gearGroup);
+    this.gearGroup.traverse(mesh => {
+      if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+    });
+  }
+
+  buildMainBayFairing(side, material) {
+    // Rounded fairing under the wing root, with a wheel recess and a narrow
+    // strut slot. The lower skin rises toward the perimeter instead of ending
+    // in a rectangular box below the airframe.
+    const outline = new THREE.Shape();
+    outline.moveTo(1.05, 0.55); outline.lineTo(3.45, 0.55);
+    outline.quadraticCurveTo(3.70, 0.55, 3.70, 0.90);
+    outline.lineTo(3.70, 2.70); outline.quadraticCurveTo(3.70, 3.05, 3.45, 3.05);
+    outline.lineTo(1.05, 3.05); outline.quadraticCurveTo(0.80, 3.05, 0.80, 2.70);
+    outline.lineTo(0.80, 0.90); outline.quadraticCurveTo(0.80, 0.55, 1.05, 0.55);
+    const aperture = new THREE.Path();
+    const radius = 0.55, neck = 2.40, angle = Math.acos((neck - 1.95) / radius);
+    const dz = Math.sin(angle) * radius;
+    aperture.moveTo(neck, 1.8 + dz); aperture.lineTo(neck, 2.36);
+    aperture.lineTo(3.58, 2.36); aperture.lineTo(3.58, 1.24);
+    aperture.lineTo(neck, 1.24); aperture.lineTo(neck, 1.8 - dz);
+    aperture.absarc(1.95, 1.8, radius, -angle, angle, true); aperture.closePath();
+    // A planar ceiling leaves clearance over both tires. A sloping roof
+    // interpolated across the whole pocket can cut through the inner tire.
+    const topY = () => -1.48;
+    const bottomY = (x, z) => -2.45 + Math.max(0, x - 2.4) * 0.24 + 0.25 * (Math.abs(z - 1.8) / 1.25) ** 4;
+    const addSurface = (shape, height) => {
+      const geometry = new THREE.ShapeGeometry(shape, 16);
+      const vertices = geometry.attributes.position;
+      for (let i = 0; i < vertices.count; i++) {
+        const x = vertices.getX(i), z = vertices.getY(i);
+        vertices.setXYZ(i, side * x, height(x, z), z);
+      }
+      geometry.computeVertexNormals();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true; mesh.receiveShadow = true; this.gearBayGroup.add(mesh);
+    };
+    addSurface(outline, topY);
+    const boundary = outline.getPoints(16);
+    const positions = [];
+    for (let i = 0; i < boundary.length - 1; i++) {
+      const a = boundary[i], b = boundary[i + 1];
+      const at = [side * a.x, topY(a.x), a.y], ab = [side * a.x, bottomY(a.x, a.y), a.y];
+      const bt = [side * b.x, topY(b.x), b.y], bb = [side * b.x, bottomY(b.x, b.y), b.y];
+      positions.push(...at, ...ab, ...bt, ...bt, ...ab, ...bb);
+    }
+    const walls = new THREE.BufferGeometry();
+    walls.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); walls.computeVertexNormals();
+    const wall = new THREE.Mesh(walls, material); wall.castShadow = true; wall.receiveShadow = true;
+    this.gearBayGroup.add(wall);
+    outline.holes.push(aperture); addSurface(outline, bottomY);
+    // Fixed trunnion brace attaches below the wing, ahead of the aft wheel bay.
+    const from = new THREE.Vector3(side * 3.2, -1.30, 0.0);
+    const to = new THREE.Vector3(side * 3.2, -2.05, 1.8);
+    const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.12, from.distanceTo(to), 12), material);
+    brace.position.copy(from).add(to).multiplyScalar(0.5);
+    brace.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.sub(from).normalize());
+    brace.castShadow = true; this.gearBayGroup.add(brace);
   }
 
   buildLights() {
@@ -709,35 +799,16 @@ export class Boeing737 {
 
     // 3. Landing Gear Retraction & Dynamic Suspension Compression Animation
     const gearState = flightState.gearState !== undefined ? flightState.gearState : 1.0;
-    // Scale gear strut vertically & rotate into bays
-    if (this.noseGearGroup) {
-      this.noseGearGroup.scale.set(1.0, Math.max(0.01, gearState), 1.0);
-      this.noseGearGroup.rotation.x = (1.0 - gearState) * (Math.PI * 0.5);
-    }
-    if (this.mainGearLGroup) {
-      this.mainGearLGroup.scale.set(1.0, Math.max(0.01, gearState), 1.0);
-      this.mainGearLGroup.rotation.z = -(1.0 - gearState) * (Math.PI * 0.5);
-    }
-    if (this.mainGearRGroup) {
-      this.mainGearRGroup.scale.set(1.0, Math.max(0.01, gearState), 1.0);
-      this.mainGearRGroup.rotation.z = (1.0 - gearState) * (Math.PI * 0.5);
-    }
-
-    // Gear Doors Articulation (flush when gearState <= 0.05, open during transit and down)
-    if (this.gearDoors && this.gearDoors.length > 0) {
-      const transitSine = Math.sin(Math.min(1.0, Math.max(0.0, gearState)) * Math.PI);
-      const doorOpen = gearState > 0.05 ? Math.max(gearState, transitSine) : 0.0;
-      for (const item of this.gearDoors) {
-        if (item.obj) {
-          const targetAngle = (item.side * doorOpen * item.maxAngle) || 0;
-          if (item.axis === 'z') {
-            item.obj.rotation.z = targetAngle;
-          } else if (item.axis === 'x') {
-            item.obj.rotation.x = targetAngle;
-          }
-        }
-      }
-    }
+    // Hold doors open before moving rigid legs. This mapping is reversible:
+    // changing direction in transit retraces the same clearance-safe path.
+    const extension = THREE.MathUtils.clamp(gearState, 0, 1);
+    const legExtension = THREE.MathUtils.smoothstep(extension, 0.18, 0.88);
+    const fold = (1 - legExtension) * Math.PI * 0.5;
+    if (this.noseGearGroup) this.noseGearGroup.rotation.x = this.gearProfile === 'loaded' ? fold : -fold;
+    if (this.mainGearLGroup) this.mainGearLGroup.rotation.z = fold;
+    if (this.mainGearRGroup) this.mainGearRGroup.rotation.z = -fold;
+    const doorOpen = THREE.MathUtils.smoothstep(extension, 0, 0.18);
+    for (const item of this.gearDoors) item.obj.rotation[item.axis] = item.side * doorOpen * item.maxAngle;
 
     // Dynamic Oleo Strut Suspension Squat ("털썩" 하중 압축)
     if (gearState > 0.8 && flightState.compressions) {
@@ -792,6 +863,65 @@ export class Boeing737 {
     this.cockpit.updateControls(flightState);
   }
 
+  fitNoseDoorsToSkin(exterior = this.gltfModel) {
+    // Sample the uncut loaded skin in aircraft coordinates. Closed doors then
+    // follow its curvature and livery rather than floating below a flat patch.
+    const ray = new THREE.Raycaster();
+    const world = new THREE.Vector3(), local = new THREE.Vector3();
+    const direction = new THREE.Vector3(0, 1, 0).transformDirection(this.group.matrixWorld);
+    const skinAt = (x, z) => {
+      world.set(x, -10, z).applyMatrix4(this.group.matrixWorld);
+      ray.set(world, direction);
+      const hit = ray.intersectObject(exterior, true)[0];
+      if (!hit) return { y: -2.28, material: null, uv: new THREE.Vector2() };
+      local.copy(hit.point); this.group.worldToLocal(local);
+      const material = Array.isArray(hit.object.material) ? hit.object.material[hit.face.materialIndex] : hit.object.material;
+      return { y: local.y - 0.012, material, uv: hit.uv || new THREE.Vector2() };
+    };
+    for (const wall of this.noseBayWalls) {
+      const vertices = wall.geometry.attributes.position;
+      for (let i = 0; i < vertices.count; i++) {
+        if (vertices.getY(i) >= 0) continue;
+        const x = wall.position.x + vertices.getX(i), z = wall.position.z + vertices.getZ(i);
+        vertices.setY(i, skinAt(x, z).y + 0.025 - wall.position.y);
+      }
+      vertices.needsUpdate = true;
+      wall.geometry.computeBoundingBox(); wall.geometry.computeBoundingSphere();
+    }
+    const volume = this.gearBayVolumes[0];
+    const centerZ = (volume.min.z + volume.max.z) / 2;
+    const skin = skinAt(0, centerZ);
+    const doorMaterial = skin.material?.clone();
+    if (doorMaterial) doorMaterial.side = THREE.DoubleSide;
+    for (const { obj: hinge, side } of this.gearDoors) {
+      const panel = hinge.children[0];
+      const positions = [], uvs = [], indices = [];
+      const columns = 4, rows = 16;
+      // side is the outboard hinge side; panel spans inward toward the seam.
+      hinge.position.y = skinAt(side * 0.54, centerZ).y;
+      panel.position.set(0, 0, 0);
+      for (let row = 0; row <= rows; row++) {
+        const z = volume.min.z + row / rows * (volume.max.z - volume.min.z);
+        for (let column = 0; column <= columns; column++) {
+          const x = side * 0.54 * (1 - column / columns);
+          const sample = skinAt(x, z);
+          positions.push(x - hinge.position.x, sample.y - hinge.position.y, z - hinge.position.z);
+          uvs.push(sample.uv.x, sample.uv.y);
+        }
+      }
+      for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+        const a = row * (columns + 1) + column, b = a + columns + 1;
+        indices.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(indices); geometry.computeVertexNormals();
+      panel.geometry.dispose(); panel.geometry = geometry;
+      if (doorMaterial) panel.material = doorMaterial;
+    }
+  }
+
   loadGltfModel(url) {
     if (typeof window === 'undefined') return;
     this.loadingGltf = true;
@@ -815,6 +945,20 @@ export class Boeing737 {
           this.gltfModel.rotation.y = Math.PI * 0.5;
           this.gltfModel.position.set(0, 0, 0);
 
+          // Cut real apertures so rigid wheels enter bays rather than passing
+          // through the rendered fuselage. The shadow proxy shares this geometry.
+          this.gltfGroup.add(this.gltfModel);
+          this.group.updateMatrixWorld(true);
+          // The fallback nose is more tapered; it uses an aft bay. Build the
+          // loaded profile only after successful loading, preserving fallback
+          // geometry if loading fails and preserving the deployed contact datum.
+          this.group.remove(this.gearGroup);
+          this.buildLandingGear('loaded');
+          this.fitNoseDoorsToSkin();
+          this.gltfModel.traverse(mesh => {
+            if (mesh.isMesh && mesh.name === 'B737') cutGearBays(mesh, this.group, this.gearBayVolumes);
+          });
+
           // PBR enhancements: cast/receive shadow and tune roughness/metalness
           this.gltfModel.traverse((child) => {
             if (child.isMesh) {
@@ -836,7 +980,6 @@ export class Boeing737 {
           if (fan1) this.gltfFans.push(fan1);
           if (fan2) this.gltfFans.push(fan2);
 
-          this.gltfGroup.add(this.gltfModel);
           this.gltfGroup.visible = !this.isCockpit;
           this.modelLoaded = true;
           this.useGltf = true;
