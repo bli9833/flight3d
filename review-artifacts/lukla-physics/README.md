@@ -4,7 +4,7 @@ Validated on upstream main `3ca7119` plus this change, using Node 22.23.2 and
 Chrome's Intel Vulkan renderer (identity retained in report.json).
 
 - `npm run check`: pass.
-- `npm test`: 216 tests pass.
+- `npm test`: 222 tests pass.
 - `npm run build`: pass (existing bundle-size advisory).
 - `PORT=5181 npm run test:lukla -- --screenshots`: three full 120 Hz circuits,
   loaded DEM, zero stall frames, peak contact speed approximately 1.61 m/s,
@@ -38,3 +38,5 @@ harness successfully with `process.getuid` mocked to zero. Actual UID-0 executio
 was unavailable because sudo requires interactive authentication; this is launch-
 argument verification, not a claim of testing a root-owned container. Non-root
 launches retain the sandbox.
+
+After #68 merged, this follow-up was integrated with main `d069cdd` and revalidated: all 222 tests, build, and three browser circuits pass. `review-followup.json` records that final run.

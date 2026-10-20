@@ -33,7 +33,7 @@
   "reports": [
     {
       "stallFrames": 0,
-      "maxAlpha": 10.220840550631968,
+      "maxAlpha": 10.1842026623538,
       "stages": [
         0,
         1,
@@ -44,31 +44,31 @@
       ],
       "touchdowns": [
         {
-          "speedKt": 107.86673682931814,
+          "speedKt": 107.86593141311805,
           "contacts": [
             "mainLeft"
           ]
         },
         {
-          "speedKt": 107.8846715841356,
+          "speedKt": 107.88396440081218,
           "contacts": [
             "mainRight"
           ]
         },
         {
-          "speedKt": 103.59051681107012,
+          "speedKt": 103.59055526732756,
           "contacts": [
             "mainRight"
           ]
         },
         {
-          "speedKt": 103.4844403828916,
+          "speedKt": 103.48442764168392,
           "contacts": [
             "mainLeft"
           ]
         },
         {
-          "speedKt": 100.85644585196451,
+          "speedKt": 100.85619101959641,
           "contacts": [
             "nose"
           ]
@@ -80,19 +80,19 @@
         "massKg": 43000,
         "airborne": true,
         "touchdown": {
-          "alongRunwayM": -228.97981711344204,
-          "crossTrackM": -9.153172337172279,
-          "iasKnots": 107.8846715841356
+          "alongRunwayM": -229.05536901681802,
+          "crossTrackM": -9.138276878432649,
+          "iasKnots": 107.88396440081218
         },
-        "elapsedSeconds": 138.4166666667051,
+        "elapsedSeconds": 138.4083333333718,
         "stopPosition": {
-          "x": 146.04237461935645,
-          "y": 2860.355169552008,
-          "z": -99.41778752786647
+          "x": 145.9793423874526,
+          "y": 2860.3454498876426,
+          "z": -99.36269284812876
         }
       },
-      "maxImpact": 1.611618110408612,
-      "remainingRunwayM": 86.9656817398245,
+      "maxImpact": 1.6130656505796228,
+      "remainingRunwayM": 87.04833181561804,
       "holdDriftM": 0,
       "speedMs": 0,
       "gearFailure": null,
@@ -101,7 +101,7 @@
     },
     {
       "stallFrames": 0,
-      "maxAlpha": 10.227337273734289,
+      "maxAlpha": 10.227334087498361,
       "stages": [
         0,
         1,
@@ -112,31 +112,31 @@
       ],
       "touchdowns": [
         {
-          "speedKt": 107.86626091669666,
+          "speedKt": 107.86626097903215,
           "contacts": [
             "mainLeft"
           ]
         },
         {
-          "speedKt": 107.88425801888654,
+          "speedKt": 107.8842580730027,
           "contacts": [
             "mainRight"
           ]
         },
         {
-          "speedKt": 103.59065155615106,
+          "speedKt": 103.59065154473403,
           "contacts": [
             "mainRight"
           ]
         },
         {
-          "speedKt": 103.48453875388522,
+          "speedKt": 103.48453874683995,
           "contacts": [
             "mainLeft"
           ]
         },
         {
-          "speedKt": 100.85636361409777,
+          "speedKt": 100.8563636287645,
           "contacts": [
             "nose"
           ]
@@ -148,19 +148,19 @@
         "massKg": 43000,
         "airborne": true,
         "touchdown": {
-          "alongRunwayM": -229.01687213228817,
-          "crossTrackM": -9.153462478649573,
-          "iasKnots": 107.88425801888654
+          "alongRunwayM": -229.01686700318155,
+          "crossTrackM": -9.153462412868521,
+          "iasKnots": 107.8842580730027
         },
         "elapsedSeconds": 138.52500000003835,
         "stopPosition": {
-          "x": 146.0075816697235,
-          "y": 2860.3501222527816,
-          "z": -99.39247628341118
+          "x": 146.00758635607227,
+          "y": 2860.350122916618,
+          "z": -99.39247943597545
         }
       },
-      "maxImpact": 1.6125789377651936,
-      "remainingRunwayM": 87.00860074052537,
+      "maxImpact": 1.6125788209091443,
+      "remainingRunwayM": 87.00859509567294,
       "holdDriftM": 0,
       "speedMs": 0,
       "gearFailure": null,
@@ -297,5 +297,6 @@
       "parkingBrake": false,
       "gearBrakes": 0
     }
-  ]
+  ],
+  "baseCommit": "d069cdd"
 }
