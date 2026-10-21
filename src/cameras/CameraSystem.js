@@ -766,6 +766,12 @@ export class CameraSystem {
     // Damp only changes in orbit/attitude, so variable frame times cannot change
     // the aircraft distance and pitch the horizon during a steady approach.
     if (this.chaseTargetInitialized) {
+      if (this.droneInitialized) {
+        this.dronePos.add(planePos).sub(this.chaseTarget);
+      }
+      if (this.flybySet && this.flybyRegime === 'parked') {
+        this.flybyPos.add(planePos).sub(this.chaseTarget);
+      }
       this.chasePos.add(planePos).sub(this.chaseTarget);
     }
     this.chaseTarget.copy(planePos);
@@ -964,7 +970,7 @@ export class CameraSystem {
             this.flybySet = true;
           } else {
             // Smoothly track in front of aircraft if taxiing or turning
-            this.flybyPos.lerp(targetPos, Math.min(1.0, dt * 6.0));
+            this.flybyPos.lerp(targetPos, 1 - Math.exp(-Math.max(0, dt) * 6.0));
           }
         } else if (currentRegime === 'rollout') {
           // Case 2: Active takeoff roll or landing rollout at high speed (>= 12 m/s / ~23 kts)
@@ -1058,7 +1064,7 @@ export class CameraSystem {
           this.droneInitialized = true;
         } else {
           // Smooth position interpolation to prevent abrupt jumps
-          this.dronePos.lerp(targetPos, Math.min(1.0, dt * 8.5));
+          this.dronePos.lerp(targetPos, 1 - Math.exp(-Math.max(0, dt) * 8.5));
         }
         this.camera.position.copy(this.dronePos);
 
