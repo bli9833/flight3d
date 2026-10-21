@@ -7,30 +7,22 @@ import * as THREE from 'three';
  * - Albedo in RGB, Roughness in Alpha
  * - Tangent-space Normal in RGB (128, 128, 255 = flat)
  *
- * Uses deterministic PRNG and periodic lattice noise so textures tile 100% seamlessly
+ * Uses deterministic hashing and periodic lattice noise so textures tile 100% seamlessly
  * with zero boundary seams and zero network/external asset dependencies.
  */
-
-function mulberry32(seed) {
-  return function() {
-    let t = (seed += 0x6D2B79F5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /**
  * Generate a periodic 2D fractal noise grid of size [w, h] with integer period.
  * Wrapping at boundaries is mathematically exact (periodic lattice).
  */
 function createPeriodicNoiseGrid(w, h, basePeriod = 16, octaves = 4, persistence = 0.5, seed = 42) {
-  const prng = mulberry32(seed);
-  const permSize = 256;
-  const perm = new Uint8Array(permSize);
-  for (let i = 0; i < permSize; i++) {
-    perm[i] = Math.floor(prng() * 256);
-  }
+  // Hash both axes independently. Flattening rows into a 256-entry permutation
+  // correlated adjacent rows and produced diagonal/checker patterns from altitude.
+  const lattice = (x, y, octave) => {
+    let hash = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ seed ^ Math.imul(octave, 1274126177);
+    hash = Math.imul(hash ^ (hash >>> 13), 1274126177);
+    return ((hash ^ (hash >>> 16)) >>> 0) / 4294967295;
+  };
 
   const out = new Float32Array(w * h);
 
@@ -40,8 +32,6 @@ function createPeriodicNoiseGrid(w, h, basePeriod = 16, octaves = 4, persistence
 
   for (let o = 0; o < octaves; o++) {
     const period = basePeriod * curFreq;
-    const offX = (o * 37) & (permSize - 1);
-    const offY = (o * 59) & (permSize - 1);
 
     for (let y = 0; y < h; y++) {
       const yCoord = (y / h) * period;
@@ -50,8 +40,6 @@ function createPeriodicNoiseGrid(w, h, basePeriod = 16, octaves = 4, persistence
       const fy = yCoord - j0;
       const sy = fy * fy * (3.0 - 2.0 * fy);
 
-      const pRow0 = ((j0 + offY) & (permSize - 1)) * 16;
-      const pRow1 = ((j1 + offY) & (permSize - 1)) * 16;
       const yOffset = y * w;
 
       for (let x = 0; x < w; x++) {
@@ -61,14 +49,14 @@ function createPeriodicNoiseGrid(w, h, basePeriod = 16, octaves = 4, persistence
         const fx = xCoord - i0;
         const sx = fx * fx * (3.0 - 2.0 * fx);
 
-        const v00 = perm[(pRow0 + ((i0 + offX) & (permSize - 1))) & (permSize - 1)];
-        const v10 = perm[(pRow0 + ((i1 + offX) & (permSize - 1))) & (permSize - 1)];
-        const v01 = perm[(pRow1 + ((i0 + offX) & (permSize - 1))) & (permSize - 1)];
-        const v11 = perm[(pRow1 + ((i1 + offX) & (permSize - 1))) & (permSize - 1)];
+        const v00 = lattice(i0, j0, o);
+        const v10 = lattice(i1, j0, o);
+        const v01 = lattice(i0, j1, o);
+        const v11 = lattice(i1, j1, o);
 
         const v0 = v00 * (1.0 - sx) + v10 * sx;
         const v1 = v01 * (1.0 - sx) + v11 * sx;
-        const val = (v0 * (1.0 - sy) + v1 * sy) * (curAmp / 255.0);
+        const val = (v0 * (1.0 - sy) + v1 * sy) * curAmp;
 
         out[yOffset + x] += val;
       }
