@@ -37,7 +37,7 @@ export class CoastalDemoScenario {
         }
         this.sim.cameraSystem.setMode(CameraSystem.MODES.DRONE);
         this.sim.cameraSystem.resetDroneOrbit?.(-Math.PI * 0.45, 36.0, 9.5);
-        this.sim.sky.setTimeOfDay(6.5);
+        this.director.setTimeOfDay(6.5);
         if (this.sim.water && this.sim.water.setSunDirection) {
           this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
         }
@@ -58,7 +58,7 @@ export class CoastalDemoScenario {
           'TOGA 100% 추력 가속 • 보잉 글래스 콕핏(MCP, PFD, ND, ISFD) 계기 감상'
         );
         this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
-        this.sim.sky.setTimeOfDay(7.2);
+        this.director.setTimeOfDay(7.2);
         if (this.sim.water && this.sim.water.setSunDirection) {
           this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
         }
@@ -105,7 +105,7 @@ export class CoastalDemoScenario {
         );
         this.sim.setPreset('approach', true);
         this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
-        this.sim.sky.setTimeOfDay(17.6);
+        this.director.setTimeOfDay(17.6);
         if (this.sim.water && this.sim.water.setSunDirection) {
           this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
         }
@@ -214,7 +214,7 @@ export class CoastalDemoScenario {
         this.sim.controls.setVirtualInput('rudder', Math.max(-0.10, Math.min(0.10, targetBankDeg * 0.005)));
 
         const sunTime = 7.2 + Math.min(10.0, this.director.stageTimer * 0.8);
-        this.sim.sky.setTimeOfDay(sunTime);
+        this.director.setTimeOfDay(sunTime);
         if (this.sim.water && this.sim.water.setSunDirection) {
           this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
         }

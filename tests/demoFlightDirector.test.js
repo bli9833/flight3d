@@ -341,3 +341,30 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
   });
 });
 
+
+for (const airport of ['coastal', 'lukla']) {
+  it(`preserves user time through camera changes, stages and demo restart (${airport})`, () => {
+    const sim = createMockSimulator(airport);
+    sim.sky.setTimeOfDay = function(hours) { this.timeOfDay = hours; };
+    const director = new DemoFlightDirector(sim);
+    director.start();
+    assert.strictEqual(sim.sky.timeOfDay, airport === 'coastal' ? 6.5 : 8.5);
+    director.onUserTimeOfDayChange();
+    sim.sky.setTimeOfDay(22.5);
+    sim.cameraSystem.cycleMode();
+    const stages = airport === 'coastal'
+      ? [DemoFlightDirector.COASTAL_STAGES.TAKEOFF_ROLL,
+         DemoFlightDirector.COASTAL_STAGES.COASTAL_BANK,
+         DemoFlightDirector.COASTAL_STAGES.FINAL_APPROACH]
+      : [DemoFlightDirector.LUKLA_STAGES.HIMALAYAN_CRUISE,
+         DemoFlightDirector.LUKLA_STAGES.CANYON_APPROACH];
+    for (const stage of stages) {
+      director.setStage(stage);
+      director.update(0.1);
+      assert.strictEqual(sim.sky.timeOfDay, 22.5);
+    }
+    director.stop();
+    director.start();
+    assert.strictEqual(sim.sky.timeOfDay, 22.5);
+  });
+}
