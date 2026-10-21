@@ -22,6 +22,7 @@ export class EICASCanvas {
     this.e1 = { n1: 22, n2: 60, egt: 420, ff: 350 };
     this.e2 = { n1: 22, n2: 60, egt: 420, ff: 350 };
     this.gearState = 1.0;
+    this.gearDamage = {};
     this.isTransit = false;
     this.flapDegree = 0;
     this.spoilers = 0;
@@ -35,6 +36,7 @@ export class EICASCanvas {
     if (state.engine2) this.e2 = state.engine2;
     this.gearState = state.gearState !== undefined ? state.gearState : 1.0;
     this.isTransit = state.isTransit || false;
+    this.gearDamage = state.gearDamage || {};
     this.flapDegree = state.flapDegree || 0;
     this.spoilers = state.spoilers || 0;
     this.parkBrake = state.parkBrake || false;
@@ -229,14 +231,18 @@ export class EICASCanvas {
     }
 
     // Draw Nose, Left Main, Right Main triangles/boxes
-    const drawGearBox = (bx, by, label) => {
-      ctx.fillStyle = fillColor;
+    const drawGearBox = (bx, by, id) => {
+      const damage = this.gearDamage[id];
+      const failed = damage === 'collapsed';
+      const damaged = damage === 'damaged';
+      const label = failed ? 'FAIL' : damaged ? 'DMG' : text;
+      ctx.fillStyle = failed ? '#450a0a' : damaged ? '#78350f' : fillColor;
       ctx.fillRect(bx, by, 40, 22);
-      ctx.strokeStyle = borderColor;
+      ctx.strokeStyle = failed ? '#ef4444' : damaged ? '#f59e0b' : borderColor;
       ctx.lineWidth = 1.8;
       ctx.strokeRect(bx, by, 40, 22);
 
-      ctx.fillStyle = textColor;
+      ctx.fillStyle = failed ? '#ef4444' : damaged ? '#fbbf24' : textColor;
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -244,11 +250,11 @@ export class EICASCanvas {
     };
 
     // Nose
-    drawGearBox(x + 46, y + 26, text);
+    drawGearBox(x + 46, y + 26, 'nose');
     // Left Main
-    drawGearBox(x + 10, y + 60, text);
+    drawGearBox(x + 10, y + 60, 'mainLeft');
     // Right Main
-    drawGearBox(x + 82, y + 60, text);
+    drawGearBox(x + 82, y + 60, 'mainRight');
   }
 
   drawFlapsIndicator(ctx, x, y, width, height) {

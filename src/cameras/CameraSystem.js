@@ -50,6 +50,7 @@ export class CameraSystem {
     this.chasePitch = 0;
     this.chasePos = new THREE.Vector3();
     this.chaseTarget = new THREE.Vector3();
+    this.chaseTargetInitialized = false;
 
     // Wing View Parameters
     this.wingLookYaw = 0;
@@ -95,6 +96,9 @@ export class CameraSystem {
     this.touchStartY = 0;
     this.touchMoved = false;
     this.onResetLook = null;
+
+    // User manual look override flag (유저가 시선을 수동 변경한 경우 카메라 모드 전환 전까지 앱 자동 시선 개입 차단)
+    this.userLookOverridden = false;
 
     // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
     this.enableEdgePan = true;
@@ -159,8 +163,12 @@ export class CameraSystem {
       this.domElement.addEventListener('wheel', (e) => {
         if (this.mode === CameraSystem.MODES.CHASE) {
           this.chaseDistance = Math.max(20.0, Math.min(140.0, this.chaseDistance + e.deltaY * 0.05));
+          this.userLookOverridden = true;
+          this.cancelTemporaryView();
         } else if (this.mode === CameraSystem.MODES.DRONE) {
           this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance + e.deltaY * 0.04));
+          this.userLookOverridden = true;
+          this.cancelTemporaryView();
         }
       }, { passive: true });
     }
@@ -395,6 +403,10 @@ export class CameraSystem {
    * Apply two-finger pinch zoom to camera distance
    */
   applyPinchZoom(deltaDist) {
+    if (Math.abs(deltaDist) > 0) {
+      this.userLookOverridden = true;
+      this.cancelTemporaryView();
+    }
     if (this.mode === CameraSystem.MODES.CHASE) {
       this.chaseDistance = Math.max(20.0, Math.min(140.0, this.chaseDistance - deltaDist * 0.15));
     } else if (this.mode === CameraSystem.MODES.DRONE) {
@@ -403,6 +415,10 @@ export class CameraSystem {
   }
 
   applyMouseDelta(dx, dy) {
+    if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+      this.userLookOverridden = true;
+      this.cancelTemporaryView();
+    }
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: {
         this.lookYaw -= dx * 0.0035;
@@ -492,6 +508,7 @@ export class CameraSystem {
   }
 
   resetLook() {
+    this.userLookOverridden = false;
     this.lookYaw = 0;
     this.lookPitch = -0.25;
     this.chaseYaw = 0;
@@ -523,6 +540,9 @@ export class CameraSystem {
   }
 
   resetDroneOrbit(angle = 1.8, distance = 38.0, height = 11.5) {
+    if (this.userLookOverridden) {
+      return;
+    }
     this.droneOrbitAngle = angle;
     this.droneDistance = distance;
     this.droneHeight = height;
@@ -551,6 +571,8 @@ export class CameraSystem {
     behindLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.chasePitch);
     behindLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.chaseYaw);
     this.chasePos.copy(behindLocal.applyMatrix4(aircraftMesh.matrixWorld));
+    this.chaseTarget.copy(aircraftMesh.position);
+    this.chaseTargetInitialized = true;
 
     if (this.mode === CameraSystem.MODES.COCKPIT) {
       const eyeLocal = this.cockpitHeadOffset.clone();
@@ -611,6 +633,9 @@ export class CameraSystem {
   }
 
   showTemporaryView(m, durationSeconds = 4.5, onComplete = null) {
+    if (this.userLookOverridden) {
+      return;
+    }
     if (this.mode !== m && this.temporaryViewTimer <= 0) {
       this.savedMode = this.mode;
     }
@@ -639,14 +664,18 @@ export class CameraSystem {
 
   cycleMode() {
     const selected = this.autoSwitch ? CameraSystem.MODES.AUTO : (this.savedMode ?? this.mode);
-    this.setMode((selected + 1) % 8);
+    this.setMode((selected + 1) % 8, true);
     if (this.onCycleMode) {
       this.onCycleMode(this.mode);
     }
     return this.getModeName();
   }
 
-  setMode(m) {
+  setMode(m, isUserAction = false) {
+    if (this.userLookOverridden && !isUserAction) {
+      return false;
+    }
+    this.userLookOverridden = false;
     this.cancelTemporaryView();
     this.autoSwitch = m === CameraSystem.MODES.AUTO;
     this.autoSwitchTimer = 0;
@@ -665,6 +694,7 @@ export class CameraSystem {
     if (this.mode === CameraSystem.MODES.DRONE) {
       this.droneInitialized = false;
     }
+    return true;
   }
 
   toggleCockpitPhoto() {
@@ -702,7 +732,7 @@ export class CameraSystem {
     if (getTerrainHeight) {
       this.setTerrain(getTerrainHeight);
     }
-    if (this.autoSwitch && this.temporaryViewTimer <= 0) {
+    if (this.autoSwitch && !this.userLookOverridden && this.temporaryViewTimer <= 0) {
       this.autoSwitchTimer += Math.max(0, dt);
       if (this.autoSwitchTimer >= 10) {
         this.setMode((this.mode + 1) % 7);
@@ -732,6 +762,15 @@ export class CameraSystem {
     const planePos = aircraftMesh.position;
     const planeQuat = aircraftMesh.quaternion;
 
+    // Carry translation through immediately, even while another view is active.
+    // Damp only changes in orbit/attitude, so variable frame times cannot change
+    // the aircraft distance and pitch the horizon during a steady approach.
+    if (this.chaseTargetInitialized) {
+      this.chasePos.add(planePos).sub(this.chaseTarget);
+    }
+    this.chaseTarget.copy(planePos);
+    this.chaseTargetInitialized = true;
+
     // Smooth Touchdown Jolt with exponential decay (affects cockpit and exterior suspension reaction)
     this.touchJoltOffset = (this.touchJoltOffset || 0) * Math.max(0.0, 1.0 - dt * 6.0);
     if (flightState.touchdown) {
@@ -740,9 +779,14 @@ export class CameraSystem {
       this.touchJoltOffset = -0.045 * severity;
     }
 
-    // Smoothly interpolate cursor tracking offsets (마우스 움직임에 따른 실시간 시선 부드러운 추종)
-    this.cursorNormX += (this.targetCursorNormX - this.cursorNormX) * Math.min(1.0, dt * 7.0);
-    this.cursorNormY += (this.targetCursorNormY - this.cursorNormY) * Math.min(1.0, dt * 7.0);
+    // Smoothly interpolate cursor tracking offsets (마우스 움직임에 따른 실시간 시선 부드러운 추종 - 유저 시선 개입 시 오프셋 배제)
+    if (!this.userLookOverridden) {
+      this.cursorNormX += (this.targetCursorNormX - this.cursorNormX) * Math.min(1.0, dt * 7.0);
+      this.cursorNormY += (this.targetCursorNormY - this.cursorNormY) * Math.min(1.0, dt * 7.0);
+    } else {
+      this.cursorNormX = 0;
+      this.cursorNormY = 0;
+    }
 
     // Continuous Edge Pan (마우스 드래그 중 화면 끝 도달 시 적당한 속도로 시선 지속 회전)
     this.updateEdgePan(dt);
@@ -822,7 +866,10 @@ export class CameraSystem {
         }
 
         // Damped interpolation to smooth camera motion
-        this.chasePos.lerp(targetBehindWorld, Math.min(1.0, dt * 6.5));
+        this.chasePos.lerp(targetBehindWorld, 1 - Math.exp(-Math.max(0, dt) * 6.5));
+        // Clamp the final smoothed position too, especially along steep terrain.
+        this.chasePos.y = Math.max(this.chasePos.y,
+          this.queryGroundHeight(this.chasePos.x, this.chasePos.z) + 1.8);
         this.camera.position.copy(this.chasePos);
 
         const lookTarget = planePos.clone().add(new THREE.Vector3(0, 1.5, 0));
@@ -994,8 +1041,10 @@ export class CameraSystem {
       }
 
       case CameraSystem.MODES.DRONE: {
-        // Continuous 360° circular drone orbit around aircraft from slightly above
-        this.droneOrbitAngle += this.droneOrbitSpeed * dt;
+        // Continuous 360° circular drone orbit around aircraft from slightly above (pauses when user overrides look)
+        if (!this.userLookOverridden) {
+          this.droneOrbitAngle += this.droneOrbitSpeed * dt;
+        }
 
         // Subtle organic drone hovering bob motion
         const hoverBob = Math.sin(this.droneOrbitAngle * 2.2) * 0.55;

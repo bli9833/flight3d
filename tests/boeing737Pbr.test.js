@@ -136,6 +136,34 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     assert.strictEqual(aircraft.gltfGroup.rotation.z, 0, 'GLTF group rotation should reset to 0');
   });
 
+  it('shows independent gear failures and restores articulation and indications after repair', () => {
+    const pfd = new PFDCanvas(256, 256);
+    const nd = new NDCanvas(256, 256);
+    const eicas = new EICASCanvas(256, 256);
+    const aircraft = new Boeing737(pfd, nd, eicas);
+    aircraft.update(1 / 60, { gearState: 1 });
+    const normalAngle = aircraft.mainGearLGroup.rotation.z;
+    const state = { gearState: 1, gearDamage: { nose: 'damaged', mainLeft: 'collapsed', mainRight: 'normal' } };
+    aircraft.update(1 / 60, state);
+    const failedAngle = aircraft.mainGearLGroup.rotation.z;
+    aircraft.update(1 / 60, state);
+    assert.strictEqual(aircraft.mainGearLGroup.rotation.z, failedAngle, 'Damage transforms must not accumulate each frame');
+    assert.ok(Math.abs(failedAngle - normalAngle) > 0.5);
+    assert.strictEqual(aircraft.mainGearLGroup.scale.y, 1);
+    const labels = [];
+    const ctx = new Proxy({}, { get: (_, name) => name === 'fillText' ? text => labels.push(text) : () => {} });
+    eicas.updateData(state);
+    eicas.drawGearStatus(ctx, 0, 0, 140, 110);
+    assert.deepStrictEqual(labels, ['LANDING GEAR', 'DMG', 'FAIL', 'DOWN']);
+    labels.length = 0;
+    eicas.updateData({ gearState: 1 });
+    eicas.drawGearStatus(ctx, 0, 0, 140, 110);
+    assert.deepStrictEqual(labels, ['LANDING GEAR', 'DOWN', 'DOWN', 'DOWN']);
+    aircraft.update(1 / 60, { gearState: 1 });
+    assert.strictEqual(aircraft.mainGearLGroup.scale.y, 1);
+    assert.strictEqual(aircraft.mainGearLGroup.rotation.z, normalAngle);
+  });
+
   it('should verify 3D assets exist in public/ and remain well within memory budget (< 15MB)', () => {
     const modelPath = path.resolve(process.cwd(), 'public/models/b737-800.glb');
     const hdrPath = path.resolve(process.cwd(), 'public/textures/environment/sky_1k.hdr');

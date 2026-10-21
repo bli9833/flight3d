@@ -449,7 +449,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       camSys.handleTouchEnd({ touches: [] });
 
       // DRONE mode
-      camSys.setMode(CameraSystem.MODES.DRONE);
+      camSys.setMode(CameraSystem.MODES.DRONE, true);
       const initialDroneAngle = camSys.droneOrbitAngle;
       const initialDroneHeight = camSys.droneHeight;
       camSys.handleTouchStart({
@@ -616,6 +616,137 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       assert.strictEqual(camSys.lookPitch, -0.25, 'lookPitch should be reset to -0.25');
       assert.strictEqual(resetCount, 1, 'onResetLook callback should be fired');
       assert.strictEqual(camSys.isDragging, false);
+    });
+  });
+
+  describe('User Manual Look Override Protection (유저 시선 변경 시 자동 개입 차단)', () => {
+    it('should initialize userLookOverridden as false', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      assert.strictEqual(camSys.userLookOverridden, false);
+    });
+
+    it('should set userLookOverridden to true on mouse drag and pinch zoom', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+
+      assert.strictEqual(camSys.userLookOverridden, false);
+      camSys.applyMouseDelta(15, -10);
+      assert.strictEqual(camSys.userLookOverridden, true);
+
+      camSys.resetLook();
+      assert.strictEqual(camSys.userLookOverridden, false);
+
+      camSys.applyPinchZoom(25);
+      assert.strictEqual(camSys.userLookOverridden, true);
+    });
+
+    it('should prevent automated setMode calls while userLookOverridden is true', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+
+      // User adjusts cockpit gaze
+      camSys.applyMouseDelta(100, 50);
+      assert.strictEqual(camSys.userLookOverridden, true);
+      const savedYaw = camSys.lookYaw;
+      const savedPitch = camSys.lookPitch;
+
+      // Automated camera change (e.g. from scenario timer) without isUserAction
+      const switched = camSys.setMode(CameraSystem.MODES.CHASE);
+      assert.strictEqual(switched, false, 'automated setMode should be blocked');
+      assert.strictEqual(camSys.mode, CameraSystem.MODES.COCKPIT, 'camera mode should remain COCKPIT');
+      assert.strictEqual(camSys.lookYaw, savedYaw, 'lookYaw should NOT be reset');
+      assert.strictEqual(camSys.lookPitch, savedPitch, 'lookPitch should NOT be reset');
+    });
+
+    it('should prevent showTemporaryView cuts while userLookOverridden is true', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+
+      camSys.applyMouseDelta(50, 0);
+      assert.strictEqual(camSys.userLookOverridden, true);
+
+      // Automated cinematic cut (e.g. takeoff liftoff or gear transit)
+      camSys.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
+      assert.strictEqual(camSys.mode, CameraSystem.MODES.COCKPIT, 'temporary view should not activate');
+      assert.strictEqual(camSys.temporaryViewTimer, 0, 'temporary timer should not start');
+    });
+
+    it('should pause DRONE continuous orbit auto-rotation while userLookOverridden is true', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.DRONE, true);
+
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(0, 100, 0);
+
+      // 1. Without override, drone continuously orbits
+      const initialAngle = camSys.droneOrbitAngle;
+      camSys.update(0.1, aircraft);
+      assert.ok(camSys.droneOrbitAngle > initialAngle, 'drone orbit should advance normally');
+
+      // 2. User manually rotates/adjusts drone view
+      camSys.applyMouseDelta(60, 0);
+      assert.strictEqual(camSys.userLookOverridden, true);
+      const angleAfterUserDrag = camSys.droneOrbitAngle;
+
+      // 3. Subsequent frame updates should pause auto-rotation
+      camSys.update(0.1, aircraft);
+      camSys.update(0.1, aircraft);
+      assert.strictEqual(camSys.droneOrbitAngle, angleAfterUserDrag, 'drone orbit auto-rotation should pause');
+    });
+
+    it('should suppress cursor tracking drift while userLookOverridden is true', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(0, 100, 0);
+
+      camSys.applyMouseDelta(80, -30);
+      assert.strictEqual(camSys.userLookOverridden, true);
+
+      // Set non-zero target cursor tracking
+      camSys.setCursorPosition(1900, 100, 1920, 1080);
+      camSys.update(0.1, aircraft);
+
+      assert.strictEqual(camSys.cursorNormX, 0, 'cursor tracking offset X should remain 0');
+      assert.strictEqual(camSys.cursorNormY, 0, 'cursor tracking offset Y should remain 0');
+    });
+
+    it('should clear userLookOverridden and allow mode changes on user cycleMode() or explicit setMode(m, true)', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+
+      // 1. User manual drag
+      camSys.applyMouseDelta(100, 50);
+      assert.strictEqual(camSys.userLookOverridden, true);
+
+      // 2. User presses CAM button / 'C' key -> cycleMode()
+      const nextModeName = camSys.cycleMode();
+      assert.strictEqual(camSys.userLookOverridden, false, 'cycleMode should clear userLookOverridden');
+      assert.strictEqual(camSys.mode, CameraSystem.MODES.CHASE);
+      assert.ok(nextModeName.includes('CHASE'));
+
+      // 3. User drags in CHASE mode
+      camSys.applyMouseDelta(50, 50);
+      assert.strictEqual(camSys.userLookOverridden, true);
+
+      // 4. User explicitly clicks a camera view or preset -> setMode(m, true)
+      const switched = camSys.setMode(CameraSystem.MODES.WING, true);
+      assert.strictEqual(switched, true);
+      assert.strictEqual(camSys.userLookOverridden, false);
+      assert.strictEqual(camSys.mode, CameraSystem.MODES.WING);
+
+      // 5. User double taps or resets view -> resetLook()
+      camSys.applyMouseDelta(30, 30);
+      assert.strictEqual(camSys.userLookOverridden, true);
+      camSys.resetLook();
+      assert.strictEqual(camSys.userLookOverridden, false);
     });
   });
 });

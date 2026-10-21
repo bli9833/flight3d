@@ -92,6 +92,7 @@ body, html {
 .hud-val.cyan  { color: #38bdf8; }
 
 .status-green { color: #10b981; }
+.status-danger { color: #ef4444; }
 .status-amber { color: #f59e0b; }
 .status-dim   { color: #64748b; }
 

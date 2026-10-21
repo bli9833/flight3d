@@ -49,3 +49,24 @@ test('camera shortcuts map digits and numpad, ignoring repeats, modifiers and ed
   }
   assert.deepEqual(selected, expected);
 });
+
+
+test('explicit camera selection overrides manual look while automatic cuts respect it', () => {
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  const aircraft = new THREE.Object3D();
+  aircraft.position.y = 100;
+  aircraft.updateMatrixWorld();
+  system.setMode(CameraSystem.MODES.AUTO, true);
+  system.applyMouseDelta(10, 0);
+  system.update(12, aircraft);
+  assert.equal(system.mode, CameraSystem.MODES.CHASE);
+  assert.equal(system.userLookOverridden, true);
+  assert.equal(system.setMode(CameraSystem.MODES.WING), false);
+  assert.equal(system.setMode(CameraSystem.MODES.WING, true), true);
+  assert.equal(system.autoSwitch, false);
+  assert.equal(system.userLookOverridden, false);
+  system.applyMouseDelta(10, 0);
+  system.cycleMode();
+  assert.equal(system.mode, CameraSystem.MODES.TOWER);
+  assert.equal(system.userLookOverridden, false);
+});

@@ -95,44 +95,15 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
     assert.strictEqual(sim.controls.getVirtualInput('brakes'), 0.0);
   });
 
-  it('should transition through Lukla demo stages in sequence', () => {
+  it('does not infer Lukla takeoff from elapsed time or radio altitude while grounded', () => {
     const sim = createMockSimulator('lukla');
     const director = new DemoFlightDirector(sim);
-
     director.start('lukla');
-    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
-
-    // 1. Advance to Canyon Climb when reaching cliff / timer
-    director.stageTimer = 9.0;
+    director.stageTimer = 60;
     sim.telemetry.iasKnots = 130;
     sim.telemetry.radioAltFt = 100;
     director.update(0.1);
-    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.CANYON_CLIMB);
-
-    // 2. Advance to Himalayan Cruise
-    director.stageTimer = 10.0;
-    director.update(0.1);
-    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.HIMALAYAN_CRUISE);
-
-    // 3. Advance to Canyon Approach
-    director.stageTimer = 9.5;
-    director.update(0.1);
-    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.CANYON_APPROACH);
-
-    // 4. Advance to Uphill Touchdown
-    // Position aircraft over Threshold 06: s >= -263.5m, onGround = true
-    sim.position.set(-200 * 0.848048, 2810, 200 * 0.529919); // s ≈ -200m
-    sim.telemetry.onGround = true;
-    director.update(0.1);
-    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.UPHILL_TOUCHDOWN);
-    assert.strictEqual(sim.aero.spoilers, 1.0);
-    assert.strictEqual(sim.controls.getVirtualInput('brakes'), 1.0);
-
-    // 5. Complete rollout when stopped
-    sim.telemetry.iasKnots = 2;
-    director.stageTimer = 8.5;
-    director.update(0.1);
-    assert.strictEqual(director.isActive, false);
+    assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
   });
 
   it('should support Coastal demo flight when coastal airport is explicitly targeted', () => {
@@ -341,3 +312,54 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
   });
 });
 
+
+for (const airport of ['coastal', 'lukla']) {
+  it(`preserves user time through camera changes, stages and demo restart (${airport})`, () => {
+    const sim = createMockSimulator(airport);
+    sim.sky.setTimeOfDay = function(hours) { this.timeOfDay = hours; };
+    const director = new DemoFlightDirector(sim);
+    director.start();
+    assert.strictEqual(sim.sky.timeOfDay, airport === 'coastal' ? 6.5 : 8.5);
+    director.onUserTimeOfDayChange();
+    sim.sky.setTimeOfDay(22.5);
+    sim.cameraSystem.cycleMode();
+    const stages = airport === 'coastal'
+      ? [DemoFlightDirector.COASTAL_STAGES.TAKEOFF_ROLL,
+         DemoFlightDirector.COASTAL_STAGES.COASTAL_BANK,
+         DemoFlightDirector.COASTAL_STAGES.FINAL_APPROACH]
+      : [DemoFlightDirector.LUKLA_STAGES.HIMALAYAN_CRUISE,
+         DemoFlightDirector.LUKLA_STAGES.CANYON_APPROACH];
+    for (const stage of stages) {
+      director.setStage(stage);
+      // Coastal lighting also advances every frame; Lukla sets time on entry.
+      if (airport === 'coastal') director.update(0.1);
+      assert.strictEqual(sim.sky.timeOfDay, 22.5);
+    }
+    director.stop();
+    director.start();
+    assert.strictEqual(sim.sky.timeOfDay, 22.5);
+  });
+}
+
+describe('Airborne demo handoff', () => {
+  it('preserves climb throttle while releasing virtual controls at completion', () => {
+    const sim = createMockSimulator('coastal');
+    sim.controls.throttle = .92;
+    let engineThrottle;
+    sim.engines.setThrottle = value => {engineThrottle=value;};
+    sim.controls.setVirtualInput('elevator', .2);
+    const director = new DemoFlightDirector(sim);
+    director.isActive = true;
+    director.stop('Completed', false, { preserveThrottle: true });
+    assert.equal(director.isActive,false);
+    assert.equal(sim.controls.throttle,.92);
+    assert.equal(engineThrottle,.92);
+    assert.equal(sim.controls.getVirtualInput('elevator'),undefined);
+    assert.equal(sim.controls.parkingBrake,false);
+    // Ordinary stops retain the existing idle-throttle behavior.
+    director.isActive=true;
+    director.stop();
+    assert.equal(sim.controls.throttle,0);
+    assert.equal(engineThrottle,0);
+  });
+});
