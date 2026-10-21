@@ -268,6 +268,7 @@ class FlightSimulator {
     };
 
     this.controls.onCycleTimeOfDay = (deltaHours) => {
+      this.demoDirector?.onUserTimeOfDayChange();
       this.sky.setTimeOfDay(this.sky.timeOfDay + deltaHours, this.position, this.camera.position);
       this.water.syncWithAtmosphere(this.sky);
       const h = Math.floor(this.sky.timeOfDay);

@@ -64,6 +64,7 @@ export class DemoFlightDirector {
 
     // Track whether user has manually changed camera view in current stage
     this.userCameraOverridden = false;
+    this.userTimeOfDayOverridden = false;
     this._boundOnCycleMode = () => this.onUserCameraChange();
   }
 
@@ -284,6 +285,16 @@ export class DemoFlightDirector {
 
     if (message && this.sim.showToast) {
       this.sim.showToast(message);
+    }
+  }
+
+  onUserTimeOfDayChange() {
+    this.userTimeOfDayOverridden = true;
+  }
+
+  setTimeOfDay(hours) {
+    if (!this.userTimeOfDayOverridden) {
+      this.sim.sky.setTimeOfDay(hours);
     }
   }
 
