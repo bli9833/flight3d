@@ -131,6 +131,7 @@ class FlightSimulator {
     this.currentAirport = this.airport;
 
     this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water);
+    this.foliage.setTimeOfDay(this.sky.timeOfDay);
     this.water.syncWithAtmosphere(this.sky);
 
     // 6. Audio & Controls & Camera & Diagnostics
@@ -283,6 +284,7 @@ class FlightSimulator {
     this.controls.onCycleTimeOfDay = (deltaHours) => {
       this.demoDirector?.onUserTimeOfDayChange();
       this.sky.setTimeOfDay(this.sky.timeOfDay + deltaHours, this.position, this.camera.position);
+      this.foliage.setTimeOfDay(this.sky.timeOfDay);
       this.water.syncWithAtmosphere(this.sky);
       const h = Math.floor(this.sky.timeOfDay);
       const m = Math.floor((this.sky.timeOfDay % 1) * 60);
@@ -835,7 +837,8 @@ class FlightSimulator {
     }
 
     // 12. Cinematic Camera Cuts: Automatic temporary gear view for Takeoff, Touchdown, and Gear Retract/Extend
-    const allowAutoCut = !this.cameraSystem.userLookOverridden
+    const allowAutoCut = (!this.cameraSystem.userModeSelected || this.cameraSystem.autoSwitch)
+      && !this.cameraSystem.userLookOverridden
       && !(this.demoDirector && this.demoDirector.isActive && this.demoDirector.userCameraOverridden);
     if (allowAutoCut && !this.landingIncident && this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
       // Takeoff liftoff
@@ -975,6 +978,7 @@ class FlightSimulator {
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
+    this.foliage.updateCityLod(this.camera.position);
     this.sky.updateSun(this.position, this.camera.position);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
@@ -1065,6 +1069,7 @@ class FlightSimulator {
       this.camera.updateProjectionMatrix();
     }
     this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
+    this.foliage.updateCityLod(this.camera.position);
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();

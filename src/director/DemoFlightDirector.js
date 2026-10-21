@@ -297,11 +297,12 @@ export class DemoFlightDirector {
   setTimeOfDay(hours) {
     if (!this.userTimeOfDayOverridden) {
       this.sim.sky.setTimeOfDay(hours);
+      this.sim.foliage?.setTimeOfDay(hours);
     }
   }
 
   onUserCameraChange() {
-    this.userCameraOverridden = true;
+    this.userCameraOverridden = !this.sim.cameraSystem.autoSwitch;
   }
 
   setStage(newStage) {

@@ -70,3 +70,36 @@ test('explicit camera selection overrides manual look while automatic cuts respe
   assert.equal(system.mode, CameraSystem.MODES.TOWER);
   assert.equal(system.userLookOverridden, false);
 });
+
+for (let mode = 0; mode < 7; mode++) {
+  test(`manual view ${mode} survives automatic cuts, look reset and demo changes`, () => {
+    const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+    const aircraft = new THREE.Object3D();
+    aircraft.position.y = 100;
+    system.showTemporaryView(CameraSystem.MODES.GEAR, 5, () => assert.fail('cancelled cut callback'));
+    system.setMode(mode, true);
+    system.resetLook();
+    for (const automatedMode of [CameraSystem.MODES.DRONE, CameraSystem.MODES.GEAR, CameraSystem.MODES.COCKPIT]) {
+      assert.equal(system.setMode(automatedMode), false);
+      system.showTemporaryView(CameraSystem.MODES.GEAR, 5);
+      system.update(12, aircraft);
+      assert.equal(system.mode, mode);
+      assert.equal(system.temporaryViewTimer, 0);
+      assert.equal(system.savedMode, null);
+    }
+    system.setMode(CameraSystem.MODES.AUTO, true);
+    assert.equal(system.setMode(CameraSystem.MODES.COCKPIT), false);
+    system.update(10, aircraft);
+    assert.equal(system.mode, CameraSystem.MODES.WING);
+    system.showTemporaryView(CameraSystem.MODES.GEAR, 3);
+    assert.equal(system.mode, CameraSystem.MODES.GEAR);
+    system.update(3, aircraft);
+    assert.equal(system.mode, CameraSystem.MODES.WING);
+    system.update(10, aircraft);
+    assert.equal(system.mode, CameraSystem.MODES.TOWER);
+    system.cycleMode();
+    system.showTemporaryView(CameraSystem.MODES.GEAR, 3);
+    system.update(20, aircraft);
+    assert.equal(system.mode, CameraSystem.MODES.COCKPIT);
+  });
+}
