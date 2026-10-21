@@ -113,7 +113,7 @@ export class CoastalDemoScenario {
 
       case CoastalDemoScenario.STAGES.COMPLETED:
         this.director.updateBanner(() => t('demo.complete.taking.manual.control'), () => t('choose.a.preset.and.camera.view.to'));
-        this.director.stop(t('demo.flight.complete.enjoy.your.flight'));
+        this.director.stop(() => t('demo.flight.complete.enjoy.your.flight'));
         break;
     }
   }

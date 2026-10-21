@@ -20,3 +20,12 @@ Vulkan. Desktop viewport: 1440 × 1000; mobile viewport: 390 × 844.
 `results.json` contains the assertions' observed values. Screenshots show the
 English desktop flight guide and the English/Korean mobile settings menus.
 Existing avionics abbreviations and diagnostic codes remain in English.
+
+## Review follow-up: active demo-stop notifications
+
+All seven stop paths were exercised in headless Chrome before their toast
+expired: manual button, Escape, coastal completion, Lukla completion, terrain
+loading failure, terrain not ready, and aircraft damage. Each notification stayed
+visible and changed Korean → English → Korean while the demo remained stopped.
+See `demo-stop-review.json`. Seven matching Node regression cases failed against
+the original eager translations and pass with deferred translation callbacks.

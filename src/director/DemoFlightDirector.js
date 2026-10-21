@@ -92,7 +92,7 @@ export class DemoFlightDirector {
 
     if (this.skipBtn) {
       this.skipBtn.addEventListener('click', () => {
-        this.stop(t('manual.control.engaged'));
+        this.stop(() => t('manual.control.engaged'));
       });
     }
 
@@ -124,7 +124,7 @@ export class DemoFlightDirector {
       window.addEventListener('keydown', (e) => {
         if (e.target?.closest?.('select')) return;
         if (e.key === 'Escape' && this.isActive) {
-          this.stop(t('manual.control.engaged'));
+          this.stop(() => t('manual.control.engaged'));
         } else if ((e.key === 'p' || e.key === 'P') && !e.target?.matches?.('input, textarea')) {
           this.start();
         }
@@ -318,7 +318,7 @@ export class DemoFlightDirector {
     if (this.waitingForTerrain) {
       if (this.sim.currentTerrain?.loadError) {
         this.luklaScenario.recordFailure({ description: this.sim.currentTerrain.loadError });
-        this.stop(t('could.not.load.lukla.terrain.refresh.and'));
+        this.stop(() => t('could.not.load.lukla.terrain.refresh.and'));
         return;
       }
       if (this.sim.currentTerrain?.isLoaded === true) this.start(this.activeDemoAirport);

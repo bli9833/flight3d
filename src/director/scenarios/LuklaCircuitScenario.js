@@ -45,7 +45,7 @@ export class LuklaCircuitScenario {
         if (this.sim.currentTerrain?.isLoaded === false) {
           this.result.status = 'failed';
           this.result.reason = 'DEM not loaded';
-          this.director.stop(t('load.lukla.terrain.data.before.restarting.the'));
+          this.director.stop(() => t('load.lukla.terrain.data.before.restarting.the'));
           return;
         }
         this.director.updateBanner(() => t('1.5.lukla.runway.24.downhill.takeoff'), () => t('43.t.light.aircraft.simulation.downhill.takeoff'));
@@ -129,7 +129,7 @@ export class LuklaCircuitScenario {
         this.result.elapsedSeconds = this.director.totalTimer;
         this.result.stopPosition = this.sim.position.clone();
         this.director.updateBanner(() => t('lukla.challenge.complete.taking.manual.control'), () => t('landing.complete.at.one.of.the.world'));
-        this.director.stop(t('lukla.demo.complete.enjoy.your.flight'), true);
+        this.director.stop(() => t('lukla.demo.complete.enjoy.your.flight'), true);
 
         break;
     }
@@ -179,7 +179,7 @@ export class LuklaCircuitScenario {
     const tel = this.sim.telemetry;
     if (this.sim.isCrashed) {
       this.recordFailure(this.sim.crashResult);
-      this.director.stop(t('lukla.demo.failed.aircraft.damage'));
+      this.director.stop(() => t('lukla.demo.failed.aircraft.damage'));
       return;
     }
     // s: along runway axis (+toward 24 rock wall, -toward 06 cliff)
