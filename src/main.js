@@ -28,6 +28,7 @@ import { DemoFlightDirector } from './director/DemoFlightDirector.js';
 import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
+import { initMobileMenu } from './ui/MobileMenu.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 
@@ -137,6 +138,7 @@ class FlightSimulator {
     this.audio = new FlightAudio();
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
+    initMobileMenu();
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
     this.cameraSystem.onResetLook = () => {
