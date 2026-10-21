@@ -161,3 +161,38 @@ describe('FlightControls (Keyboard & Touch Inputs)', () => {
     }
   });
 });
+
+
+it('throttle responds to held Equal/Minus, stops on release, and clamps output', () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { addEventListener() {} };
+  try {
+    const controls = new FlightControls({ addEventListener() {} });
+    controls.handleKeyDown({ code: 'Equal' });
+    controls.update(1);
+    assert.strictEqual(controls.throttle, 0.35);
+    controls.handleKeyUp({ code: 'Equal' });
+    controls.update(1);
+    assert.strictEqual(controls.throttle, 0.35);
+    controls.handleKeyDown({ code: 'Minus' });
+    controls.update(0.5);
+    assert.strictEqual(controls.throttle, 0.175);
+    controls.update(10);
+    assert.strictEqual(controls.throttle, 0);
+    controls.handleKeyUp({ code: 'Minus' });
+    controls.handleKeyDown({ code: 'Equal' });
+    controls.update(10);
+    assert.strictEqual(controls.throttle, 1);
+    controls.handleKeyUp({ code: 'Equal' });
+    controls.throttle = 0.5;
+    for (const code of ['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight']) {
+      controls.handleKeyDown({ code });
+      controls.update(1);
+      assert.strictEqual(controls.throttle, 0.5);
+      controls.handleKeyUp({ code });
+    }
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});

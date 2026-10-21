@@ -131,11 +131,11 @@ export class FlightControls {
   }
 
   update(dt, iasKnots = 140) {
-    // 1. Throttle input (Shift increases, Ctrl decreases)
-    if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) {
+    // 1. Throttle input (Equal increases, Minus decreases)
+    if (this.keys['Equal']) {
       this.throttle = Math.min(1.0, this.throttle + dt * 0.35);
     }
-    if (this.keys['ControlLeft'] || this.keys['ControlRight']) {
+    if (this.keys['Minus']) {
       this.throttle = Math.max(0.0, this.throttle - dt * 0.35);
     }
 
