@@ -22,6 +22,7 @@ import { LuklaAirport } from './environment/LuklaAirport.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
+import { RenderPose } from './core/RenderPose.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
 import { DemoFlightDirector } from './director/DemoFlightDirector.js';
 import { CollisionDetector } from './physics/CollisionDetector.js';
@@ -167,6 +168,7 @@ class FlightSimulator {
     // Angular state
     this.quaternion = new THREE.Quaternion();
     this.angularVelocity = new THREE.Vector3(); // body rad/s (p, q, r)
+    this.renderPose = new RenderPose(this.position, this.quaternion);
 
     // Simulation Timing
     this.clock = new THREE.Clock();
@@ -490,6 +492,7 @@ class FlightSimulator {
     this.gear.setBrakes(0.0);
     this.physicsAccumulator = 0;
 
+    this.renderPose.reset(this.position, this.quaternion);
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.aircraft.group.updateMatrixWorld(true);
@@ -594,6 +597,10 @@ class FlightSimulator {
    * Physics Integration Substep (120 Hz)
    */
   integratePhysics(dt) {
+    // Gear/contact queries consume this mesh too. Restore the authoritative
+    // transform before physics so a rendered interpolation never feeds back.
+    this.aircraft.group.position.copy(this.position);
+    this.aircraft.group.quaternion.copy(this.quaternion);
     // If crashed, damp out velocities and rest on terrain
     if (this.isCrashed) {
       this.linearVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 2.8));
@@ -945,6 +952,10 @@ class FlightSimulator {
       this.integratePhysics(this.physicsDt);
       this.totalSimTime += this.physicsDt;
     }
+    // Deterministic stepping displays the current state without interpolation.
+    // Discard render history before the real-time loop resumes.
+    this.physicsAccumulator = 0;
+    this.renderPose.reset(this.position, this.quaternion);
     this.updateFlightDisplays();
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
@@ -997,15 +1008,15 @@ class FlightSimulator {
       if (this.demoDirector && this.demoDirector.isActive) {
         this.demoDirector.update(this.physicsDt);
       }
+      this.renderPose.reset(this.position, this.quaternion);
       this.integratePhysics(this.physicsDt);
       this.physicsAccumulator -= this.physicsDt;
     }
 
     // 1. Update 3D Aircraft Model & Articulations
     this.aircraft.update(frameDelta, this.telemetry);
-    this.aircraft.group.position.copy(this.position);
-    this.aircraft.group.quaternion.copy(this.quaternion);
-    this.aircraft.group.updateMatrixWorld(true);
+    this.renderPose.apply(this.aircraft.group, this.position, this.quaternion,
+      this.physicsAccumulator / this.physicsDt);
 
     // 2. Update Flight Instrument Canvas Displays
     this.updateFlightDisplays();

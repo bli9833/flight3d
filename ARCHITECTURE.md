@@ -73,6 +73,22 @@ This document provides a comprehensive technical overview of the Boeing 737-800 
 
 ---
 
+### Render timing and camera tracking
+
+Physics runs at 120 Hz. `RenderPose` interpolates position and quaternion between
+the previous and current physics steps using the remaining accumulator fraction.
+The aircraft mesh and cameras share that displayed pose, with up to one physics
+step (8.33 ms) of visual delay. Telemetry and collisions use current physics state.
+Because gear and aerodynamics also read the aircraft mesh, `integratePhysics`
+restores its authoritative transform before querying forces. Presets and
+deterministic `stepSimulation` calls discard interpolation history.
+
+Moving exterior cameras (chase, drone and parked/slow-taxi flyby) carry aircraft
+translation immediately and damp only their relative framing. Airborne and
+rollout flyby shots remain fixed in world space. Regressions should cover uneven
+frame intervals, 90/144/165 Hz displays, view changes and preset resets; constant
+60 Hz stepping alone can conceal both translation lag and fixed-step judder.
+
 ## 2. Coordinate Conventions & Aeronautical Math
 
 The simulator couples the standard **Three.js WebGL World Frame** with the standard **ISO/AIAA Aeronautical Body Frame**.
