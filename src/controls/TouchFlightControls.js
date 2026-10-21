@@ -293,6 +293,15 @@ export class TouchFlightControls {
   }
 
   /* ---------------- Virtual Stick Handling ---------------- */
+  updateStickGeometry() {
+    const rect = this.stickZone.getBoundingClientRect();
+    this.stickCenterX = rect.left + rect.width * 0.5;
+    this.stickCenterY = rect.top + rect.height * 0.5;
+    // Keep the entire knob inside the zone, including its border, after resize.
+    const knobSize = Math.max(this.stickKnob.offsetWidth, this.stickKnob.offsetHeight);
+    this.stickRadius = Math.max(1, (Math.min(rect.width, rect.height) - knobSize) * 0.5 - 2);
+  }
+
   onStickPointerDown(e) {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     if (this.controls.onUserInteract) this.controls.onUserInteract();
@@ -300,10 +309,7 @@ export class TouchFlightControls {
     this.stickPointerId = e.pointerId;
     this.stickZone.setPointerCapture(e.pointerId);
 
-    const rect = this.stickZone.getBoundingClientRect();
-    this.stickCenterX = rect.left + rect.width * 0.5;
-    this.stickCenterY = rect.top + rect.height * 0.5;
-    this.stickRadius = (rect.width * 0.5) - 20;
+    this.updateStickGeometry();
 
     this.updateStickPosition(e.clientX, e.clientY);
   }
@@ -544,15 +550,17 @@ export class TouchFlightControls {
 
     // Update virtual stick graphic to match gyro deflection
     if (this.stickKnob && !this.stickActive) {
-      const gx = normRoll * this.stickRadius;
-      const gy = normPitch * this.stickRadius;
+      this.updateStickGeometry();
+      const magnitude = Math.max(1, Math.hypot(normRoll, normPitch));
+      const gx = normRoll / magnitude * this.stickRadius;
+      const gy = normPitch / magnitude * this.stickRadius;
       this.stickKnob.style.transform = `translate(${gx}px, ${gy}px)`;
     }
   }
 
   /* ---------------- Sync Telemetry State to Buttons ---------------- */
   updateUI(telemetry) {
-    if (!this.enabled || !telemetry) return;
+    if (!telemetry) return;
 
     // Sync throttle display if not actively dragging
     if (!this.throttleActive) {
