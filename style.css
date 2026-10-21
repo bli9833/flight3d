@@ -1561,3 +1561,131 @@ body.touch-mode .action-panel {
   }
 }
 
+
+/* Compact browser layout: reserve the center for the flight view. */
+.mobile-menu-toggle, .mobile-menu { display: none; }
+body.compact-ui {
+  height: 100dvh;
+  --edge-left: max(8px, env(safe-area-inset-left));
+  --edge-right: max(8px, env(safe-area-inset-right));
+  --edge-top: max(8px, env(safe-area-inset-top));
+  --edge-bottom: max(8px, env(safe-area-inset-bottom));
+}
+.compact-ui #hud-overlay { height: 100dvh; z-index: 30; }
+.compact-ui .mobile-menu-toggle {
+  display: block;
+  position: absolute;
+  top: var(--edge-top);
+  left: var(--edge-left);
+  min-height: 44px;
+  pointer-events: auto;
+  z-index: 60;
+}
+.compact-ui .hud-strip {
+  top: var(--edge-top);
+  left: calc(var(--edge-left) + 86px);
+  right: var(--edge-right);
+  max-width: none;
+  transform: none;
+  gap: 10px;
+  min-height: 44px;
+  overflow-x: auto;
+  pointer-events: auto;
+  touch-action: pan-x;
+}
+.compact-ui .hud-item { flex: 0 0 auto; min-width: 50px; }
+.compact-ui .mobile-menu.is-open {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: absolute;
+  top: calc(var(--edge-top) + 52px);
+  left: var(--edge-left);
+  width: min(360px, calc(100% - var(--edge-left) - var(--edge-right)));
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 60px);
+  padding: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid #475569;
+  border-radius: 10px;
+  pointer-events: auto;
+  z-index: 55;
+}
+.compact-ui .mobile-menu .presets-bar,
+.compact-ui .mobile-menu .action-panel {
+  display: flex !important;
+  position: static;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 100%;
+  overflow: visible;
+  padding: 0;
+}
+.compact-ui .mobile-menu .btn-group,
+.compact-ui .mobile-menu .airport-group { flex-wrap: wrap; }
+.compact-ui .mobile-menu .btn { min-height: 44px; white-space: normal; }
+.compact-ui .mobile-menu .touch-left-actions,
+.compact-ui .mobile-menu .touch-right-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.compact-ui .demo-banner,
+.compact-ui .demo-pill-btn { top: calc(var(--edge-top) + 52px); }
+.compact-ui .demo-banner {
+  flex-wrap: wrap;
+  width: calc(100% - var(--edge-left) - var(--edge-right));
+  max-height: calc(100dvh - 180px);
+  overflow-y: auto;
+}
+.compact-ui .demo-info { min-width: 0; }
+.compact-ui .touch-controls-overlay {
+  height: 100dvh;
+  padding: 0 var(--edge-right) var(--edge-bottom) var(--edge-left);
+  gap: 8px;
+}
+.compact-ui .touch-quadrant { flex-shrink: 0; }
+.compact-ui .touch-throttle-card { width: 108px; }
+.compact-ui .touch-stick-zone { width: 120px; height: 120px; }
+.compact-ui .touch-stick-card { padding: 6px; }
+.compact-ui .touch-stick-card .touch-card-header { flex-direction: column; }
+.compact-ui .touch-throttle-track { height: 120px; flex-shrink: 0; }
+.compact-ui .touch-rudder-card { width: 140px; }
+.compact-ui .diagnostics-panel {
+  top: calc(var(--edge-top) + 52px);
+  right: var(--edge-right);
+  width: min(360px, calc(100% - var(--edge-left) - var(--edge-right)));
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 60px);
+}
+.compact-ui .modal-card { max-height: 85dvh; }
+.compact-ui .modal-header { flex-shrink: 0; }
+.compact-ui .modal-body { min-height: 0; }
+.compact-ui .crash-card { max-height: 85dvh; overflow-y: auto; }
+.compact-ui .help-grid { grid-template-columns: 1fr; }
+@media (max-width: 540px) {
+  .compact-ui.touch-mode .touch-controls-overlay {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr auto auto;
+    align-items: end;
+    row-gap: 6px;
+  }
+  .compact-ui .touch-left { grid-column: 1; grid-row: 2; }
+  .compact-ui .touch-right { grid-column: 2; grid-row: 2; justify-self: end; }
+  .compact-ui .touch-center {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    flex-direction: row;
+    justify-content: center;
+  }
+  .compact-ui .touch-center .btn-touch-brake { width: 52px; height: 52px; }
+}
+.compact-ui .mobile-menu button { touch-action: pan-y; }
+.compact-ui .modal-close, .compact-ui .diag-close-btn {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+/* Prevent transient wide controls/canvas from enlarging the mobile layout viewport. */
+#canvas-container, #hud-overlay, .touch-controls-overlay { overflow: hidden; }
+#canvas-container canvas { max-width: 100%; max-height: 100%; }

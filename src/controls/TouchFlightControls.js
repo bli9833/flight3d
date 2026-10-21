@@ -191,6 +191,11 @@ export class TouchFlightControls {
     this.rudderThumb = el.querySelector('#touch-rudder-thumb');
     this.brakeBtn = el.querySelector('#touch-btn-brake');
     this.gyroBtn = el.querySelector('#touch-btn-gyro');
+    // Retain references when compact UI moves action groups into the menu.
+    this.gearBtn = el.querySelector('#touch-btn-gear');
+    this.spoilersBtn = el.querySelector('#touch-btn-spoilers');
+    this.reverserBtn = el.querySelector('#touch-btn-reverser');
+    this.soundBtn = el.querySelector('#touch-btn-sound');
     this.stickTelemetry = el.querySelector('#touch-stick-telemetry');
     this.rudderReadout = el.querySelector('#touch-rudder-val');
   }
@@ -288,6 +293,15 @@ export class TouchFlightControls {
   }
 
   /* ---------------- Virtual Stick Handling ---------------- */
+  updateStickGeometry() {
+    const rect = this.stickZone.getBoundingClientRect();
+    this.stickCenterX = rect.left + rect.width * 0.5;
+    this.stickCenterY = rect.top + rect.height * 0.5;
+    // Keep the entire knob inside the zone, including its border, after resize.
+    const knobSize = Math.max(this.stickKnob.offsetWidth, this.stickKnob.offsetHeight);
+    this.stickRadius = Math.max(1, (Math.min(rect.width, rect.height) - knobSize) * 0.5 - 2);
+  }
+
   onStickPointerDown(e) {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     if (this.controls.onUserInteract) this.controls.onUserInteract();
@@ -295,10 +309,7 @@ export class TouchFlightControls {
     this.stickPointerId = e.pointerId;
     this.stickZone.setPointerCapture(e.pointerId);
 
-    const rect = this.stickZone.getBoundingClientRect();
-    this.stickCenterX = rect.left + rect.width * 0.5;
-    this.stickCenterY = rect.top + rect.height * 0.5;
-    this.stickRadius = (rect.width * 0.5) - 20;
+    this.updateStickGeometry();
 
     this.updateStickPosition(e.clientX, e.clientY);
   }
@@ -539,15 +550,17 @@ export class TouchFlightControls {
 
     // Update virtual stick graphic to match gyro deflection
     if (this.stickKnob && !this.stickActive) {
-      const gx = normRoll * this.stickRadius;
-      const gy = normPitch * this.stickRadius;
+      this.updateStickGeometry();
+      const magnitude = Math.max(1, Math.hypot(normRoll, normPitch));
+      const gx = normRoll / magnitude * this.stickRadius;
+      const gy = normPitch / magnitude * this.stickRadius;
       this.stickKnob.style.transform = `translate(${gx}px, ${gy}px)`;
     }
   }
 
   /* ---------------- Sync Telemetry State to Buttons ---------------- */
   updateUI(telemetry) {
-    if (!this.enabled || !telemetry) return;
+    if (!telemetry) return;
 
     // Sync throttle display if not actively dragging
     if (!this.throttleActive) {
@@ -559,7 +572,7 @@ export class TouchFlightControls {
     }
 
     // Sync Gear Button
-    const gearBtn = this.overlay.querySelector('#touch-btn-gear');
+    const gearBtn = this.gearBtn;
     if (gearBtn) {
       const isDown = telemetry.gearState > 0.5;
       gearBtn.className = isDown ? 'btn-touch-pill active' : 'btn-touch-pill';
@@ -567,14 +580,14 @@ export class TouchFlightControls {
     }
 
     // Sync Spoilers Button
-    const spBtn = this.overlay.querySelector('#touch-btn-spoilers');
+    const spBtn = this.spoilersBtn;
     if (spBtn) {
       const isExt = telemetry.spoilers > 0.1;
       spBtn.className = isExt ? 'btn-touch-pill active' : 'btn-touch-pill';
     }
 
     // Sync Reverser Button
-    const revBtn = this.overlay.querySelector('#touch-btn-reverser');
+    const revBtn = this.reverserBtn;
     if (revBtn) {
       const isRev = telemetry.engine1?.reverserActive;
       revBtn.className = isRev ? 'btn-touch-pill active-amber' : 'btn-touch-pill';
@@ -584,7 +597,7 @@ export class TouchFlightControls {
   /* ---------------- Audio UI State ---------------- */
   updateAudioUI(state) {
     if (!this.overlay || !state) return;
-    const soundBtn = this.overlay.querySelector('#touch-btn-sound');
+    const soundBtn = this.soundBtn;
     if (!soundBtn) return;
     if (state.muted) {
       soundBtn.className = 'btn-touch-pill muted';
