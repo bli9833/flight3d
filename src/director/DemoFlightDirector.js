@@ -300,7 +300,7 @@ export class DemoFlightDirector {
   }
 
   onUserCameraChange() {
-    this.userCameraOverridden = true;
+    this.userCameraOverridden = !this.sim.cameraSystem.autoSwitch;
   }
 
   setStage(newStage) {

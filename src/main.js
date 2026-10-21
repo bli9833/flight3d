@@ -834,7 +834,8 @@ class FlightSimulator {
     }
 
     // 12. Cinematic Camera Cuts: Automatic temporary gear view for Takeoff, Touchdown, and Gear Retract/Extend
-    const allowAutoCut = !this.cameraSystem.userLookOverridden
+    const allowAutoCut = (!this.cameraSystem.userModeSelected || this.cameraSystem.autoSwitch)
+      && !this.cameraSystem.userLookOverridden
       && !(this.demoDirector && this.demoDirector.isActive && this.demoDirector.userCameraOverridden);
     if (allowAutoCut && !this.landingIncident && this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
       // Takeoff liftoff
