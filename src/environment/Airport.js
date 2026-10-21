@@ -52,7 +52,7 @@ export class Airport {
   async loadBuildings(loadKit = loadAirportKit) {
     try {
       const kit = await loadKit();
-      // Subclasses such as Incheon own their terminal/boarding geometry.
+      // Replace the procedural terminal only when this airport provides one.
       const replaceTerminal = Boolean(this.terminalGroup);
       const buildings = createAirportBuildings(kit, this, { terminal: replaceTerminal });
       const oldTower = this.towerGroup;

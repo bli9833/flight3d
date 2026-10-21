@@ -261,6 +261,12 @@ class FlightSimulator {
       this.showToast(`Camera: ${modeName}`);
     };
 
+    this.controls.onSelectCamera = (mode) => {
+      this.cameraSystem.setMode(mode, true);
+      if (this.demoDirector?.isActive) this.demoDirector.onUserCameraChange();
+      this.showToast(`Camera: ${this.cameraSystem.getModeName()}`);
+    };
+
     this.controls.onToggleLights = () => {
       this.aircraft.lightsOn = !this.aircraft.lightsOn;
       this.aircraft.lightsGroup.visible = this.aircraft.lightsOn;

@@ -4,7 +4,6 @@ import { readFile } from 'node:fs/promises';
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Airport } from '../src/environment/Airport.js';
-import { IncheonAirport } from '../src/environment/IncheonAirport.js';
 import { createAirportBuildings, validateAirportKit } from '../src/environment/AirportBuildings.js';
 
 const bytes = await readFile(new URL('../public/models/airport/airport-kit.glb', import.meta.url));
@@ -85,11 +84,14 @@ test('failed loading preserves fallback; successful replacement binds animation 
   assert.equal(airport.beaconLights[0].parent.position.y, 83);
 });
 
-test('Incheon retains boarding terminal while sharing the replacement tower', async () => {
-  class TestIncheon extends IncheonAirport { buildRunway() {} loadBuildings() { return Promise.resolve(false); } }
-  const airport = new TestIncheon(), bridges = airport.jetBridges;
-  assert.equal(await Airport.prototype.loadBuildings.call(airport, async () => kit), true);
-  assert.strictEqual(airport.jetBridges, bridges);
-  assert.ok(bridges.every(b => b.parent === airport.group));
-  assert.equal(airport.buildings.lods.length, 1);
+test('tower-only placement omits terminal, bridges and hangars', () => {
+  const airport = new TestAirport();
+  const buildings = createAirportBuildings(kit, airport, { terminal: false });
+  assert.deepEqual(buildings.lods.map(lod => lod.name), ['Tower']);
+  assert.strictEqual(buildings.tower.parent, buildings.group);
+  assert.strictEqual(buildings.radar.parent, buildings.tower);
+  assert.strictEqual(buildings.beacon.parent.parent, buildings.tower);
+  assert.deepEqual(buildings.tower.position.toArray(), [
+    airport.controlTowerData.x, airport.controlTowerData.y, airport.controlTowerData.z
+  ]);
 });

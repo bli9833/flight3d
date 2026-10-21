@@ -3,8 +3,7 @@
 The coastal airport loads `public/models/airport/airport-kit.glb`. The synchronous
 procedural buildings remain visible until a validated kit loads, and remain the
 fallback on HTTP failure or invalid content. One cached request supplies shared
-geometry and materials to both coastal and Incheon towers. Incheon's boarding
-terminal, passengers and bridges retain their existing behavior; Lukla is independent.
+geometry and materials to coastal airport buildings; Lukla is independent.
 
 ## Selection and provenance
 
@@ -56,7 +55,7 @@ Both the loaded models and fallback now use the metadata positions. This is the
 intentional placement correction; runway/taxiway/apron geometry is unchanged.
 All new structures remain clear of the runway and parallel taxiway.
 
-The existing coastal/Incheon tower camera remains at (120,78,280), inside the
+The existing coastal tower camera remains at (120,78,280), inside the
 cab. Node raycasting checks its westward sightline; browser evidence also looks
 toward the runway threshold from that exact position. Mullions are offset from
 the cardinal axes to keep this sightline clear. Bounds tests use the actual GLB,
