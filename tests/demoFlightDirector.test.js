@@ -314,17 +314,16 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
 
 
 
-describe('Incheon airborne handoff', () => {
+describe('Airborne demo handoff', () => {
   it('preserves climb throttle while releasing virtual controls at completion', () => {
-    const sim = createMockSimulator('incheon');
-    sim.incheonAirport = {tug:{visible:false}};
+    const sim = createMockSimulator('coastal');
     sim.controls.throttle = .92;
     let engineThrottle;
     sim.engines.setThrottle = value => {engineThrottle=value;};
     sim.controls.setVirtualInput('elevator', .2);
     const director = new DemoFlightDirector(sim);
     director.isActive = true;
-    director.setStage(8);
+    director.stop('Completed', false, { preserveThrottle: true });
     assert.equal(director.isActive,false);
     assert.equal(sim.controls.throttle,.92);
     assert.equal(engineThrottle,.92);
