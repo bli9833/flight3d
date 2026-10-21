@@ -1,3 +1,4 @@
+import { t } from '../../i18n/index.js';
 import * as THREE from 'three';
 import { CameraSystem } from '../../cameras/CameraSystem.js';
 
@@ -28,10 +29,7 @@ export class CoastalDemoScenario {
     this.stageCameraCutDone = false;
     switch (stage) {
       case CoastalDemoScenario.STAGES.PREFLIGHT_ORBIT:
-        this.director.updateBanner(
-          '🎬 [1/8] 비행 전 드론 서클 점검 (Pre-Flight Drone Inspection)',
-          '보잉 737 기체 외관 360° 드론 조망 • 플랩 5 전개 • 황금빛 일출 해안 전경 [Esc: 직접 조종]'
-        );
+        this.director.updateBanner(() => t('1.8.pre.flight.drone.inspection.235'), () => t('360.boeing.737.exterior.inspection.flaps.5'));
         if (this.sim.setPreset) {
           this.sim.setPreset('runway', true);
         }
@@ -53,10 +51,7 @@ export class CoastalDemoScenario {
         break;
 
       case CoastalDemoScenario.STAGES.TAKEOFF_ROLL:
-        this.director.updateBanner(
-          '🛫 [2/8] 활주로 이륙 활주 (Runway 09L Takeoff Roll)',
-          'TOGA 100% 추력 가속 • 보잉 글래스 콕핏(MCP, PFD, ND, ISFD) 계기 감상'
-        );
+        this.director.updateBanner(() => t('2.8.runway.09l.takeoff.roll'), () => t('toga.100.thrust.boeing.glass.cockpit.instruments'));
         this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
         this.director.setTimeOfDay(7.2);
         if (this.sim.water && this.sim.water.setSunDirection) {
@@ -72,18 +67,12 @@ export class CoastalDemoScenario {
         break;
 
       case CoastalDemoScenario.STAGES.ROTATION_CLIMB:
-        this.director.updateBanner(
-          '✈️ [3/8] V_r 로테이션 & 이륙 상승 (Rotation & Initial Climb)',
-          '133 KT 부드러운 기수 인상(2.2°/s) • 앞/뒷바퀴 이륙 & 랜딩 기어 접기 • 기체 외형 및 도심 전경'
-        );
+        this.director.updateBanner(() => t('3.8.rotation.initial.climb'), () => t('smooth.rotation.at.133.kt.2.2'));
         this.sim.controls.setVirtualInput('elevator', 0.65);
         break;
 
       case CoastalDemoScenario.STAGES.COASTAL_BANK:
-        this.director.updateBanner(
-          '⛰️ [4/8] 해안가 선회 비행 (Scenic Coastal Banking Turn)',
-          '우측 20° 선회 • 굴곡 산맥 지형, 3,500+ 그루 식생 및 500+ 채 도심 빌딩 조망'
-        );
+        this.director.updateBanner(() => t('4.8.scenic.coastal.banking.turn'), () => t('20.right.bank.mountains.3.500.trees'));
         this.sim.cameraSystem.setMode(CameraSystem.MODES.WING);
         if (this.sim.aero && this.sim.aero.setFlapPosition) {
           this.sim.aero.setFlapPosition(0);
@@ -91,18 +80,12 @@ export class CoastalDemoScenario {
         break;
 
       case CoastalDemoScenario.STAGES.OCEAN_CRUISE:
-        this.director.updateBanner(
-          '🚢 [5/8] 해상 선박 & 거스트너 파도 수면 순항 (Ocean Waves & Fleet Cruise)',
-          '햇빛 반사 수면 • 컨테이너 화물선, 대형 유람선 및 쾌속 모터보트 웨이크 감상'
-        );
+        this.director.updateBanner(() => t('5.8.ocean.waves.fleet.cruise'), () => t('sunlit.water.container.ships.cruise.ships.and'));
         this.sim.cameraSystem.setMode(CameraSystem.MODES.FLYBY);
         break;
 
       case CoastalDemoScenario.STAGES.FINAL_APPROACH:
-        this.director.updateBanner(
-          '🛬 [6/8] 3NM 최종 착륙 접근 (Runway 09L Final Approach)',
-          'PAPI 4등식 3.0° 활공각 유도(2 White 2 Red) • ALS 진입 스트로브 • 플랩 30 전개'
-        );
+        this.director.updateBanner(() => t('6.8.runway.09l.final.approach'), () => t('four.light.papi.3.0.glide.path'));
         this.sim.setPreset('approach', true);
         this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
         this.director.setTimeOfDay(17.6);
@@ -114,18 +97,12 @@ export class CoastalDemoScenario {
         break;
 
       case CoastalDemoScenario.STAGES.TOUCHDOWN_ROLLOUT:
-        this.director.updateBanner(
-          '🛑 [7/8] 활주로 접지 & 역추진 제동 (Touchdown & Reverser Rollout)',
-          '랜딩 기어 뷰: 뒷바퀴/앞바퀴 순차 완충 접지 • 타이어 연기 • 스포일러 & 역추진 제동'
-        );
+        this.director.updateBanner(() => t('7.8.touchdown.reverse.thrust.rollout'), () => t('landing.gear.view.main.nose.wheel.touchdown'));
         this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
         break;
 
       case CoastalDemoScenario.STAGES.POSTFLIGHT_ORBIT:
-        this.director.updateBanner(
-          '🚁 [8/8] 안전 착륙 완료 & 드론 서클 쇼케이스 (Touchdown Complete • Drone Orbit View)',
-          '활주로 정지 완료 • 스포일러/역추진 격납 • 보잉 737 기체 전경 드론 조망 [Esc: 직접 조종]'
-        );
+        this.director.updateBanner(() => t('8.8.touchdown.complete.drone.orbit'), () => t('stopped.on.runway.spoilers.reverse.thrust.stowed'));
         this.sim.cameraSystem.setMode(CameraSystem.MODES.DRONE);
         this.sim.cameraSystem.resetDroneOrbit?.(this.sim.cameraSystem.droneOrbitAngle, 38.0, 11.5);
         this.sim.controls.setVirtualInput('brakes', 1.0);
@@ -135,11 +112,8 @@ export class CoastalDemoScenario {
         break;
 
       case CoastalDemoScenario.STAGES.COMPLETED:
-        this.director.updateBanner(
-          '🎉 데모 시연 완료! 조종사 수동 조종 인계',
-          '이제 원하는 프리셋과 카메라 뷰를 선택하여 직접 비행을 즐겨보세요! [Esc]'
-        );
-        this.director.stop('데모 비행 시연이 완료되었습니다. 비행을 즐겨보세요!');
+        this.director.updateBanner(() => t('demo.complete.taking.manual.control'), () => t('choose.a.preset.and.camera.view.to'));
+        this.director.stop(() => t('demo.flight.complete.enjoy.your.flight'));
         break;
     }
   }

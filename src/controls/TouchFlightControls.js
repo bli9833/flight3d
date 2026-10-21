@@ -1,3 +1,4 @@
+import { t, translateDOM } from '../i18n/index.js';
 /**
  * TouchFlightControls.js
  * Comprehensive Mobile & Touchscreen Flight Control System
@@ -104,16 +105,16 @@ export class TouchFlightControls {
 
           <!-- Quick Action Buttons Column on Left -->
           <div class="touch-left-actions">
-            <button type="button" id="touch-btn-sound" class="btn-touch-pill active" title="사운드 볼륨 / 모바일 부스트 (M)">
+            <button type="button" id="touch-btn-sound" class="btn-touch-pill active" title="사운드 볼륨 / 모바일 부스트 (M)" data-i18n-title="audio.volume.tooltip">
               <span class="pill-icon">🔊</span> VOL
             </button>
-            <button type="button" id="touch-btn-reverser" class="btn-touch-pill" title="역추진 (Reverse Thrust)">
+            <button type="button" id="touch-btn-reverser" class="btn-touch-pill" title="역추진 (Reverse Thrust)" data-i18n-title="reverse.thrust">
               <span class="pill-icon">⚡</span> REV
             </button>
-            <button type="button" id="touch-btn-gear" class="btn-touch-pill active" title="랜딩 기어 (Gear)">
+            <button type="button" id="touch-btn-gear" class="btn-touch-pill active" title="랜딩 기어 (Gear)" data-i18n-title="landing.gear">
               <span class="pill-icon">🛞</span> GEAR
             </button>
-            <button type="button" id="touch-btn-spoilers" class="btn-touch-pill" title="스포일러 (Spoilers)">
+            <button type="button" id="touch-btn-spoilers" class="btn-touch-pill" title="스포일러 (Spoilers)" data-i18n-title="spoilers">
               <span class="pill-icon">🛡️</span> SP OIL
             </button>
           </div>
@@ -122,7 +123,7 @@ export class TouchFlightControls {
         <!-- Center Bottom: Rudder & Brakes Bar -->
         <div class="touch-quadrant touch-center">
           <!-- Hydraulic Wheel Brake Button -->
-          <button type="button" id="touch-btn-brake" class="btn-touch-brake" title="휠 브레이크 (Hold to Brake)">
+          <button type="button" id="touch-btn-brake" class="btn-touch-brake" title="휠 브레이크 (Hold to Brake)" data-i18n-title="wheel.brakes.hold.to.brake">
             <span class="brake-label">BRAKE</span>
             <span class="brake-sub">HOLD</span>
           </button>
@@ -145,16 +146,16 @@ export class TouchFlightControls {
         <div class="touch-quadrant touch-right">
           <!-- Flaps & Camera Bar -->
           <div class="touch-right-actions">
-            <button type="button" id="touch-btn-cam" class="btn-touch-pill" title="시점 변경 (Camera)">
+            <button type="button" id="touch-btn-cam" class="btn-touch-pill" title="시점 변경 (Camera)" data-i18n-title="change.camera">
               <span class="pill-icon">🎥</span> CAM
             </button>
-            <button type="button" id="touch-btn-flaps-dec" class="btn-touch-pill" title="플랩 - (Flaps Retract)">
+            <button type="button" id="touch-btn-flaps-dec" class="btn-touch-pill" title="플랩 - (Flaps Retract)" data-i18n-title="flaps.retract">
               FLAP -
             </button>
-            <button type="button" id="touch-btn-flaps-inc" class="btn-touch-pill" title="플랩 + (Flaps Extend)">
+            <button type="button" id="touch-btn-flaps-inc" class="btn-touch-pill" title="플랩 + (Flaps Extend)" data-i18n-title="flaps.extend">
               FLAP +
             </button>
-            <button type="button" id="touch-btn-gyro" class="btn-touch-pill" title="기기 기울기 자이로 센서 모드">
+            <button type="button" id="touch-btn-gyro" class="btn-touch-pill" title="기기 기울기 자이로 센서 모드" data-i18n-title="gyroscope.device.tilt.mode">
               <span class="pill-icon">📱</span> GYRO
             </button>
           </div>
@@ -178,6 +179,7 @@ export class TouchFlightControls {
         </div>
       `;
       document.body.appendChild(el);
+    translateDOM(el);
     }
 
     this.overlay = el;
@@ -493,7 +495,7 @@ export class TouchFlightControls {
         if (response === 'granted') {
           this.enableGyro();
         } else {
-          alert('기기 기울기(자이로) 센서 접근 권한이 허용되지 않았습니다.');
+          alert(t('permission.to.access.the.device.tilt.sensor'));
         }
       } catch (err) {
         console.warn('DeviceOrientation permission error:', err);
@@ -501,7 +503,7 @@ export class TouchFlightControls {
     } else if (window.DeviceOrientationEvent) {
       this.enableGyro();
     } else {
-      alert('이 기기는 자이로스코프 / 기울기 센서를 지원하지 않습니다.');
+      alert(t('this.device.does.not.support.gyroscope.tilt'));
     }
   }
 

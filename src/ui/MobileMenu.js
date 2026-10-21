@@ -1,14 +1,15 @@
+import { t, bindText } from '../i18n/index.js';
 /** Keep secondary controls reachable without covering the flight view. */
 export function initMobileMenu() {
   const button = document.createElement('button');
   button.className = 'btn mobile-menu-toggle';
-  button.textContent = '☰ 메뉴';
+  bindText(button, () => t('menu'));
   button.setAttribute('aria-expanded', 'false');
   button.setAttribute('aria-controls', 'mobile-menu');
   const panel = document.createElement('div');
   panel.id = 'mobile-menu';
   panel.className = 'mobile-menu';
-  panel.setAttribute('aria-label', '비행 설정 및 추가 조작');
+  bindText(panel, () => t('flight.settings.and.additional.controls'), 'aria-label');
   document.getElementById('hud-overlay').append(button, panel);
   const controls = [...document.querySelectorAll('.presets-bar, .action-panel, .touch-left-actions, .touch-right-actions')]
     .map(node => {

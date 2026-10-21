@@ -367,6 +367,83 @@ describe('Airborne demo handoff', () => {
   });
 });
 
+// Exercise each production stop path, keeping the notification alive across
+// both locale changes instead of rendering it only at stop time.
+describe('localized demo stop notifications', () => {
+  const cases = [
+    ['manual button', 'manual.control.engaged', (director, sim, handlers) => handlers.click()],
+    ['Escape key', 'manual.control.engaged', (director, sim, handlers) => handlers.keydown({ key: 'Escape' })],
+    ['terrain loading failure', 'could.not.load.lukla.terrain.refresh.and', (director, sim) => {
+      director.waitingForTerrain = true;
+      sim.currentTerrain = { loadError: 'failed' };
+      director.update(0.1);
+    }],
+    ['terrain not ready', 'load.lukla.terrain.data.before.restarting.the', (director, sim) => {
+      sim.currentTerrain = { isLoaded: false };
+      director.luklaScenario.enterStage(DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
+    }],
+    ['aircraft damage', 'lukla.demo.failed.aircraft.damage', (director, sim) => {
+      sim.isCrashed = true;
+      director.luklaScenario.update(0.1);
+    }],
+    ['Lukla completion', 'lukla.demo.complete.enjoy.your.flight', director => {
+      director.setStage(DemoFlightDirector.LUKLA_STAGES.COMPLETED);
+    }],
+    ['coastal completion', 'demo.flight.complete.enjoy.your.flight', director => {
+      director.start('coastal');
+      director.setStage(DemoFlightDirector.COASTAL_STAGES.COMPLETED);
+    }],
+  ];
+
+  for (const [name, key, stopDemo] of cases) {
+    it(`${name} toast updates in place when language changes after stopping`, async () => {
+      const { setLanguage, t, bindText } = await import('../src/i18n/index.js');
+      const storage = { setItem() {} };
+      const toast = { isConnected: true, textContent: '' };
+      const sim = createMockSimulator();
+      sim.showToast = render => {
+        assert.strictEqual(typeof render, 'function', 'localized toast must retain its renderer');
+        bindText(toast, render);
+      };
+      const director = new DemoFlightDirector(sim);
+      const handlers = {};
+      const originalWindow = globalThis.window;
+      const originalDocument = globalThis.document;
+      setLanguage('ko', storage);
+      try {
+        globalThis.window = { addEventListener: (type, listener) => { handlers[type] = listener; } };
+        globalThis.document = {
+          getElementById: id => id === 'btn-skip-demo'
+            ? { addEventListener: (type, listener) => { handlers[type] = listener; } }
+            : null,
+        };
+        director.initUI();
+      } finally {
+        if (originalWindow === undefined) delete globalThis.window;
+        else globalThis.window = originalWindow;
+        if (originalDocument === undefined) delete globalThis.document;
+        else globalThis.document = originalDocument;
+      }
+      try {
+        director.start('lukla');
+        stopDemo(director, sim, handlers);
+        assert.strictEqual(director.isActive, false);
+        assert.strictEqual(toast.textContent, t(key));
+        const korean = toast.textContent;
+        setLanguage('en', storage);
+        assert.strictEqual(toast.textContent, t(key));
+        assert.notStrictEqual(toast.textContent, korean);
+        setLanguage('ko', storage);
+        assert.strictEqual(toast.textContent, korean);
+        assert.strictEqual(director.isActive, false);
+      } finally {
+        toast.isConnected = false;
+        setLanguage('ko', storage);
+      }
+    });
+  }
+});
+
 for (const airport of ['coastal', 'lukla']) {
   it(`preserves explicit camera choices across demo stages and restart (${airport})`, () => {
     const sim = createMockSimulator(airport);

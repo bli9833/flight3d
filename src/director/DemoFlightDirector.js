@@ -1,3 +1,4 @@
+import { t, bindText } from '../i18n/index.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { LuklaCircuitScenario } from './scenarios/LuklaCircuitScenario.js';
 import { CoastalDemoScenario } from './scenarios/CoastalDemoScenario.js';
@@ -91,7 +92,7 @@ export class DemoFlightDirector {
 
     if (this.skipBtn) {
       this.skipBtn.addEventListener('click', () => {
-        this.stop('직접 조종 모드로 전환되었습니다.');
+        this.stop(() => t('manual.control.engaged'));
       });
     }
 
@@ -121,8 +122,9 @@ export class DemoFlightDirector {
     // Keyboard shortcut for cancelling demo (ESC) or starting/restarting demo (P)
     if (typeof window !== 'undefined') {
       window.addEventListener('keydown', (e) => {
+        if (e.target?.closest?.('select')) return;
         if (e.key === 'Escape' && this.isActive) {
-          this.stop('직접 조종 모드로 전환되었습니다.');
+          this.stop(() => t('manual.control.engaged'));
         } else if ((e.key === 'p' || e.key === 'P') && !e.target?.matches?.('input, textarea')) {
           this.start();
         }
@@ -191,7 +193,7 @@ export class DemoFlightDirector {
     if (this.waitingForTerrain) {
       this.currentStage = DemoFlightDirector.STAGES.IDLE;
       this.luklaScenario.result = { status: 'pending', airborne: false };
-      this.updateBanner('루클라 지형 로딩 중', '지형 데이터를 불러오면 데모 비행이 자동으로 시작됩니다. [Esc: 취소]');
+      this.updateBanner(() => t('loading.lukla.terrain'), () => t('the.demo.will.start.when.terrain.data'));
       this.sim.controls?.setParkingBrake?.(true);
       this.sim.gear?.setBrakes(1);
       return;
@@ -212,8 +214,8 @@ export class DemoFlightDirector {
     }
 
     if (this.sim.showToast) {
-      const airportName = this.activeDemoAirport === 'lukla' ? '루클라 (VNLK)' : '국제공항 (09L)';
-      this.sim.showToast(`🎬 ${airportName} 자율 시네마틱 데모 비행 시작`);
+      const airportKey = this.activeDemoAirport === 'lukla' ? 'airport.lukla.name' : 'coastal.airport.09l';
+      this.sim.showToast(() => t('starting.value.cinematic.demo.flight', { value: t(airportKey) }));
     }
   }
 
@@ -317,7 +319,7 @@ export class DemoFlightDirector {
     if (this.waitingForTerrain) {
       if (this.sim.currentTerrain?.loadError) {
         this.luklaScenario.recordFailure({ description: this.sim.currentTerrain.loadError });
-        this.stop('루클라 지형을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.');
+        this.stop(() => t('could.not.load.lukla.terrain.refresh.and'));
         return;
       }
       if (this.sim.currentTerrain?.isLoaded === true) this.start(this.activeDemoAirport);
@@ -332,13 +334,13 @@ export class DemoFlightDirector {
   }
 
   updateBanner(title, desc) {
-    if (this.titleEl) this.titleEl.textContent = title;
-    if (this.descEl) this.descEl.textContent = desc;
+    if (this.titleEl) bindText(this.titleEl, () => typeof title === 'function' ? title() : title);
+    if (this.descEl) bindText(this.descEl, () => typeof desc === 'function' ? desc() : desc);
     if (this.pillTextEl) {
-      const match = title.match(/\[(\d+\/\d+)\]/);
-      this.pillTextEl.textContent = match
-        ? `🎬 AUTO DEMO [${match[1]}] [안내 열기 ▾]`
-        : `🎬 AUTO DEMO [안내 열기 ▾]`;
+      const match = (typeof title === 'function' ? title() : title).match(/\[(\d+\/\d+)\]/);
+      bindText(this.pillTextEl, () => match
+        ? t('auto.demo.value.open.guide', { value: match[1] })
+        : t('auto.demo.open.guide'));
     }
   }
 }

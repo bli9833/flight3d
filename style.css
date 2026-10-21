@@ -1689,3 +1689,15 @@ body.compact-ui {
 /* Prevent transient wide controls/canvas from enlarging the mobile layout viewport. */
 #canvas-container, #hud-overlay, .touch-controls-overlay { overflow: hidden; }
 #canvas-container canvas { max-width: 100%; max-height: 100%; }
+
+/* Language lives with flight settings, including the compact mobile menu. */
+.language-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e2e8f0;
+  font: 12px system-ui, sans-serif;
+  pointer-events: auto;
+}
+.language-control select { cursor: pointer; min-width: 110px; }
+.language-control option { background: #142030; color: #fff; }
