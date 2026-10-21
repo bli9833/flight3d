@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs } from './Pavement.js';
+import { loadAirportKit, createAirportBuildings } from './AirportBuildings.js';
 
 /**
  * International Airport Environment (Runway 09L/27R, Control Tower, Terminal, Hangars, Lighting)
@@ -45,6 +46,45 @@ export class Airport {
     ];
 
     this.initAirport();
+    this.buildingsReady = this.loadBuildings();
+  }
+
+  async loadBuildings(loadKit = loadAirportKit) {
+    try {
+      const kit = await loadKit();
+      // Subclasses such as Incheon own their terminal/boarding geometry.
+      const replaceTerminal = Boolean(this.terminalGroup);
+      const buildings = createAirportBuildings(kit, this, { terminal: replaceTerminal });
+      const oldTower = this.towerGroup;
+      const oldBeacons = new Set();
+      oldTower.traverse(node => { if (node.isPointLight) oldBeacons.add(node); });
+      const removed = [oldTower, ...(replaceTerminal ? [this.terminalGroup] : [])];
+      const geometries = new Set(), materials = new Set();
+      for (const object of removed) {
+        object.removeFromParent();
+        object.traverse(node => {
+          if (node.isMesh) {
+            geometries.add(node.geometry);
+            for (const material of [node.material].flat()) materials.add(material);
+          }
+        });
+      }
+      geometries.forEach(geometry => geometry.dispose());
+      materials.forEach(material => material.dispose());
+      this.beaconLights = this.beaconLights.filter(light => !oldBeacons.has(light));
+      this.beaconLights.push(buildings.beacon);
+      this.towerGroup = buildings.tower;
+      this.radarDish = buildings.radar;
+      this.terminalGroup = null;
+      this.buildings = buildings;
+      this.group.add(buildings.group);
+      return true;
+    } catch (error) {
+      // Keep the complete synchronous airport when offline or when the kit is invalid.
+      this.buildingsError = error;
+      console.warn('Airport building kit unavailable; keeping procedural buildings.', error);
+      return false;
+    }
   }
 
   initAirport() {
@@ -471,6 +511,7 @@ export class Airport {
 
   buildTerminal(concreteMat) {
     const termGroup = new THREE.Group();
+    this.terminalGroup = termGroup;
     termGroup.position.set(-80, this.elevation, 340);
 
     // Main Terminal Concourse (Length 350m, Depth 70m, Height 18m)
@@ -505,11 +546,11 @@ export class Airport {
     const hangarMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5, metalness: 0.6 });
 
     const hangar1 = new THREE.Mesh(hangarGeo, hangarMat);
-    hangar1.position.set(-450, 0, 310);
+    hangar1.position.set(-370, 0, -30);
     hangar1.castShadow = true;
     hangar1.receiveShadow = true;
     const hangar2 = new THREE.Mesh(hangarGeo, hangarMat);
-    hangar2.position.set(-580, 0, 310);
+    hangar2.position.set(-500, 0, -30);
     hangar2.castShadow = true;
     hangar2.receiveShadow = true;
 
