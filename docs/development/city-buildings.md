@@ -1,0 +1,75 @@
+# City buildings (issue #11)
+
+## Assets and placement
+
+The selected building kit is original to Flight3d: three modular silhouettes
+(stepped office tower, residential block and commercial block) and a 2 x 2
+facade/window/rooftop atlas generated at runtime by
+[`CityBuildingAssets.js`](../../src/environment/CityBuildingAssets.js). Source URL:
+https://github.com/yt7good/flight3d/blob/codex/issue-11-city-buildings/src/environment/CityBuildingAssets.js.
+Creator: Flight3d contributors, 2026. License: [MIT for these original
+assets](../../src/environment/CITY_ASSETS_LICENSE.txt). The source and generated
+art can be included in this repository and distributed by the web build. Fab,
+ambientCG and Poly Haven were considered in the issue, but no third-party item
+was purchased or downloaded. The earlier single plain box is replaced by three
+procedural geometries; no external texture request is made.
+
+Buildings retain the three existing city clusters and original size formula.
+Their positions and colors are generated with the same random sequence; the
+review's fixed seed places 539 baseline and 537 current buildings. The two
+removed footprints crossed the runway exclusion boundary even though their
+centers did not. The remaining 537 centers match the baseline exactly.
+
+Each archetype uses one near and one far `InstancedMesh`. Near meshes use the
+atlas for facade, window and rooftop panels; distant meshes are plain boxes.
+LOD selects near instances within 1800 m of the camera and updates when the
+camera moves at least 80 m. A shared emissive mask lights a bounded subset of
+windows; intensity reaches zero at midday and at most 0.75 at night. The demo
+director and manual time controls both update it. No bloom or point lights are
+created for individual windows.
+
+`buildingData` records the rotated world AABB width/depth, base elevation and
+full height. The near and far meshes stay inside the same envelope; the
+collision grid and aircraft probe checks use that AABB. Unit tests cover the
+actual geometry bounds, airport exclusion, LOD totals and a rotated footprint.
+
+## Reproduce visual and performance evidence
+
+From the repository root, start `npm run dev -- --host 127.0.0.1` and run:
+
+```sh
+node scripts/verify-city-buildings.mjs
+node --test tests/cityBuildings.test.js tests/collision.test.js
+```
+
+The browser script compares commit `28559fc` with the current code at the same
+1440 x 900 resolution, seeded building positions, camera poses and noon/23:00
+lighting. Only the baseline's random calls are routed through an injected seed;
+its geometry and materials are unchanged. The isolated scene uses flat ground
+and excludes trees from rendering so city cost is measurable. It asserts that
+all current centers existed in the baseline. Eight screenshots and raw metrics
+are in [review-artifacts/city-buildings](../../review-artifacts/city-buildings/).
+
+Host: Intel N95, headless Chrome 154, ANGLE Vulkan SwiftShader. Draw calls
+include the ground plane. Frame samples are wall times for isolated rendering
+plus `gl.finish`, after five warmups, with 20 samples per pose. They are not
+full-flight frame rates or GPU timer-query measurements.
+
+| View | Buildings | Calls before → after | Triangles before → after | Median ms before → after |
+| --- | ---: | ---: | ---: | ---: |
+| East near, noon | 539 → 537 | 2 → 7 | 6,470 → 8,414 | 0.3 → 0.3 |
+| East skyline, noon | 539 → 537 | 2 → 4 | 6,470 → 6,446 | 0.2 → 0.4 |
+| North near, noon | 539 → 537 | 2 → 7 | 6,470 → 8,174 | 0.2 → 0.2 |
+| East near, 23:00 | 539 → 537 | 2 → 7 | 6,470 → 8,414 | 0.2 → 0.2 |
+
+Texture storage rises from zero to an estimated 699,051 bytes for two 256 x
+256 RGBA8 atlases including mipmaps. This is a CPU-side format estimate, not
+measured VRAM. The atlases have **zero separate network transfer bytes** because
+they are generated from code. The production JavaScript bundle at the same
+lockfile grows from 1,124,392 to 1,130,976 bytes, or from 295,877 to 297,823
+bytes with gzip. These are local build sizes, not live CDN transfer statistics.
+The browser results include the individual median and p95 samples for all poses.
+
+The existing browser crash suite reached and passed its city skyscraper impact
+scenario with the new buildings. The suite's subsequent quick-restart check
+stalled in headless Chrome and was stopped; no full-suite pass is claimed.

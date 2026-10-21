@@ -295,6 +295,7 @@ export class DemoFlightDirector {
   setTimeOfDay(hours) {
     if (!this.userTimeOfDayOverridden) {
       this.sim.sky.setTimeOfDay(hours);
+      this.sim.foliage?.setTimeOfDay(hours);
     }
   }
 
