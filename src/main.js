@@ -997,6 +997,7 @@ class FlightSimulator {
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
     this.foliage.updateCityLod(this.camera.position);
+    this.foliage.update(this.camera.position);
     this.sky.updateSun(this.position, this.camera.position);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
@@ -1098,6 +1099,8 @@ class FlightSimulator {
     this.updateHUD();
     this.touchControls.updateUI(this.telemetry);
     this.diagnostics.update(frameDelta, this.telemetry);
+
+    this.foliage.update(this.camera.position);
 
     // 8. Render 3D Scene
     this.sky.prepareRender(this.camera);
