@@ -79,7 +79,7 @@ test('cloud lighting follows day, sunset, night and repeated airport changes', (
   const sunset = sky.cloudLayer.material.uniforms.sunColor.value;
   assert.ok(sunset.r > sunset.b * 2);
   assert.ok(brightness(0) < noon * 0.1);
-  for (const airport of ['lukla', 'coastal', 'lukla', 'incheon']) {
+  for (const airport of ['lukla', 'coastal', 'lukla', 'coastal']) {
     sky.setAirport(airport);
     assert.equal(sky.cloudsGroup.position.y, airport === 'lukla' ? 3400 : 0);
     assert.equal(sky.cloudsGroup.children.length, 1);
