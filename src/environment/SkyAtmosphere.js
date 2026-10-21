@@ -4,9 +4,9 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { CloudLayer } from './CloudLayer.js';
 
 /**
- * Atmospheric Sky, Sun, Dynamic Lighting & Atlas Clouds
+ * Atmospheric Sky, Sun, Dynamic Lighting & Cumulus Clouds
  * Features realistic Rayleigh & Mie scattering Sky shader, time-of-day presets (Dawn, Noon, Sunset, Night),
- * and instanced cumulus cloud cards at 2,800–3,600m altitude.
+ * and instanced cumulus density volumes at 2,800–3,600m altitude.
  */
 export class SkyAtmosphere {
   constructor(scene, renderer = null, water = null) {
