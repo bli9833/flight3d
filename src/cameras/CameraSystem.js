@@ -13,13 +13,16 @@ export class CameraSystem {
     TOWER: 3,
     FLYBY: 4,
     GEAR: 5,
-    DRONE: 6
+    DRONE: 6,
+    AUTO: 7
   };
 
   constructor(camera, domElement) {
     this.camera = camera;
     this.domElement = domElement;
     this.mode = CameraSystem.MODES.COCKPIT;
+    this.autoSwitch = false;
+    this.autoSwitchTimer = 0;
 
     // Temporary Cinematic View Cut State (e.g. brief gear cam preview during takeoff, landing, gear transit)
     this.temporaryViewTimer = 0;
@@ -635,16 +638,8 @@ export class CameraSystem {
   }
 
   cycleMode() {
-    this.cancelTemporaryView();
-    this.mode = (this.mode + 1) % 7;
-    this.resetLook();
-    if (this.mode === CameraSystem.MODES.FLYBY) {
-      this.flybySet = false;
-      this.flybyRegime = null;
-    }
-    if (this.mode === CameraSystem.MODES.DRONE) {
-      this.droneInitialized = false;
-    }
+    const selected = this.autoSwitch ? CameraSystem.MODES.AUTO : (this.savedMode ?? this.mode);
+    this.setMode((selected + 1) % 8);
     if (this.onCycleMode) {
       this.onCycleMode(this.mode);
     }
@@ -653,7 +648,9 @@ export class CameraSystem {
 
   setMode(m) {
     this.cancelTemporaryView();
-    this.mode = m;
+    this.autoSwitch = m === CameraSystem.MODES.AUTO;
+    this.autoSwitchTimer = 0;
+    this.mode = this.autoSwitch ? CameraSystem.MODES.CHASE : m;
     this.resetLook();
     if (this.camera) {
       this.camera.near = (this.mode === CameraSystem.MODES.COCKPIT) ? 0.08 : 0.25;
@@ -684,6 +681,11 @@ export class CameraSystem {
   }
 
   getModeName() {
+    const name = this.getViewName();
+    return this.autoSwitch ? `AUTO · ${name}` : name;
+  }
+
+  getViewName() {
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: return 'COCKPIT (CAPTAIN)';
       case CameraSystem.MODES.CHASE: return 'CHASE (EXTERIOR)';
@@ -699,6 +701,13 @@ export class CameraSystem {
   update(dt, aircraftMesh, flightState = {}, getTerrainHeight = null) {
     if (getTerrainHeight) {
       this.setTerrain(getTerrainHeight);
+    }
+    if (this.autoSwitch && this.temporaryViewTimer <= 0) {
+      this.autoSwitchTimer += Math.max(0, dt);
+      if (this.autoSwitchTimer >= 10) {
+        this.setMode((this.mode + 1) % 7);
+        this.autoSwitch = true;
+      }
     }
     // 1. Process temporary cinematic view timer (auto-cut during takeoff, landing, gear transit)
     if (this.temporaryViewTimer > 0) {

@@ -46,6 +46,7 @@ export class FlightControls {
     this.onCycleFlaps = null;
     this.onToggleReverser = null;
     this.onCycleCamera = null;
+    this.onSelectCamera = null;
     this.onToggleLights = null;
     this.onCycleTimeOfDay = null;
     this.onToggleAudio = null;
@@ -76,6 +77,15 @@ export class FlightControls {
   }
 
   handleKeyDown(e) {
+    const cameraDigit = /^(?:Digit|Numpad)([1-8])$/.exec(e.code);
+    if (cameraDigit || e.code === 'KeyC') {
+      if (e.repeat || e.ctrlKey || e.altKey || e.metaKey ||
+          e.target?.isContentEditable || e.target?.closest?.('input, textarea, select')) return;
+      if (cameraDigit) {
+        if (this.onSelectCamera) this.onSelectCamera(Number(cameraDigit[1]) - 1);
+      } else if (this.onCycleCamera) this.onCycleCamera();
+      return;
+    }
     this.keys[e.code] = true;
 
     // One-shot actions
@@ -94,9 +104,6 @@ export class FlightControls {
         break;
       case 'KeyR':
         if (this.onToggleReverser) this.onToggleReverser();
-        break;
-      case 'KeyC':
-        if (this.onCycleCamera) this.onCycleCamera();
         break;
       case 'KeyL':
         if (this.onToggleLights) this.onToggleLights();

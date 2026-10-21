@@ -1,0 +1,51 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { CameraSystem } from '../src/cameras/CameraSystem.js';
+import { FlightControls } from '../src/controls/FlightControls.js';
+
+test('auto cycles real views, pauses for temporary cuts, and stops on manual selection', () => {
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  const aircraft = new THREE.Object3D();
+  aircraft.position.y = 100;
+  aircraft.updateMatrixWorld();
+  system.setMode(CameraSystem.MODES.AUTO);
+  assert.match(system.getModeName(), /^AUTO/);
+  system.update(9, aircraft);
+  assert.equal(system.mode, CameraSystem.MODES.CHASE);
+  system.showTemporaryView(CameraSystem.MODES.GEAR, 3);
+  system.update(3, aircraft);
+  assert.equal(system.mode, CameraSystem.MODES.CHASE);
+  system.update(1, aircraft);
+  assert.equal(system.mode, CameraSystem.MODES.WING);
+  system.setMode(CameraSystem.MODES.FLYBY);
+  system.update(20, aircraft);
+  assert.equal(system.mode, CameraSystem.MODES.FLYBY);
+  assert.equal(system.autoSwitch, false);
+  system.setMode(CameraSystem.MODES.DRONE);
+  system.cycleMode();
+  assert.equal(system.autoSwitch, true);
+  system.cycleMode();
+  assert.equal(system.mode, CameraSystem.MODES.COCKPIT);
+  assert.equal(system.autoSwitch, false);
+});
+
+test('camera shortcuts map digits and numpad, ignoring repeats, modifiers and editing', () => {
+  const controls = Object.create(FlightControls.prototype);
+  const selected = [];
+  controls.onSelectCamera = mode => selected.push(mode);
+  controls.onCycleCamera = () => selected.push('cycle');
+  for (let digit = 1; digit <= 8; digit++) {
+    controls.handleKeyDown({ code: `Digit${digit}` });
+  }
+  controls.handleKeyDown({ code: 'Numpad8' });
+  controls.handleKeyDown({ code: 'KeyC' });
+  const expected = [0, 1, 2, 3, 4, 5, 6, 7, 7, 'cycle'];
+  assert.deepEqual(selected, expected);
+  for (const extra of [{ repeat: true }, { ctrlKey: true }, { altKey: true },
+    { metaKey: true }, { target: { isContentEditable: true } },
+    { target: { closest: () => ({}) } }]) {
+    controls.handleKeyDown({ code: 'Digit1', ...extra });
+  }
+  assert.deepEqual(selected, expected);
+});
