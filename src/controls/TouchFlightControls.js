@@ -191,6 +191,11 @@ export class TouchFlightControls {
     this.rudderThumb = el.querySelector('#touch-rudder-thumb');
     this.brakeBtn = el.querySelector('#touch-btn-brake');
     this.gyroBtn = el.querySelector('#touch-btn-gyro');
+    // Retain references when compact UI moves action groups into the menu.
+    this.gearBtn = el.querySelector('#touch-btn-gear');
+    this.spoilersBtn = el.querySelector('#touch-btn-spoilers');
+    this.reverserBtn = el.querySelector('#touch-btn-reverser');
+    this.soundBtn = el.querySelector('#touch-btn-sound');
     this.stickTelemetry = el.querySelector('#touch-stick-telemetry');
     this.rudderReadout = el.querySelector('#touch-rudder-val');
   }
@@ -559,7 +564,7 @@ export class TouchFlightControls {
     }
 
     // Sync Gear Button
-    const gearBtn = this.overlay.querySelector('#touch-btn-gear');
+    const gearBtn = this.gearBtn;
     if (gearBtn) {
       const isDown = telemetry.gearState > 0.5;
       gearBtn.className = isDown ? 'btn-touch-pill active' : 'btn-touch-pill';
@@ -567,14 +572,14 @@ export class TouchFlightControls {
     }
 
     // Sync Spoilers Button
-    const spBtn = this.overlay.querySelector('#touch-btn-spoilers');
+    const spBtn = this.spoilersBtn;
     if (spBtn) {
       const isExt = telemetry.spoilers > 0.1;
       spBtn.className = isExt ? 'btn-touch-pill active' : 'btn-touch-pill';
     }
 
     // Sync Reverser Button
-    const revBtn = this.overlay.querySelector('#touch-btn-reverser');
+    const revBtn = this.reverserBtn;
     if (revBtn) {
       const isRev = telemetry.engine1?.reverserActive;
       revBtn.className = isRev ? 'btn-touch-pill active-amber' : 'btn-touch-pill';
@@ -584,7 +589,7 @@ export class TouchFlightControls {
   /* ---------------- Audio UI State ---------------- */
   updateAudioUI(state) {
     if (!this.overlay || !state) return;
-    const soundBtn = this.overlay.querySelector('#touch-btn-sound');
+    const soundBtn = this.soundBtn;
     if (!soundBtn) return;
     if (state.muted) {
       soundBtn.className = 'btn-touch-pill muted';
