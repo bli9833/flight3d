@@ -1,5 +1,8 @@
 # Issue #66 material comparisons
 
+For the final ocean appearance, see the [wave-scale refinement](water-scale/README.md).
+The images below record the initial material pass.
+
 Baseline: `f46c426` (current main at implementation start). Captured with
 `scripts/verify-material-surfaces.mjs`, Chrome/ANGLE Vulkan, 1200×800,
 fixed time 12.5s and fixed cameras/lighting. Each `before-*.png` pairs with the

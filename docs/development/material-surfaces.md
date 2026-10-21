@@ -3,8 +3,10 @@
 The 36km ocean mesh has a 200m vertex spacing. Rendering 12–48m waves at those
 vertices aliases their shape and interpolated normals into broad glossy patches.
 The ocean now displaces only 900m/1600m swell. Shorter waves contribute analytic
-fragment normals, with pixel-footprint filtering for the distant surface and
-cross-wave phase modulation to break parallel bands. Ship buoyancy samples the
+fragment normals: 16cm–1.1m wind ripples over gentle 2.4m/5.6m waves. The shader
+measures phase derivatives per pixel, including perspective and phase modulation.
+Waves blend out between approximately 12 and 3 pixels per cycle; unresolved slope
+variance contributes to reflection roughness instead of visible distant patterns. Ship buoyancy samples the
 same broad swell. Water uses dielectric Fresnel (F0 0.02), one roughness-aware sun
 lobe, and the renderer's tone mapping and output colour conversion. The sun lobe
 fades below the horizon. Reflections remain an approximate sky gradient, rather
@@ -30,9 +32,12 @@ node scripts/verify-material-surfaces.mjs
 
 Override `SIM_URL`, `CDP_URL`, or `ARTIFACT_DIR` when ports/paths are occupied.
 The check replaces the page with controlled 1200×800 scenes using production
-materials: ocean at 35m and 1000m, terrain in both quality modes, sunset, and night.
+materials: ocean at 3m, 35m, 250m and 1000m with the same downward viewing angle,
+terrain in both quality modes, sunset, and night.
 It records shader diagnostics and browser errors, and saves PNGs for inspection.
-It fails on browser errors or nonrunnable shader programs. This is bounded material
+It fails on browser errors or nonrunnable shader programs. A GPU diagnostic pass
+samples the production normal calculation and requires visible horizontal normal
+energy at 1000m to be below 20% of the 3m view, while retaining close-up detail. This is bounded material
 acceptance, not a full flight, shoreline, mobile device, or frame-rate benchmark.
 The rough sky background makes the horizon boundary visible in these test scenes.
 
@@ -44,3 +49,5 @@ BASELINE_PREFIX=/.cache/material-baseline node scripts/verify-material-surfaces.
 ```
 
 See [recorded comparisons](../../review-artifacts/material-surfaces/README.md).
+
+[Perspective refinement comparisons](../../review-artifacts/material-surfaces/water-scale/README.md) supersede the original ocean captures.

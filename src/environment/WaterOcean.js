@@ -95,32 +95,46 @@ export class WaterOcean {
         varying vec3 vWorldPos;
         varying vec2 vLocalPos;
 
-        // Analytic wave slopes, filtered by pixel footprint to avoid distant shimmer.
-        vec2 waveSlope(vec2 direction, float steepness, float wavelength, float speed, float footprint) {
+        // Integrate unresolved wave slopes into roughness instead of displaying
+        // metre-scale rings from altitude. Derivatives include perspective,
+        // viewing direction, resolution and the phase modulation itself.
+        vec3 waveSlope(vec2 direction, float steepness, float wavelength, float speed) {
           vec2 dir = normalize(direction);
+          vec2 crossDir = vec2(-dir.y, dir.x);
           float k = 6.2831853 / wavelength;
           vec2 p = vWorldPos.xz;
-          // Cross-wave phase modulation breaks up long parallel sine bands.
-          float modulation = wavelength < 100.0 ?
-            2.2 * sin(dot(p, vec2(-dir.y, dir.x)) * k * 0.43 + uTime * 0.13)
-            + 1.4 * sin(dot(p, vec2(0.37, 0.93)) * k * 0.71 - uTime * 0.09) : 0.0;
-          float phase = k * (dot(dir, p) - sqrt(9.8 / k) * speed * uTime) + modulation;
-          float resolved = 1.0 - smoothstep(wavelength * 0.12, wavelength * 0.5, footprint);
-          return dir * steepness * cos(phase) * resolved;
+          float crossPhase = dot(p, crossDir) * k * 0.43 + uTime * 0.13;
+          float obliquePhase = dot(p, vec2(0.37, 0.93)) * k * 0.71 - uTime * 0.09;
+          float modulated = wavelength < 10.0 ? 1.0 : 0.0;
+          float phase = k * (dot(dir, p) - sqrt(9.8 / k) * speed * uTime)
+                      + modulated * (0.6 * sin(crossPhase) + 0.4 * sin(obliquePhase));
+          vec2 gradient = dir + modulated * (
+            0.258 * cos(crossPhase) * crossDir
+            + 0.284 * cos(obliquePhase) * vec2(0.37, 0.93));
+          float phasePerPixel = length(vec2(dFdx(phase), dFdy(phase)));
+          // Fully resolve at >=12 pixels/cycle, blend into the BRDF by 3 pixels/cycle.
+          float resolved = 1.0 - smoothstep(0.52, 2.09, phasePerPixel);
+          vec2 slope = gradient * steepness * cos(phase) * resolved;
+          float variance = 0.5 * steepness * steepness * dot(gradient, gradient)
+                         * (1.0 - resolved * resolved);
+          return vec3(slope, variance);
         }
 
         void main() {
           #include <logdepthbuf_fragment>
 
           vec3 viewDir = normalize(cameraPosition - vWorldPos);
-          float footprint = max(length(dFdx(vWorldPos.xz)), length(dFdy(vWorldPos.xz)));
-          vec2 slope = waveSlope(vec2(1.0, 0.4), 0.0024, 1600.0, 1.0, footprint)
-                     + waveSlope(vec2(-0.6, 0.8), 0.0024, 900.0, 1.2, footprint)
-                     + waveSlope(vec2(1.0, 0.4), 0.18, 48.0, 1.0, footprint)
-                     + waveSlope(vec2(-0.6, 0.8), 0.14, 26.0, 1.2, footprint)
-                     + waveSlope(vec2(0.2, -1.0), 0.10, 12.0, 1.5, footprint)
-                     + waveSlope(vec2(0.8, 0.6), 0.06, 3.5, 0.8, footprint);
-          vec3 normal = normalize(vec3(-slope.x, 1.0, -slope.y));
+          // Fine wind ripples (16cm–1.1m) sit over gentle metre-scale waves.
+          // Physical wavelengths stay in world metres; never scale UVs by camera distance.
+          vec3 waves = waveSlope(vec2(1.0, 0.4), 0.0024, 1600.0, 1.0)
+                     + waveSlope(vec2(-0.6, 0.8), 0.0024, 900.0, 1.2)
+                     + waveSlope(vec2(1.0, 0.4), 0.008, 5.6, 1.0)
+                     + waveSlope(vec2(-0.6, 0.8), 0.014, 2.4, 1.1)
+                     + waveSlope(vec2(0.2, -1.0), 0.025, 1.1, 1.0)
+                     + waveSlope(vec2(0.8, 0.6), 0.032, 0.57, 0.9)
+                     + waveSlope(vec2(-0.9, 0.3), 0.040, 0.31, 0.8)
+                     + waveSlope(vec2(0.5, -0.9), 0.045, 0.16, 0.7);
+          vec3 normal = normalize(vec3(-waves.x, 1.0, -waves.y));
 
           // Water is a dielectric (F0 ~ 0.02), with stronger sky reflection at grazing angles.
           float cosTheta = clamp(dot(viewDir, normal), 0.0, 1.0);
@@ -130,7 +144,7 @@ export class WaterOcean {
           float nDotH = max(0.0, dot(normal, halfVector));
           float daylight = smoothstep(-0.04, 0.15, lightDir.y);
           // Unresolved ripples broaden the sun reflection instead of sparkling at subpixel scale.
-          float roughness = mix(0.16, 0.28, smoothstep(1.0, 20.0, footprint));
+          float roughness = pow(pow(0.18, 4.0) + waves.z, 0.25);
           float alpha2 = pow(roughness, 4.0);
           float denominator = nDotH * nDotH * (alpha2 - 1.0) + 1.0;
           float distribution = alpha2 / max(0.00001, PI * denominator * denominator);

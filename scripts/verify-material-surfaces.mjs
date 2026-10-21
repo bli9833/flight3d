@@ -3,7 +3,7 @@ import path from "node:path";
 import assert from "node:assert/strict";
 const dir = process.env.ARTIFACT_DIR || path.resolve(".cache/material-review");
 fs.mkdirSync(dir, { recursive: true });
-// Start Vite on 5173 and headless Chromium with CDP on 9466 first; see ci.md.
+// Start Vite on 5186 and Chrome with CDP on 9466; see material-surfaces.md.
 const cdp = process.env.CDP_URL || 'http://127.0.0.1:9466';
 const site = process.env.SIM_URL || 'http://127.0.0.1:5186/';
 const pages = await (await fetch(cdp + '/json')).json();
@@ -62,7 +62,7 @@ await evaluate(`(async()=>{
 })()`);
 const results=[];
 for(const version of (process.env.BASELINE_PREFIX ? ['before','after'] : ['after'])) {
- for(const sceneName of ['ocean-low','ocean-high','terrain-high','terrain-low','sunset','night']) {
+ for(const sceneName of ['ocean-close','ocean-low','ocean-mid','ocean-high','terrain-high','terrain-low','sunset','night']) {
  const result=await evaluate(`(async()=>{
  const {THREE,renderer,camera}=window.review;
  const prefix='${version}'==='before'? ${JSON.stringify(process.env.BASELINE_PREFIX || '/src/environment')}:'/src/environment';
@@ -75,10 +75,32 @@ for(const version of (process.env.BASELINE_PREFIX ? ['before','after'] : ['after
  const ocean=new WaterOcean();ocean.update(12.5);ocean.setSunDirection(sun.position);ocean.material.uniforms.uFogColor.value.copy(fog);scene.add(ocean.mesh);
  let terrain;
  if('${sceneName}'.startsWith('terrain')){terrain=new Terrain(20000,256,{quality:'${sceneName}'==='terrain-low'?'low':'high'});scene.add(terrain.mesh);camera.position.set(2800,450,1600);camera.lookAt(0,50,-1500);}
- else {camera.position.set(0,'${sceneName}'==='ocean-high'?1000:35,6000);camera.lookAt(0,0,2000);}
+ else {
+   const height=({'ocean-close':3,'ocean-mid':250,'ocean-high':1000})['${sceneName}'] || 35;
+   camera.position.set(0,height,6000);camera.lookAt(0,0,6000-height*4);
+ }
  renderer.compile(scene,camera);
  for(let i=0;i<10;i++)renderer.render(scene,camera);
  const result={version:'${version}',scene:'${sceneName}',calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,programs:renderer.info.programs.map(p=>({runnable:p.diagnostics?.runnable??true}))};
+ if ('${sceneName}'.startsWith('ocean')) {
+   // Exercise the production normal calculation on the GPU, independent of sun/glare.
+   const original=ocean.mesh.material;
+   const diagnostic=original.clone();
+   diagnostic.fragmentShader=diagnostic.fragmentShader
+     .replace('gl_FragColor = vec4(finalColor, 1.0);',
+       'gl_FragColor = vec4(normal.x * 0.5 + 0.5, normal.z * 0.5 + 0.5, 0.0, 1.0);')
+     .replace('#include <tonemapping_fragment>','')
+     .replace('#include <colorspace_fragment>','');
+   const target=new THREE.WebGLRenderTarget(1200,800);
+   ocean.mesh.material=diagnostic;renderer.setRenderTarget(target);renderer.render(scene,camera);
+   const pixels=new Uint8Array(128*128*4);
+   renderer.readRenderTargetPixels(target,536,136,128,128,pixels);
+   let energy=0;
+   for(let i=0;i<pixels.length;i+=4){const x=pixels[i]/255*2-1,z=pixels[i+1]/255*2-1;energy+=x*x+z*z;}
+   result.horizontalNormalEnergy=energy/(128*128);
+   ocean.mesh.material=original;renderer.setRenderTarget(null);diagnostic.dispose();target.dispose();
+   renderer.render(scene,camera);
+ }
  window.review.current={scene,ocean,terrain};return result;
 })()`);
  results.push(result);
@@ -91,3 +113,10 @@ fs.writeFileSync(path.join(dir,'results.json'),JSON.stringify({results,errors},n
 console.log(JSON.stringify({results,errors},null,2));ws.close();
 assert.equal(errors.length,0,'Browser errors');
 assert.ok(results.every(r=>r.programs.length && r.programs.every(p=>p.runnable)), 'All shaders must compile');
+
+const near=results.find(r=>r.version==='after' && r.scene==='ocean-close');
+const far=results.find(r=>r.version==='after' && r.scene==='ocean-high');
+assert.ok(Number.isFinite(near?.horizontalNormalEnergy) && near.horizontalNormalEnergy > 0,
+  'Near-water GPU normal samples must contain wave detail');
+assert.ok(Number.isFinite(far?.horizontalNormalEnergy) && far.horizontalNormalEnergy < near.horizontalNormalEnergy * 0.2,
+  'At 1000m, visible normal energy must be below 20% of the 3m view');
