@@ -4,6 +4,29 @@ The default cockpit must request `b737-cockpit-medium.glb`. Call
 `loadCockpitModel()` without a URL at initialization; explicitly passing the lite
 URL bypasses the medium default. The lite Draco asset remains the load fallback.
 
+## Preserve the enclosure
+
+Keep every native shell mesh visible, including `Body018`. Its geometry closes
+parts of the cockpit even though it was previously classified as exterior nose
+skin. Frame, lining, and console surfaces include single-layer triangles and
+must render with `DoubleSide`; `FrontSide` makes interior-facing surfaces vanish
+at the windshield sill, side walls, and rear/roof enclosure. Preserve material
+transparency so actual window openings remain clear. The medium and lite GLBs
+remain unchanged by this rendering repair.
+
+Run the browser regression against a local Vite server:
+
+```sh
+PORT=5198 ARTIFACT_DIR=/tmp/cockpit-enclosure-evidence node scripts/verify-window-framing.js
+```
+
+It checks native shell visibility and inward rendering, raycasts the solid wall
+below the left window, and captures front, side, rear, roof, and floor views.
+The pre-repair loader fails the shell assertions. The repaired medium model
+intercepts the sidewall ray at approximately 0.268 m. Blocking the medium request
+also verified the lite fallback enclosure in Chrome, including a sidewall
+intersection at approximately 0.268 m.
+
 The GLBs share asset coordinates: forward +Z, panel LCDs at approximately
 Z=1.458, and captain yoke at X=0.302. The model root rotates by PI around Y and
 translates by (0, -1.31, -11.43) into aircraft coordinates. Display apertures are

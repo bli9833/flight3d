@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Atmosphere } from './physics/Atmosphere.js';
+import { BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics } from './physics/Aerodynamics.js';
 import { EngineModel } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
@@ -155,6 +156,7 @@ class FlightSimulator {
     this.lastGearTarget = true;
     this.airborneTime = 0.0;
     this.hasTouchedDownThisFlight = false;
+    this.gear.resetContacts();
 
     // 8. Rigid Body Physics State
     // Linear state
@@ -285,8 +287,12 @@ class FlightSimulator {
   }
 
   setPreset(type, isDemoInternal = false) {
+    if (!isDemoInternal) this.aero.loadConfig(BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
+    }
+    if (!isDemoInternal && this.cameraSystem) {
+      this.cameraSystem.userLookOverridden = false;
     }
 
     if (this.tireSmokeSystem) {
@@ -296,6 +302,10 @@ class FlightSimulator {
     this.lastGearTarget = (type !== 'cruise');
     this.airborneTime = (type === 'runway') ? 0.0 : 15.0;
     this.hasTouchedDownThisFlight = false;
+    this.gear.resetContacts();
+    this.landingIncident = false;
+    this.landingStopped = false;
+    this.bodyContactStarted = false;
 
     if (this.isCrashed) {
       this.isCrashed = false;
@@ -312,8 +322,8 @@ class FlightSimulator {
 
       if (type === 'runway') {
         // Aligned on Lukla Runway 06 Threshold (Elevation 2,805m, Heading 058°, 11.7% uphill slope)
-        // At s = -210m: x = s*sin58, z = -s*cos58, groundH = 2811.3m (+2.15m gear = 2813.45m)
-        this.position.set(-210.0 * sin58, 2813.45, 210.0 * cos58);
+        // Spawn above the current wheel geometry, allowing suspension settling.
+        this.position.set(-210.0 * sin58, 2814.8, 210.0 * cos58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
 
@@ -366,8 +376,9 @@ class FlightSimulator {
         this.showToast('Preset: 루클라 협곡 착륙 챌린지 (고도 10,070 FT, Rwy 06)');
       } else if (type === 'cliff') {
         // Lukla Runway 24 Downhill Cliff Dive Takeoff!
-        // Starts at upper threshold 24 (s = +210m, groundH = 2860.7m + 2.15m gear = 2862.85m)
-        this.position.set(210.0 * sin58, 2862.85, -210.0 * cos58);
+        // Start near the upper threshold with wheel clearance; a 5m lateral
+        // offset keeps the wide wing clear of the raised apron.
+        this.position.set(240.0 * sin58 - 5 * cos58, 2867.72, -240.0 * cos58 - 5 * sin58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
         // Pitch nose down -6.71° along 11.7% downhill slope, Heading 238° (yaw -238°)
@@ -411,7 +422,7 @@ class FlightSimulator {
       // Coastal International Airport Presets
       if (type === 'runway') {
         // Aligned on Runway 09L Threshold (Heading 090° East)
-        this.position.set(-1350, 14.15, 0);
+        this.position.set(-1350, 15.5, 0);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
         this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.5); // Face East (+X)
@@ -502,7 +513,7 @@ class FlightSimulator {
       if (isLukla) {
         this.collisionDetector.setEnvironment(this.luklaTerrain, this.luklaAirport, null, null, null);
       } else {
-        this.collisionDetector.setEnvironment(this.terrain, this.airport, this.foliage, this.ships, this.water);
+        this.collisionDetector.setEnvironment(this.terrain, this.currentAirport, this.foliage, this.ships, this.water);
       }
     }
 
@@ -556,7 +567,7 @@ class FlightSimulator {
       if (btnCliff) btnCliff.style.display = 'none';
     }
 
-    document.getElementById('btn-airport-coastal')?.classList.toggle('active', !isLukla);
+    document.getElementById('btn-airport-coastal')?.classList.toggle('active', id === 'coastal');
     document.getElementById('btn-airport-lukla')?.classList.toggle('active', isLukla);
 
     if (this.demoDirector && this.demoDirector.isActive) {
@@ -633,6 +644,23 @@ class FlightSimulator {
       (x, z) => (this.currentTerrain.getNormal ? this.currentTerrain.getNormal(x, z) : null)
     );
 
+    if (gearResult.damageEvents.length || (gearResult.bodyContacts.length && !this.bodyContactStarted)) {
+      this.landingIncident = true;
+      if (this.demoDirector?.isActive) this.demoDirector.stop();
+      const labels = { nose: '전륜', mainLeft: '좌측 주기어', mainRight: '우측 주기어' };
+      for (const event of gearResult.damageEvents) {
+        this.showToast(`${labels[event.id]} ${event.state === 'collapsed' ? '붕괴' : '손상'} — 지지·조향 성능 저하`);
+      }
+      if (gearResult.bodyContacts.length) {
+        this.bodyContactStarted = true;
+        this.showToast('기체 하부 접촉 — 활주 중');
+      }
+    }
+    if (this.landingIncident && gearResult.onGround && !this.landingStopped && groundSpeed < 0.5 && Math.abs(this.linearVelocity.y) < 0.2) {
+      this.landingStopped = true;
+      this.showToast('비상착륙 정지 — 프리셋을 선택하면 기체가 복구됩니다');
+    }
+
     // 5. Aerodynamic Forces & Moments
     const aeroResult = this.aero.computeAero(
       dt,
@@ -668,13 +696,6 @@ class FlightSimulator {
     }
 
     this.position.addScaledVector(this.linearVelocity, dt);
-
-    // Crash terrain penetration prevention (allow dynamic suspension stroke of up to 0.65m)
-    const minSafeY = groundHeight + (gearResult.gearState > 0.5 ? 2.80 : 1.80);
-    if (this.position.y < minSafeY) {
-      this.position.y = minSafeY;
-      if (this.linearVelocity.y < 0) this.linearVelocity.y = 0;
-    }
 
     // 9. Total Moments Integration: M = I * alpha
     // Moment in body frame: aero moment + landing gear moment
@@ -750,6 +771,9 @@ class FlightSimulator {
       gearState: gearResult.gearState,
       isTransit: gearResult.isTransit,
       compressions: gearResult.compressions,
+      gearDamage: gearResult.gearDamage,
+      bodyContacts: gearResult.bodyContacts.map(c => c.id),
+      structuralDamage: gearResult.structuralDamage,
       flapDegree: this.aero.currentFlapAngle,
       flapIndex: this.aero.flapsIndex,
       spoilers: this.aero.spoilers,
@@ -793,12 +817,13 @@ class FlightSimulator {
     }
 
     // 12. Cinematic Camera Cuts: Automatic temporary gear view for Takeoff, Touchdown, and Gear Retract/Extend
-    const allowAutoCut = !(this.demoDirector && this.demoDirector.isActive && this.demoDirector.userCameraOverridden);
-    if (allowAutoCut && this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
+    const allowAutoCut = !this.cameraSystem.userLookOverridden
+      && !(this.demoDirector && this.demoDirector.isActive && this.demoDirector.userCameraOverridden);
+    if (allowAutoCut && !this.landingIncident && this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
       // Takeoff liftoff
       this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
       this.showToast('🎥 랜딩 기어 뷰: 이륙 상승 (Takeoff Climb)');
-    } else if (allowAutoCut && genuineLandingTouchdown && this.totalSimTime > 2.0) {
+    } else if (allowAutoCut && !this.landingIncident && genuineLandingTouchdown && this.totalSimTime > 2.0) {
       // Touchdown landing (only on genuine landing touchdown)
       this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 5.0);
       this.showToast('🎥 랜딩 기어 뷰: 활주로 접지 & 서스펜션 완충 (Touchdown)');
@@ -829,7 +854,8 @@ class FlightSimulator {
         this.linearVelocity,
         gearResult.gearState,
         pitchDeg,
-        rollDeg
+        rollDeg,
+        gearResult
       );
 
       if (crash) {
@@ -855,10 +881,8 @@ class FlightSimulator {
     // 4. Catastrophic Camera Trauma Shake
     this.cameraSystem.addTrauma(1.0);
 
-    // 5. Halt Demo Flight if active
-    if (this.demoDirector && this.demoDirector.isActive) {
-      this.demoDirector.stop();
-    }
+    // Record the outcome before stop() makes scenario.update unreachable.
+    this.demoDirector?.stopForCrash(crashResult);
 
     // 6. Kill Engines and Damp Kinetic Energy
     this.engines.setThrottle(0.0);
@@ -1026,6 +1050,7 @@ class FlightSimulator {
     this.diagnostics.update(frameDelta, this.telemetry);
 
     // 8. Render 3D Scene
+    this.sky.prepareRender(this.camera);
     this.renderer.render(this.scene, this.camera);
 
     // 9. Render 2D Photorealistic Cockpit Overlay (when in photo cockpit mode)
@@ -1054,8 +1079,11 @@ class FlightSimulator {
     if (elN1) elN1.textContent = `${Math.round(this.telemetry.engine1 ? this.telemetry.engine1.n1 : 22)}%`;
     if (elFlaps) elFlaps.textContent = `${Math.round(this.telemetry.flapDegree)}°`;
     if (elGear) {
-      elGear.textContent = this.telemetry.gearState > 0.95 ? 'DOWN' : (this.telemetry.gearState < 0.05 ? 'UP' : 'TRANS');
-      elGear.className = this.telemetry.gearState > 0.95 ? 'status-green' : (this.telemetry.gearState < 0.05 ? 'status-dim' : 'status-amber');
+      const states = Object.values(this.telemetry.gearDamage || {});
+      const failed = states.includes('collapsed');
+      const damaged = states.includes('damaged');
+      elGear.textContent = failed ? 'FAIL' : damaged ? 'DMG' : this.telemetry.gearState > 0.95 ? 'DOWN' : (this.telemetry.gearState < 0.05 ? 'UP' : 'TRANS');
+      elGear.className = failed ? 'status-danger' : damaged ? 'status-amber' : this.telemetry.gearState > 0.95 ? 'status-green' : (this.telemetry.gearState < 0.05 ? 'status-dim' : 'status-amber');
     }
     if (elSpoilers) {
       elSpoilers.textContent = this.telemetry.spoilers > 0.1 ? 'EXT' : 'ARM';

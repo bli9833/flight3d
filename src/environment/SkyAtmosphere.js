@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { CloudLayer } from './CloudLayer.js';
 
 /**
- * Atmospheric Sky, Sun, Dynamic Lighting & Volumetric Clouds
+ * Atmospheric Sky, Sun, Dynamic Lighting & Cumulus Clouds
  * Features realistic Rayleigh & Mie scattering Sky shader, time-of-day presets (Dawn, Noon, Sunset, Night),
- * and instanced cumulus cloud formations at 1,800m altitude.
+ * and instanced cumulus density volumes at 2,800–3,600m altitude.
  */
 export class SkyAtmosphere {
   constructor(scene, renderer = null, water = null) {
@@ -50,7 +51,7 @@ export class SkyAtmosphere {
 
     this.sunPosition = new THREE.Vector3();
 
-    // Procedural Cumulus Cloud layer at y = 1800m
+    // Fair-weather cumulus cloud layer
     this.cloudsGroup = new THREE.Group();
     this.initClouds();
     this.scene.add(this.cloudsGroup);
@@ -217,6 +218,8 @@ export class SkyAtmosphere {
       this.renderer.toneMappingExposure = exposure;
     }
 
+    this.cloudLayer.syncLighting(this.sunLight, this.ambientLight);
+
     // 6. Synchronize Water Ocean Atmospheric Shaders
     if (this.water && typeof this.water.syncWithAtmosphere === 'function') {
       this.water.syncWithAtmosphere(this);
@@ -224,56 +227,13 @@ export class SkyAtmosphere {
   }
 
   initClouds() {
-    const cloudCount = 180;
-    const puffGeo = new THREE.DodecahedronGeometry(1, 1);
-    const cloudMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.95,
-      metalness: 0.05,
-      transparent: true,
-      opacity: 0.85
-    });
+    this.cloudLayer = new CloudLayer();
+    this.cloudsGroup.add(this.cloudLayer);
+  }
 
-    const cloudInst = new THREE.InstancedMesh(puffGeo, cloudMat, cloudCount * 6);
-    const dummy = new THREE.Object3D();
-    let placed = 0;
-
-    // Distribute cloud clusters at realistic fair-weather altitude (y = 2800m ~ 3600m / ~9,200ft ~ 11,800ft)
-    // Expand horizontal coverage to 32km and provide an airport departure corridor
-    for (let c = 0; c < cloudCount; c++) {
-      const cx = (Math.random() - 0.5) * 32000;
-      const cz = (Math.random() - 0.5) * 32000;
-
-      // Keep airport immediate departure/approach corridor clear (x: ±4000m, z: ±2500m)
-      if (Math.abs(cx) < 4000 && Math.abs(cz) < 2500) {
-        continue;
-      }
-
-      const cy = 2800 + Math.random() * 800;
-
-      // Each cloud has 4-7 overlapping puffs
-      const puffs = 4 + Math.floor(Math.random() * 3);
-      for (let p = 0; p < puffs; p++) {
-        const ox = (Math.random() - 0.5) * 450;
-        const oz = (Math.random() - 0.5) * 450;
-        const oy = (Math.random() - 0.5) * 120;
-
-        const scaleX = 260 + Math.random() * 200;
-        const scaleY = 120 + Math.random() * 80;
-        const scaleZ = 260 + Math.random() * 200;
-
-        dummy.position.set(cx + ox, cy + oy, cz + oz);
-        dummy.scale.set(scaleX, scaleY, scaleZ);
-        dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-        dummy.updateMatrix();
-
-        cloudInst.setMatrixAt(placed++, dummy.matrix);
-      }
-    }
-
-    cloudInst.count = placed;
-    cloudInst.instanceMatrix.needsUpdate = true;
-    this.cloudsGroup.add(cloudInst);
+  prepareRender(camera) {
+    // Sort before renderer.render uploads instance buffers, including camera cuts.
+    this.cloudLayer.sortForCamera(camera);
   }
 
   getSunDirection() {

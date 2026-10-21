@@ -73,3 +73,60 @@ describe('LandingGear (Tricycle Oleo-Pneumatic Suspension & Steering)', () => {
     assert.ok(res.forces.y > 0, 'Suspension must generate positive upward normal force');
   });
 });
+
+describe('Landing gear impact and failure envelope', () => {
+  const pose = y => {
+    const mesh = new THREE.Object3D();
+    mesh.position.set(0, y, 0);
+    mesh.updateMatrixWorld(true);
+    return mesh;
+  };
+  it('captures a severe impact at wheel height before any positional correction and retains damage until reset', () => {
+    const gear = new LandingGear();
+    const mesh = pose(4.2);
+    gear.update(1 / 120, mesh, new THREE.Vector3(0, -20, -65), new THREE.Vector3(), () => 0);
+    assert.equal(gear.failure, null, 'No impact before wheel contact');
+    mesh.position.y = 3.75;
+    mesh.updateMatrixWorld(true);
+    let result = gear.update(1 / 120, mesh, new THREE.Vector3(0, -20, -65), new THREE.Vector3(), () => 0);
+    assert.equal(result.failure.reason, 'impact');
+    assert.equal(result.failure.sinkRate, 20);
+    result = gear.update(1 / 120, mesh, new THREE.Vector3(), new THREE.Vector3(), () => 0);
+    assert.ok(result.failure, 'Velocity changes cannot erase existing gear damage');
+    gear.resetContacts();
+    result = gear.update(1 / 120, mesh, new THREE.Vector3(0, -1, -65), new THREE.Vector3(), () => 0);
+    assert.equal(result.failure, null);
+  });
+  it('emits a touchdown event at shallow first contact without waiting for 3cm penetration', () => {
+    const gear = new LandingGear();
+    const result = gear.update(1 / 120, pose(3.779), new THREE.Vector3(0, -1, -60), new THREE.Vector3(), () => 0);
+    assert.equal(result.touchdown, true);
+    assert.equal(result.touchdownContacts.length, 2);
+    assert.ok(result.touchdownContacts.every(c => c.compression < 0.03));
+    assert.equal(result.failure, null);
+  });
+  it('uses surface-normal velocity on a slope, not world vertical speed', () => {
+    const normal = new THREE.Vector3(-0.1176, 1, 0).normalize();
+    for (const tangent of [false, true]) {
+      const gear = new LandingGear();
+      const mesh = pose(3.75);
+      mesh.quaternion.setFromEuler(new THREE.Euler(Math.atan(0.1176), -Math.PI / 2, 0, 'YXZ'));
+      mesh.updateMatrixWorld(true);
+      const velocity = new THREE.Vector3(65, tangent ? 65 * 0.1176 : 0, 0);
+      const result = gear.update(1 / 120, mesh, velocity, new THREE.Vector3(), x => x * 0.1176, () => normal);
+      assert.equal(result.onGround, true);
+      if (tangent) assert.equal(result.failure, null, 'Following the grade is safe');
+      else assert.ok(result.failure.sinkRate > 7.5, 'Level flight strikes the uphill runway');
+    }
+  });
+  it('includes angular motion when the nose gear hits and detects a bottomed-out strut', () => {
+    const gear = new LandingGear();
+    let result = gear.update(1 / 120, pose(3.6), new THREE.Vector3(0, 0, -60),
+      new THREE.Vector3(-0.3, 0, 0), () => 0);
+    assert.equal(result.failure.contact, 'nose');
+    assert.ok(result.failure.sinkRate > 3.7);
+    gear.resetContacts();
+    result = gear.update(1 / 120, pose(2.5), new THREE.Vector3(), new THREE.Vector3(), () => 0);
+    assert.equal(result.failure.reason, 'bottom-out');
+  });
+});
