@@ -1,12 +1,14 @@
 import * as THREE from 'three';
+import { cityWindowIntensity, createCityBuildingAssets } from './CityBuildingAssets.js';
 
 /**
  * High-Performance Instanced Foliage (3,500+ Trees) & Urban City Buildings (500+ Structures)
  * Uses THREE.InstancedMesh for optimal 60+ FPS rendering while guaranteeing clear airport flight paths.
  */
 export class FoliageAndCities {
-  constructor(terrain) {
+  constructor(terrain, random = Math.random) {
     this.terrain = terrain;
+    this.random = random;
     this.group = new THREE.Group();
 
     this.treeData = [];
@@ -41,8 +43,8 @@ export class FoliageAndCities {
     const seedPoints = [];
 
     for (let i = 0; i < treeCount * 2 && placed < treeCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 600 + Math.sqrt(Math.random()) * (areaRadius - 600);
+      const angle = this.random() * Math.PI * 2;
+      const dist = 600 + Math.sqrt(this.random()) * (areaRadius - 600);
       const x = Math.cos(angle) * dist;
       const z = Math.sin(angle) * dist;
 
@@ -62,10 +64,10 @@ export class FoliageAndCities {
       }
 
       // Random organic scaling
-      const scale = 0.75 + Math.random() * 0.85;
+      const scale = 0.75 + this.random() * 0.85;
       dummy.position.set(x, y, z);
-      dummy.scale.set(scale, scale * (0.85 + Math.random() * 0.35), scale);
-      dummy.rotation.y = Math.random() * Math.PI * 2;
+      dummy.scale.set(scale, scale * (0.85 + this.random() * 0.35), scale);
+      dummy.rotation.y = this.random() * Math.PI * 2;
       dummy.updateMatrix();
 
       trunkInst.setMatrixAt(placed, dummy.matrix);
@@ -93,20 +95,22 @@ export class FoliageAndCities {
 
   initCities() {
     const buildingCount = 550;
-
-    // Building geometry with beveled rooftop
-    const bldgGeo = new THREE.BoxGeometry(1, 1, 1);
-    bldgGeo.translate(0, 0.5, 0); // Origin at building base
-
-    // Palette of modern city architectural materials
-    const bldgMat = new THREE.MeshStandardMaterial({
-      color: 0x94a3b8,
-      roughness: 0.35,
-      metalness: 0.45
+    this.cityAssets = createCityBuildingAssets();
+    this.cityLodNearDistance = 1800;
+    this.cityLodCamera = new THREE.Vector3(Infinity, Infinity, Infinity);
+    this.cityArchetypes = this.cityAssets.nearGeometries.map((geometry, index) => {
+      const near = new THREE.InstancedMesh(geometry, this.cityAssets.nearMaterial, buildingCount);
+      const far = new THREE.InstancedMesh(this.cityAssets.farGeometry, this.cityAssets.farMaterial, buildingCount);
+      near.name = `city-near-${index}`;
+      far.name = `city-far-${index}`;
+      // Instances cover separate clusters; a single aggregate bounding sphere
+      // would include most of the map and offer no useful frustum culling.
+      near.frustumCulled = false;
+      far.frustumCulled = false;
+      near.count = far.count = 0;
+      this.group.add(near, far);
+      return { near, far, records: [] };
     });
-
-    const bldgInst = new THREE.InstancedMesh(bldgGeo, bldgMat, buildingCount);
-    const colors = new Float32Array(buildingCount * 3);
 
     const dummy = new THREE.Object3D();
     let placed = 0;
@@ -131,8 +135,8 @@ export class FoliageAndCities {
 
     clusters.forEach(cluster => {
       for (let i = 0; i < cluster.count && placed < buildingCount; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const r = Math.sqrt(Math.random()) * cluster.radius;
+        const angle = this.random() * Math.PI * 2;
+        const r = Math.sqrt(this.random()) * cluster.radius;
         const x = cluster.cx + Math.cos(angle) * r;
         const z = cluster.cz + Math.sin(angle) * r;
 
@@ -143,43 +147,74 @@ export class FoliageAndCities {
         if (groundY < 2.5) continue; // Don't place in ocean
 
         // Building Dimensions
-        const width = 18 + Math.random() * 26;
-        const depth = 18 + Math.random() * 26;
+        const width = 18 + this.random() * 26;
+        const depth = 18 + this.random() * 26;
         // Central skyscrapers taller than outskirts
         const distFromCenter = r / cluster.radius;
-        const height = (15 + Math.random() * 25) + (1.0 - distFromCenter) * cluster.maxH;
+        const height = (15 + this.random() * 25) + (1.0 - distFromCenter) * cluster.maxH;
+
+        const rotationY = Math.floor(this.random() * 4) * (Math.PI * 0.5); // Grid aligned
+        const worldWidth = Math.abs(Math.cos(rotationY)) * width + Math.abs(Math.sin(rotationY)) * depth;
+        const worldDepth = Math.abs(Math.sin(rotationY)) * width + Math.abs(Math.cos(rotationY)) * depth;
+        const c = colorVariants[Math.floor(this.random() * colorVariants.length)];
+        // Check the full rotated footprint, not only its center.
+        if (Math.abs(x) < 2200 + worldWidth / 2 && Math.abs(z) < 420 + worldDepth / 2) continue;
 
         dummy.position.set(x, groundY, z);
         dummy.scale.set(width, height, depth);
-        dummy.rotation.y = Math.floor(Math.random() * 4) * (Math.PI * 0.5); // Grid aligned
+        dummy.rotation.y = rotationY;
         dummy.updateMatrix();
-
-        bldgInst.setMatrixAt(placed, dummy.matrix);
+        const archetype = placed % this.cityArchetypes.length;
 
         this.buildingData.push({
           x,
           y: groundY,
           z,
-          width,
+          width: worldWidth,
           height,
-          depth
+          depth: worldDepth,
+          localWidth: width,
+          localDepth: depth,
+          rotationY,
+          archetype
         });
 
-        // Pick color
-        const c = colorVariants[Math.floor(Math.random() * colorVariants.length)];
-        colors[placed * 3 + 0] = c.r;
-        colors[placed * 3 + 1] = c.g;
-        colors[placed * 3 + 2] = c.b;
+        this.cityArchetypes[archetype].records.push({ x, y: groundY, z, height, matrix: dummy.matrix.clone(), color: c });
 
         placed++;
       }
     });
 
-    bldgInst.count = placed;
-    bldgInst.instanceMatrix.needsUpdate = true;
-    bldgInst.instanceColor = new THREE.InstancedBufferAttribute(colors, 3);
-    bldgInst.instanceColor.needsUpdate = true;
+    this.updateCityLod(new THREE.Vector3());
+    this.setTimeOfDay(16.8);
+  }
 
-    this.group.add(bldgInst);
+  updateCityLod(cameraPosition) {
+    if (this.cityLodCamera.distanceToSquared(cameraPosition) < 80 * 80) return;
+    this.cityLodCamera.copy(cameraPosition);
+    const nearDistanceSquared = this.cityLodNearDistance ** 2;
+    for (const { near, far, records } of this.cityArchetypes) {
+      let nearCount = 0;
+      let farCount = 0;
+      for (const record of records) {
+        const dx = cameraPosition.x - record.x;
+        const dy = cameraPosition.y - (record.y + record.height / 2);
+        const dz = cameraPosition.z - record.z;
+        const mesh = dx * dx + dy * dy + dz * dz < nearDistanceSquared ? near : far;
+        const index = mesh === near ? nearCount++ : farCount++;
+        mesh.setMatrixAt(index, record.matrix);
+        mesh.setColorAt(index, record.color);
+      }
+      near.count = nearCount;
+      far.count = farCount;
+      near.instanceMatrix.needsUpdate = true;
+      far.instanceMatrix.needsUpdate = true;
+      if (near.instanceColor) near.instanceColor.needsUpdate = true;
+      if (far.instanceColor) far.instanceColor.needsUpdate = true;
+    }
+  }
+
+  setTimeOfDay(hour) {
+    this.cityAssets.nearMaterial.emissiveIntensity = cityWindowIntensity(hour);
   }
 }
