@@ -22,6 +22,8 @@ export class CameraSystem {
     this.domElement = domElement;
     this.mode = CameraSystem.MODES.COCKPIT;
     this.autoSwitch = false;
+    // Explicit view choices persist across demo stages, presets and look resets.
+    this.userModeSelected = false;
     this.autoSwitchTimer = 0;
 
     // Temporary Cinematic View Cut State (e.g. brief gear cam preview during takeoff, landing, gear transit)
@@ -633,7 +635,7 @@ export class CameraSystem {
   }
 
   showTemporaryView(m, durationSeconds = 4.5, onComplete = null) {
-    if (this.userLookOverridden) {
+    if (this.userLookOverridden || (this.userModeSelected && !this.autoSwitch)) {
       return;
     }
     if (this.mode !== m && this.temporaryViewTimer <= 0) {
@@ -672,9 +674,14 @@ export class CameraSystem {
   }
 
   setMode(m, isUserAction = false) {
-    if (this.userLookOverridden && !isUserAction) {
+    if ((this.userLookOverridden || this.userModeSelected) && !isUserAction) {
       return false;
     }
+    if (isUserAction) this.userModeSelected = true;
+    return this.#applyMode(m);
+  }
+
+  #applyMode(m) {
     this.userLookOverridden = false;
     this.cancelTemporaryView();
     this.autoSwitch = m === CameraSystem.MODES.AUTO;
@@ -735,7 +742,7 @@ export class CameraSystem {
     if (this.autoSwitch && !this.userLookOverridden && this.temporaryViewTimer <= 0) {
       this.autoSwitchTimer += Math.max(0, dt);
       if (this.autoSwitchTimer >= 10) {
-        this.setMode((this.mode + 1) % 7);
+        this.#applyMode((this.mode + 1) % 7);
         this.autoSwitch = true;
       }
     }

@@ -294,21 +294,24 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
     assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.FLYBY, 'Camera mode must stay FLYBY during cliff takeoff');
   });
 
-  it('should reset userCameraOverridden on stage transition so each stage begins with intended showcase view', () => {
+  it('keeps a manually cycled view when the next demo stage begins', () => {
     const sim = createMockSimulator('coastal');
     const director = new DemoFlightDirector(sim);
 
     director.start('coastal');
     director.setStage(DemoFlightDirector.COASTAL_STAGES.ROTATION_CLIMB);
 
+    sim.cameraSystem = new CameraSystem(new THREE.PerspectiveCamera(), null);
+    sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
     // User overrides camera in rotation climb
     sim.cameraSystem.cycleMode();
+    director.onUserCameraChange();
     assert.strictEqual(director.userCameraOverridden, true);
 
     // Transition to next stage (COASTAL_BANK)
     director.setStage(DemoFlightDirector.COASTAL_STAGES.COASTAL_BANK);
     assert.strictEqual(director.userCameraOverridden, false, 'userCameraOverridden should be reset on entering new stage');
-    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.WING, 'Should initialize with COASTAL_BANK showcase view (WING)');
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.CHASE, 'Should preserve the manually selected view');
   });
 });
 
@@ -363,3 +366,30 @@ describe('Airborne demo handoff', () => {
     assert.equal(engineThrottle,0);
   });
 });
+
+for (const airport of ['coastal', 'lukla']) {
+  it(`preserves explicit camera choices across demo stages and restart (${airport})`, () => {
+    const sim = createMockSimulator(airport);
+    sim.cameraSystem = new CameraSystem(new THREE.PerspectiveCamera(), null);
+    const director = new DemoFlightDirector(sim);
+    director.start(airport);
+    sim.cameraSystem.setMode(CameraSystem.MODES.TOWER, true);
+    director.onUserCameraChange();
+    const stages = airport === 'coastal' ? DemoFlightDirector.COASTAL_STAGES : DemoFlightDirector.LUKLA_STAGES;
+    for (const stage of Object.values(stages).filter(value => value >= 0 && value < stages.COMPLETED)) {
+      director.setStage(stage);
+      assert.equal(sim.cameraSystem.mode, CameraSystem.MODES.TOWER);
+      sim.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 5);
+      assert.equal(sim.cameraSystem.mode, CameraSystem.MODES.TOWER);
+    }
+    director.stop();
+    director.start(airport);
+    assert.equal(sim.cameraSystem.mode, CameraSystem.MODES.TOWER);
+    sim.cameraSystem.setMode(CameraSystem.MODES.AUTO, true);
+    director.onUserCameraChange();
+    assert.equal(director.userCameraOverridden, false);
+    director.setStage(stages.FINAL_APPROACH);
+    assert.equal(sim.cameraSystem.autoSwitch, true);
+    director.stop();
+  });
+}
