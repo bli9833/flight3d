@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.js';
 import * as THREE from 'three';
 
 /**
@@ -22,14 +23,14 @@ export class CollisionDetector {
     // Aircraft collision probe points in aircraft local body coordinates (meters)
     // Nose forward (-Z), Right (+X), Up (+Y), Wingtip span ~34.4m, Length ~35m
     this.probePoints = [
-      { id: 'nose', pos: new THREE.Vector3(0, -0.2, -17.5), radius: 1.5, desc: '기수 (Nose Radome)' },
-      { id: 'tail', pos: new THREE.Vector3(0, 1.2, 17.5), radius: 1.2, desc: '후방 동체 (Tail Empennage)' },
-      { id: 'fin', pos: new THREE.Vector3(0, 9.2, 16.0), radius: 0.8, desc: '수직 꼬리날개 (Vertical Fin)' },
-      { id: 'wingL', pos: new THREE.Vector3(-17.2, 0.6, 2.8), radius: 1.0, desc: '좌측 주익단 (Left Wingtip)' },
-      { id: 'wingR', pos: new THREE.Vector3(17.2, 0.6, 2.8), radius: 1.0, desc: '우측 주익단 (Right Wingtip)' },
-      { id: 'engineL', pos: new THREE.Vector3(-5.06, -1.95, -5.22), radius: 1.0, desc: '좌측 엔진 (Left Engine)' },
-      { id: 'engineR', pos: new THREE.Vector3(5.06, -1.95, -5.22), radius: 1.0, desc: '우측 엔진 (Right Engine)' },
-      { id: 'belly', pos: new THREE.Vector3(0, -1.75, 0.0), radius: 1.8, desc: '동체 하단 (Belly Fuselage)' }
+      { id: 'nose', pos: new THREE.Vector3(0, -0.2, -17.5), radius: 1.5, get desc() { return t('nose.radome'); } },
+      { id: 'tail', pos: new THREE.Vector3(0, 1.2, 17.5), radius: 1.2, get desc() { return t('tail.empennage'); } },
+      { id: 'fin', pos: new THREE.Vector3(0, 9.2, 16.0), radius: 0.8, get desc() { return t('vertical.fin'); } },
+      { id: 'wingL', pos: new THREE.Vector3(-17.2, 0.6, 2.8), radius: 1.0, get desc() { return t('left.wingtip'); } },
+      { id: 'wingR', pos: new THREE.Vector3(17.2, 0.6, 2.8), radius: 1.0, get desc() { return t('right.wingtip'); } },
+      { id: 'engineL', pos: new THREE.Vector3(-5.06, -1.95, -5.22), radius: 1.0, get desc() { return t('left.engine'); } },
+      { id: 'engineR', pos: new THREE.Vector3(5.06, -1.95, -5.22), radius: 1.0, get desc() { return t('right.engine'); } },
+      { id: 'belly', pos: new THREE.Vector3(0, -1.75, 0.0), radius: 1.8, get desc() { return t('belly.fuselage'); } }
     ];
 
     // Spatial hash grids for O(1) broadphase lookups
@@ -112,7 +113,7 @@ export class CollisionDetector {
         id: p.id,
         pos: worldPos,
         radius: p.radius,
-        desc: p.desc
+        get desc() { return p.desc; }
       };
     });
 
@@ -122,10 +123,10 @@ export class CollisionDetector {
       return {
         collided: true,
         type: 'TOWER',
-        name: '관제탑 충돌 (CONTROL TOWER COLLISION)',
+        get name() { return t('control.tower.collision'); },
         point: towerResult.point,
         speedKnots,
-        description: `공항 관제탑에 ${towerResult.part} 부위가 격돌했습니다.`
+        get description() { return t('the.value.struck.the.airport.control.tower', { value: towerResult.part }); }
       };
     }
 
@@ -136,12 +137,12 @@ export class CollisionDetector {
       return {
         collided: true,
         type: isWall ? 'TERRAIN' : 'BUILDING',
-        name: isWall ? '석벽 방호벽 격돌 (ROCK WALL COLLISION)' : '공항 건물 충돌 (AIRPORT STRUCTURE COLLISION)',
+        get name() { return isWall ? t('rock.wall.collision') : t('airport.structure.collision'); },
         point: airportBldgResult.point,
         speedKnots,
-        description: isWall
-          ? `활주로 끝단 암벽 방호벽에 ${airportBldgResult.part} 부위가 충돌했습니다.`
-          : `공항 터미널/격납고 시설에 ${airportBldgResult.part} 부위가 충돌했습니다.`
+        get description() { return isWall
+          ? t('the.value.struck.the.rock.barrier.at', { value: airportBldgResult.part })
+          : t('the.value.struck.an.airport.terminal.or', { value: airportBldgResult.part }); }
       };
     }
 
@@ -151,10 +152,10 @@ export class CollisionDetector {
       return {
         collided: true,
         type: 'BUILDING',
-        name: '도심 빌딩 충돌 (SKYSCRAPER COLLISION)',
+        get name() { return t('skyscraper.collision'); },
         point: cityBldgResult.point,
         speedKnots,
-        description: `도심 고층 빌딩과 ${cityBldgResult.part} 부위가 격돌했습니다.`
+        get description() { return t('the.value.struck.a.city.high.rise', { value: cityBldgResult.part }); }
       };
     }
 
@@ -164,10 +165,10 @@ export class CollisionDetector {
       return {
         collided: true,
         type: 'TREE',
-        name: '산림 수목 충돌 (TREE COLLISION)',
+        get name() { return t('tree.collision'); },
         point: treeResult.point,
         speedKnots,
-        description: `울창한 수목 지대에 ${treeResult.part} 부위가 충돌했습니다.`
+        get description() { return t('the.value.struck.dense.trees', { value: treeResult.part }); }
       };
     }
 
@@ -177,10 +178,10 @@ export class CollisionDetector {
       return {
         collided: true,
         type: 'SHIP',
-        name: '해상 선박 충돌 (MARITIME VESSEL COLLISION)',
+        get name() { return t('maritime.vessel.collision'); },
         point: shipResult.point,
         speedKnots,
-        description: `해상 선박에 ${shipResult.part} 부위가 충돌했습니다.`
+        get description() { return t('the.value.struck.a.vessel', { value: shipResult.part }); }
       };
     }
 
@@ -190,10 +191,10 @@ export class CollisionDetector {
       return {
         collided: true,
         type: 'WATER',
-        name: '수면 격추 / 해상 추락 (OCEAN WATER IMPACT)',
+        get name() { return t('ocean.water.impact'); },
         point: waterResult.point,
         speedKnots,
-        description: `바다 수면에 고속으로 격돌했습니다.`
+        get description() { return t('the.aircraft.hit.the.ocean.surface.at'); }
       };
     }
 
@@ -203,10 +204,10 @@ export class CollisionDetector {
       return {
         collided: true,
         type: 'TERRAIN',
-        name: terrainResult.name,
+        get name() { return terrainResult.name; },
         point: terrainResult.point,
         speedKnots,
-        description: terrainResult.description
+        get description() { return terrainResult.description; }
       };
     }
 
@@ -229,7 +230,7 @@ export class CollisionDetector {
 
       if (distSq < effectiveRadius * effectiveRadius) {
         if (probe.pos.y >= tBaseY && probe.pos.y <= tTopY) {
-          return { point: probe.pos.clone(), part: probe.desc };
+          return { point: probe.pos.clone(), get part() { return probe.desc; } };
         }
       }
     }
@@ -263,7 +264,7 @@ export class CollisionDetector {
             Math.abs(lz) <= halfD + probe.radius &&
             probe.pos.y >= minY && probe.pos.y <= maxY
           ) {
-            return { point: probe.pos.clone(), part: probe.desc };
+            return { point: probe.pos.clone(), get part() { return probe.desc; } };
           }
         }
       } else {
@@ -278,7 +279,7 @@ export class CollisionDetector {
             probe.pos.z >= minZ - probe.radius && probe.pos.z <= maxZ + probe.radius &&
             probe.pos.y >= minY && probe.pos.y <= maxY
           ) {
-            return { point: probe.pos.clone(), part: probe.desc };
+            return { point: probe.pos.clone(), get part() { return probe.desc; } };
           }
         }
       }
@@ -300,7 +301,7 @@ export class CollisionDetector {
             probe.pos.z >= minZ - probe.radius && probe.pos.z <= maxZ + probe.radius &&
             probe.pos.y >= minY && probe.pos.y <= maxY
           ) {
-            return { point: probe.pos.clone(), part: probe.desc };
+            return { point: probe.pos.clone(), get part() { return probe.desc; } };
           }
         }
       }
@@ -327,7 +328,7 @@ export class CollisionDetector {
           Math.abs(lz) <= halfD + probe.radius &&
           probe.pos.y >= minY && probe.pos.y <= maxY
         ) {
-          return { point: probe.pos.clone(), part: probe.desc, isWall: true };
+          return { point: probe.pos.clone(), get part() { return probe.desc; }, isWall: true };
         }
       }
     }
@@ -367,7 +368,7 @@ export class CollisionDetector {
               probe.pos.z >= minZ - probe.radius && probe.pos.z <= maxZ + probe.radius &&
               probe.pos.y >= minY && probe.pos.y <= maxY
             ) {
-              return { point: probe.pos.clone(), part: probe.desc };
+              return { point: probe.pos.clone(), get part() { return probe.desc; } };
             }
           }
         }
@@ -400,7 +401,7 @@ export class CollisionDetector {
 
             if (distSq < maxR * maxR) {
               if (probe.pos.y >= t.y && probe.pos.y <= t.y + t.height) {
-                return { point: probe.pos.clone(), part: probe.desc };
+                return { point: probe.pos.clone(), get part() { return probe.desc; } };
               }
             }
           }
@@ -435,7 +436,7 @@ export class CollisionDetector {
           Math.abs(localZ) < halfL + probe.radius &&
           probe.pos.y >= 0 && probe.pos.y <= height
         ) {
-          return { point: probe.pos.clone(), part: probe.desc };
+          return { point: probe.pos.clone(), get part() { return probe.desc; } };
         }
       }
     }
@@ -468,9 +469,9 @@ export class CollisionDetector {
       ?? (Math.abs(aircraftPos.x) < 1950 && Math.abs(aircraftPos.z) < 450);
     if (onRunway && groundContact?.catastrophicImpact) {
       return {
-        name: '치명적 착륙 충격 (CATASTROPHIC LANDING IMPACT)',
+        get name() { return t('catastrophic.landing.impact'); },
         point: groundContact.bodyContacts[0]?.worldPos.clone() || aircraftPos.clone(),
-        description: '기체 하부의 과도한 충격 또는 누적 구조 손상으로 기체가 파손되었습니다.'
+        get description() { return t('excessive.belly.impact.or.accumulated.structural.damage'); }
       };
     }
     // Body contact is evaluated on every surface, including the runway. Gear
@@ -484,9 +485,9 @@ export class CollisionDetector {
       const radius = probe.id === 'engineL' || probe.id === 'engineR' ? probe.radius : 0;
       if (probe.pos.y - radius < ground + 0.1) {
         return {
-          name: gearState < 0.25 ? '동체 착륙 (GEAR-UP BELLY CRASH)' : '기체 지면 접촉 (TERRAIN / BODY STRIKE)',
+          get name() { return gearState < 0.25 ? t('gear.up.belly.crash') : t('terrain.body.strike'); },
           point: probe.pos.clone(),
-          description: `${probe.desc} 부위가 지면에 접촉했습니다.`
+          get description() { return t('the.value.made.ground.contact', { value: probe.desc }); }
         };
       }
     }

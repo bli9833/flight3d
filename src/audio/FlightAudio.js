@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.js';
 /**
  * Procedural Web Audio API Sound Engine for Boeing Airliner
  * Synthesizes twin turbofan engines (combustion roar + N1/N2 turbine whine), aerodynamic airflow slipstream,
@@ -399,15 +400,15 @@ export class FlightAudio {
 
   getVolumeState() {
     if (this.isMuted) {
-      return { muted: true, level: 0, mode: 'muted', text: '음소거 (MUTED)', icon: '🔇' };
+      return { muted: true, level: 0, mode: 'muted', text: t('audio.muted'), icon: '🔇' };
     }
     if (this.volume >= 1.9) {
-      return { muted: false, level: 2.0, mode: 'bluetooth', text: '블루투스 최대 부스트 (200%)', icon: '🎧⚡' };
+      return { muted: false, level: 2.0, mode: 'bluetooth', text: t('bluetooth.maximum.boost.200'), icon: '🎧⚡' };
     }
     if (this.volume >= 1.4) {
-      return { muted: false, level: 1.5, mode: 'mobile', text: '모바일 부스트 (150%)', icon: '🔊⚡' };
+      return { muted: false, level: 1.5, mode: 'mobile', text: t('mobile.boost.150'), icon: '🔊⚡' };
     }
-    return { muted: false, level: 1.0, mode: 'normal', text: '기본 볼륨 (100%)', icon: '🔊' };
+    return { muted: false, level: 1.0, mode: 'normal', text: t('normal.volume.100'), icon: '🔊' };
   }
 
   update(dt, state, isCockpitCam) {

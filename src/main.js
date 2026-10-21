@@ -1,3 +1,4 @@
+import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
 import { Atmosphere } from './physics/Atmosphere.js';
 import { BOEING_737_800 } from './config/aircraftConfigs.js';
@@ -36,6 +37,8 @@ import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 if (typeof window !== 'undefined') {
   window.THREE = THREE;
 }
+
+initLocalization();
 
 /**
  * Main Simulation Coordinator
@@ -138,7 +141,7 @@ class FlightSimulator {
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
     this.cameraSystem.onResetLook = () => {
-      this.showToast('카메라 시선 정면 초기화');
+      this.showToast(() => t('camera.view.centered'));
     };
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
@@ -262,19 +265,19 @@ class FlightSimulator {
       if (this.demoDirector && this.demoDirector.isActive) {
         this.demoDirector.onUserCameraChange();
       }
-      this.showToast(`Camera: ${modeName}`);
+      this.showToast(() => t('notice.camera', { name: modeName }));
     };
 
     this.controls.onSelectCamera = (mode) => {
       this.cameraSystem.setMode(mode, true);
       if (this.demoDirector?.isActive) this.demoDirector.onUserCameraChange();
-      this.showToast(`Camera: ${this.cameraSystem.getModeName()}`);
+      this.showToast(() => t('notice.camera', { name: this.cameraSystem.getModeName() }));
     };
 
     this.controls.onToggleLights = () => {
       this.aircraft.lightsOn = !this.aircraft.lightsOn;
       this.aircraft.lightsGroup.visible = this.aircraft.lightsOn;
-      this.showToast(`Lights: ${this.aircraft.lightsOn ? 'ON' : 'OFF'}`);
+      this.showToast(() => t('notice.lights', { state: t(this.aircraft.lightsOn ? 'state.on' : 'state.off') }));
     };
 
     this.controls.onCycleTimeOfDay = (deltaHours) => {
@@ -284,7 +287,7 @@ class FlightSimulator {
       const h = Math.floor(this.sky.timeOfDay);
       const m = Math.floor((this.sky.timeOfDay % 1) * 60);
       const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-      this.showToast(`Time of Day: ${timeStr}`);
+      this.showToast(() => t('notice.time', { time: timeStr }));
     };
 
     this.controls.onToggleAudio = () => {
@@ -292,7 +295,7 @@ class FlightSimulator {
       this.audio.ensureContextRunning();
       const state = this.audio.cycleVolume();
       this.updateAudioUI(state);
-      this.showToast(`사운드: ${state.text}`);
+      this.showToast(() => t('sound.value', { value: this.audio.getVolumeState().text }));
     };
   }
 
@@ -355,7 +358,7 @@ class FlightSimulator {
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 5.5;
 
-        this.showToast('Preset: 루클라 활주로 06 (해발 2,805m, 11.7% 급경사 대기)');
+        this.showToast(() => t('preset.lukla.runway.06.2.805.m'));
       } else if (type === 'approach') {
         // Final Approach 2.0 NM out in Dudh Kosi Canyon (Alt 3,070m / 10,070ft)
         // Distance to threshold 06 (s = -263.5m) is 3,536.5m
@@ -383,7 +386,7 @@ class FlightSimulator {
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 6.2;
 
-        this.showToast('Preset: 루클라 협곡 착륙 챌린지 (고도 10,070 FT, Rwy 06)');
+        this.showToast(() => t('preset.lukla.canyon.landing.challenge.10.070'));
       } else if (type === 'cliff') {
         // Lukla Runway 24 Downhill Cliff Dive Takeoff!
         // Start near the upper threshold with wheel clearance; a 5m lateral
@@ -410,7 +413,7 @@ class FlightSimulator {
         this.aero.pitchTrim = 5.5;
         this.controls.pitchTrim = 5.5;
 
-        this.showToast('Preset: 루클라 24번 활주로 절벽 가속 이륙 (11.7% 내리막 질주)');
+        this.showToast(() => t('preset.lukla.runway.24.downhill.takeoff.11'));
       } else if (type === 'cruise') {
         // Scenic Himalayan Valley Cruise at 13,000 FT (3,960m)
         this.position.set(-1500, 3960, -800);
@@ -426,7 +429,7 @@ class FlightSimulator {
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 2.5;
 
-        this.showToast('Preset: 히말라야 산맥 순항 비행 (13,000 FT)');
+        this.showToast(() => t('preset.himalayan.cruise.13.000.ft'));
       }
     } else {
       // Coastal International Airport Presets
@@ -446,7 +449,7 @@ class FlightSimulator {
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 4.5; // Takeoff trim
 
-        this.showToast('Preset: Runway 09L (Ready for Takeoff)');
+        this.showToast(() => t('preset.coastal.runway'));
       } else if (type === 'approach') {
         // Final Approach 3 NM out on 3° glideslope (5.5 km west: x = -6500m, alt = 320m / 1050ft)
         this.position.set(-6500, 310, 0);
@@ -466,7 +469,7 @@ class FlightSimulator {
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 6.0;
 
-        this.showToast('Preset: 3NM Final Approach (Runway 09L, 145 KTS, Flaps 30)');
+        this.showToast(() => t('preset.coastal.approach'));
       } else if (type === 'cruise') {
         // Scenic Coastal Cruise over Bay & Ships at 2,600 ft (800m), Speed 210 knots (108 m/s)
         this.position.set(-600, 750, 3200);
@@ -482,7 +485,7 @@ class FlightSimulator {
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 2.5;
 
-        this.showToast('Preset: Scenic Cruise (Bay & Ships)');
+        this.showToast(() => t('preset.coastal.cruise'));
       }
     }
 
@@ -567,14 +570,14 @@ class FlightSimulator {
     const btnCliff = document.getElementById('btn-preset-cliff');
 
     if (isLukla) {
-      if (btnRwy) btnRwy.textContent = '🛫 루클라 06 대기';
-      if (btnApp) btnApp.textContent = '🛬 협곡 착륙 챌린지';
-      if (btnCru) btnCru.textContent = '✈️ 히말라야 순항 (13,000 FT)';
+      if (btnRwy) bindText(btnRwy, () => t('lukla.06.ready'));
+      if (btnApp) bindText(btnApp, () => t('canyon.landing'));
+      if (btnCru) bindText(btnCru, () => t('himalayan.cruise.13.000.ft'));
       if (btnCliff) btnCliff.style.display = 'block';
     } else {
-      if (btnRwy) btnRwy.textContent = '🛫 활주로 이륙 (09L)';
-      if (btnApp) btnApp.textContent = '🛬 착륙 접근 (3 NM)';
-      if (btnCru) btnCru.textContent = '✈️ 순항 비행 (6,000 FT)';
+      if (btnRwy) bindText(btnRwy, () => t('runway.takeoff.09l'));
+      if (btnApp) bindText(btnApp, () => t('final.approach.3.nm'));
+      if (btnCru) bindText(btnCru, () => t('cruise.6.000.ft'));
       if (btnCliff) btnCliff.style.display = 'none';
     }
 
@@ -587,10 +590,10 @@ class FlightSimulator {
 
     this.setPreset('runway');
 
-    const desc = isLukla
-      ? '네팔 텐징-힐러리 공항 (VNLK 06번 활주로, 해발 2,805m, 11.7% 급경사)'
-      : '태평양 해안 국제공항 (Runway 09L, 해발 12m)';
-    this.showToast(`공항 변경: ${desc}`);
+    const airportKey = isLukla
+      ? 'tenzing.hillary.airport.nepal.vnlk.runway.06'
+      : 'pacific.coastal.international.airport.runway.09l.elevation';
+    this.showToast(() => t('airport.changed.value', { value: t(airportKey) }));
   }
 
   /**
@@ -662,18 +665,18 @@ class FlightSimulator {
     if (gearResult.damageEvents.length || (gearResult.bodyContacts.length && !this.bodyContactStarted)) {
       this.landingIncident = true;
       if (this.demoDirector?.isActive) this.demoDirector.stop();
-      const labels = { nose: '전륜', mainLeft: '좌측 주기어', mainRight: '우측 주기어' };
+      const labels = { nose: 'nose.gear', mainLeft: 'left.main.gear', mainRight: 'right.main.gear' };
       for (const event of gearResult.damageEvents) {
-        this.showToast(`${labels[event.id]} ${event.state === 'collapsed' ? '붕괴' : '손상'} — 지지·조향 성능 저하`);
+        this.showToast(() => t('notice.gearDamage', { value1: t(labels[event.id]), value2: event.state === 'collapsed' ? t('gear.collapsed') : t('gear.damaged') }));
       }
       if (gearResult.bodyContacts.length) {
         this.bodyContactStarted = true;
-        this.showToast('기체 하부 접촉 — 활주 중');
+        this.showToast(() => t('aircraft.belly.contact.sliding.on.runway'));
       }
     }
     if (this.landingIncident && gearResult.onGround && !this.landingStopped && groundSpeed < 0.5 && Math.abs(this.linearVelocity.y) < 0.2) {
       this.landingStopped = true;
-      this.showToast('비상착륙 정지 — 프리셋을 선택하면 기체가 복구됩니다');
+      this.showToast(() => t('emergency.landing.stopped.select.a.preset.to'));
     }
 
     // 5. Aerodynamic Forces & Moments
@@ -837,11 +840,11 @@ class FlightSimulator {
     if (allowAutoCut && !this.landingIncident && this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
       // Takeoff liftoff
       this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
-      this.showToast('🎥 랜딩 기어 뷰: 이륙 상승 (Takeoff Climb)');
+      this.showToast(() => t('landing.gear.view.takeoff.climb'));
     } else if (allowAutoCut && !this.landingIncident && genuineLandingTouchdown && this.totalSimTime > 2.0) {
       // Touchdown landing (only on genuine landing touchdown)
       this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 5.0);
-      this.showToast('🎥 랜딩 기어 뷰: 활주로 접지 & 서스펜션 완충 (Touchdown)');
+      this.showToast(() => t('landing.gear.view.touchdown.suspension.compression'));
     }
 
     const currentGearTarget = this.gear.targetGearState > 0.5;
@@ -850,11 +853,11 @@ class FlightSimulator {
         if (!currentGearTarget) {
           // Gear retracting
           this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
-          this.showToast('🎥 랜딩 기어 뷰: 기어 수납 (Gear Retracting)');
+          this.showToast(() => t('landing.gear.view.retracting'));
         } else {
           // Gear extending
           this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
-          this.showToast('🎥 랜딩 기어 뷰: 기어 전개 (Gear Extending)');
+          this.showToast(() => t('landing.gear.view.extending'));
         }
       }
       this.lastGearTarget = currentGearTarget;
@@ -919,7 +922,7 @@ class FlightSimulator {
     if (crashEl) crashEl.style.display = 'none';
 
     this.setPreset('runway');
-    this.showToast('기체 수리 완료: 활주로 09L에서 재시작되었습니다.');
+    this.showToast(() => t('aircraft.repaired.restarted.on.runway.09l'));
   }
 
   showCrashUI(crashResult) {
@@ -929,8 +932,8 @@ class FlightSimulator {
     const speed = document.getElementById('crash-speed');
     const type = document.getElementById('crash-type');
 
-    if (title) title.textContent = crashResult.name;
-    if (desc) desc.textContent = crashResult.description;
+    if (title) bindText(title, () => crashResult.name);
+    if (desc) bindText(desc, () => crashResult.description);
     if (speed) speed.textContent = `${Math.round(crashResult.speedKnots)} KT`;
     if (type) type.textContent = crashResult.type;
 
@@ -1123,22 +1126,22 @@ class FlightSimulator {
     if (btnSound) {
       if (state.muted) {
         btnSound.className = 'btn btn-preset btn-sound-toggle muted';
-        btnSound.textContent = '🔇 음소거 [M]';
+        bindText(btnSound, () => t('muted.m'));
       } else if (state.mode === 'bluetooth') {
         btnSound.className = 'btn btn-preset btn-sound-toggle active-bt';
-        btnSound.textContent = '🎧⚡ 블루투스 200%';
+        bindText(btnSound, () => t('bluetooth.200'));
       } else if (state.mode === 'mobile') {
         btnSound.className = 'btn btn-preset btn-sound-toggle active-boost';
-        btnSound.textContent = '🔊⚡ 부스트 (150%)';
+        bindText(btnSound, () => t('boost.150'));
       } else {
         btnSound.className = 'btn btn-preset btn-sound-toggle';
-        btnSound.textContent = '🔊 소리: 100% [M]';
+        bindText(btnSound, () => t('sound.100.m'));
       }
     }
 
     const btnSoundAction = document.getElementById('btn-sound-action');
     if (btnSoundAction) {
-      btnSoundAction.textContent = state.muted ? '🔇 음소거' : (state.mode === 'bluetooth' ? '🎧⚡ 200%' : (state.mode === 'mobile' ? '🔊⚡ 150%' : '🔊 볼륨 [M]'));
+      bindText(btnSoundAction, () => state.muted ? t('muted') : (state.mode === 'bluetooth' ? '🎧⚡ 200%' : (state.mode === 'mobile' ? '🔊⚡ 150%' : t('volume.m'))));
     }
 
     if (this.touchControls && typeof this.touchControls.updateAudioUI === 'function') {
@@ -1149,7 +1152,7 @@ class FlightSimulator {
   showToast(msg) {
     const toast = document.getElementById('toast-msg');
     if (!toast) return;
-    toast.textContent = msg;
+    bindText(toast, () => typeof msg === 'function' ? msg() : msg);
     toast.classList.add('visible');
     clearTimeout(this.toastTimeout);
     this.toastTimeout = setTimeout(() => {
@@ -1176,7 +1179,7 @@ class FlightSimulator {
     document.getElementById('btn-cam')?.addEventListener('click', () => this.controls.onCycleCamera());
     document.getElementById('btn-cam-reset')?.addEventListener('click', () => {
       this.cameraSystem.resetLook();
-      this.showToast('카메라 시선 정면 초기화');
+      this.showToast(() => t('camera.view.centered'));
     });
     document.getElementById('btn-time')?.addEventListener('click', () => this.controls.onCycleTimeOfDay(3.0));
     document.getElementById('btn-sound')?.addEventListener('click', () => this.controls.onToggleAudio());
@@ -1184,12 +1187,12 @@ class FlightSimulator {
     document.getElementById('btn-diag')?.addEventListener('click', () => this.diagnostics.toggle());
     document.getElementById('btn-touch-toggle')?.addEventListener('click', () => {
       this.touchControls.toggle();
-      const state = this.touchControls.enabled ? 'ON' : 'OFF';
-      this.showToast(`터치 조작 컨트롤: ${state}`);
+      const state = this.touchControls.enabled ? 'state.on' : 'state.off';
+      this.showToast(() => t('touch.controls.value', { value: t(state) }));
     });
     document.getElementById('btn-ap')?.addEventListener('click', () => {
       this.apMaster = !this.apMaster;
-      this.showToast(`Autopilot: ${this.apMaster ? 'ENGAGED' : 'DISENGAGED'}`);
+      this.showToast(() => t('notice.autopilot', { state: t(this.apMaster ? 'state.on' : 'state.off') }));
     });
 
     // Initialize Demo Director UI bindings
@@ -1216,7 +1219,7 @@ class FlightSimulator {
       const visible = this.aircraft.cockpit.toggleYokes();
       const button = document.getElementById('btn-yokes');
       if (button) {
-        button.textContent = visible ? '조종간 숨김 [J]' : '조종간 표시 [J]';
+        bindText(button, () => visible ? t('hide.yokes.j') : t('show.yokes.j'));
         button.setAttribute('aria-pressed', String(!visible));
       }
     };
@@ -1231,23 +1234,24 @@ class FlightSimulator {
     document.getElementById('hud-cam')?.addEventListener('click', () => {
       if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {
         const isPhoto = this.cameraSystem.toggleCockpitPhoto();
-        this.showToast(isPhoto ? '실사 포토 콕핏 (Photo Panel)' : '3D 가상 콕핏 (3D Virtual)');
+        this.showToast(() => isPhoto ? t('photo.cockpit.panel') : t('3d.virtual.cockpit'));
       }
     });
 
     window.addEventListener('keydown', (e) => {
+      if (e.target?.closest?.('select')) return;
       if (this.isCrashed && (e.code === 'Space' || e.code === 'KeyR' || e.code === 'Enter')) {
         this.resetCrash();
       }
       if (e.code === 'F2') {
         if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {
           const isPhoto = this.cameraSystem.toggleCockpitPhoto();
-          this.showToast(isPhoto ? '실사 포토 콕핏 (Photo Panel)' : '3D 가상 콕핏 (3D Virtual)');
+          this.showToast(() => isPhoto ? t('photo.cockpit.panel') : t('3d.virtual.cockpit'));
         }
       }
       if (e.code === 'KeyO') {
         this.cameraSystem.resetLook();
-        this.showToast('카메라 시선 정면 초기화');
+        this.showToast(() => t('camera.view.centered'));
       }
     });
   }

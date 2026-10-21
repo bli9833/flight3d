@@ -77,6 +77,7 @@ export class FlightControls {
   }
 
   handleKeyDown(e) {
+    if (e.target?.closest?.('select')) return;
     const cameraDigit = /^(?:Digit|Numpad)([1-8])$/.exec(e.code);
     if (cameraDigit || e.code === 'KeyC') {
       if (e.repeat || e.ctrlKey || e.altKey || e.metaKey ||

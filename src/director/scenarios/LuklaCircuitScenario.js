@@ -1,3 +1,4 @@
+import { t } from '../../i18n/index.js';
 import * as THREE from 'three';
 import { BOEING_737_800 } from '../../config/aircraftConfigs.js';
 import { CameraSystem } from '../../cameras/CameraSystem.js';
@@ -44,13 +45,10 @@ export class LuklaCircuitScenario {
         if (this.sim.currentTerrain?.isLoaded === false) {
           this.result.status = 'failed';
           this.result.reason = 'DEM not loaded';
-          this.director.stop('루클라 지형 데이터를 불러온 뒤 데모를 다시 시작해 주세요.');
+          this.director.stop(t('load.lukla.terrain.data.before.restarting.the'));
           return;
         }
-        this.director.updateBanner(
-          '🛫 [1/5] 루클라 24번 활주로 내리막 이륙 (Runway 24 Takeoff)',
-          '43t 경량 기체 시뮬레이션 • 내리막 이륙 • [Esc: 직접 조종]'
-        );
+        this.director.updateBanner(() => t('1.5.lukla.runway.24.downhill.takeoff'), () => t('43.t.light.aircraft.simulation.downhill.takeoff'));
         // Explicit empty-aircraft demonstration loading: no passengers/cargo,
         // ~1.6 t above the configured empty mass. Never inflate lift or braking.
         if (this.sim.aero?.loadConfig) {
@@ -84,30 +82,21 @@ export class LuklaCircuitScenario {
         break;
 
       case LuklaCircuitScenario.STAGES.CANYON_CLIMB:
-        this.director.updateBanner(
-          '🏔️ [2/5] 두드코시 협곡 하류 질주 & 고도 상승 (Dudh Kosi Canyon Outbound & Climb)',
-          '계곡 방향 상승 • 랜딩 기어 수납 • Copernicus 기반 주변 지형 조망'
-        );
+        this.director.updateBanner(() => t('2.5.dudh.kosi.canyon.outbound.climb'), () => t('climb.along.the.valley.gear.retraction.copernicus'));
         this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         this.sim.controls.setVirtualInput('throttle', 0.90);
         this.sim.engines.setThrottle(0.90);
         break;
 
       case LuklaCircuitScenario.STAGES.HIMALAYAN_CRUISE:
-        this.director.updateBanner(
-          '❄️ [3/5] 두드코시 계곡 180° 선회 & 설산 조망 (180° Canyon Turnaround & Mountain View)',
-          '42° 이내 선회 • 해발 2,950m 목표 • 06번 활주로 정렬'
-        );
+        this.director.updateBanner(() => t('3.5.canyon.turnaround.mountain.views'), () => t('bank.up.to.42.target.elevation.2'));
         // Continuous aerodynamic flight: NO TELEPORT!
         this.sim.cameraSystem.setMode(CameraSystem.MODES.FLYBY);
         this.director.setTimeOfDay(11.5); // Bright daytime summit glare
         break;
 
       case LuklaCircuitScenario.STAGES.CANYON_APPROACH:
-        this.director.updateBanner(
-          '🛬 [4/5] 두드코시 협곡 파이널 어프로치 (Canyon Final Approach to RW06)',
-          '플랩 40 • 112 KIAS 목표 • 활주로 경사에 맞춘 플레어'
-        );
+        this.director.updateBanner(() => t('4.5.canyon.final.approach.to.rw06'), () => t('flaps.40.target.112.kias.flare.to'));
         // Continuous approach: NO TELEPORT!
         this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
         if (!this.sim.cameraSystem.userLookOverridden) {
@@ -127,10 +116,7 @@ export class LuklaCircuitScenario {
         break;
 
       case LuklaCircuitScenario.STAGES.UPHILL_TOUCHDOWN:
-        this.director.updateBanner(
-          '🛑 [5/5] 11.7% 오르막 활주로 접지 & 감속 (Uphill Touchdown & Rollout)',
-          '11.7% 오르막 자연 감속 • 올레오 완충 접지 • 스포일러, 역추진 및 브레이크 제동'
-        );
+        this.director.updateBanner(() => t('5.5.uphill.touchdown.rollout'), () => t('11.7.uphill.deceleration.oleo.suspension.touchdown'));
         this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
         this.rolloutPitch = this.sim.telemetry.pitchDeg;
         this.sim.controls.setVirtualInput('throttle', 0);
@@ -142,11 +128,8 @@ export class LuklaCircuitScenario {
         this.result.status = 'completed';
         this.result.elapsedSeconds = this.director.totalTimer;
         this.result.stopPosition = this.sim.position.clone();
-        this.director.updateBanner(
-          '🎉 루클라 챌린지 데모 완료! 조종사 수동 조종 인계',
-          '세계에서 가장 위험한 공항 착륙 성공! 원하는 뷰와 프리셋으로 직접 비행해보세요! [Esc]'
-        );
-        this.director.stop('루클라 데모 비행이 완료되었습니다. 비행을 즐겨보세요!', true);
+        this.director.updateBanner(() => t('lukla.challenge.complete.taking.manual.control'), () => t('landing.complete.at.one.of.the.world'));
+        this.director.stop(t('lukla.demo.complete.enjoy.your.flight'), true);
 
         break;
     }
@@ -196,7 +179,7 @@ export class LuklaCircuitScenario {
     const tel = this.sim.telemetry;
     if (this.sim.isCrashed) {
       this.recordFailure(this.sim.crashResult);
-      this.director.stop('루클라 데모 실패: 기체 손상');
+      this.director.stop(t('lukla.demo.failed.aircraft.damage'));
       return;
     }
     // s: along runway axis (+toward 24 rock wall, -toward 06 cliff)

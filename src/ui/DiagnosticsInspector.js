@@ -1,3 +1,4 @@
+import { t, translateDOM } from '../i18n/index.js';
 /**
  * @file DiagnosticsInspector.js
  * @description Real-time In-Game Aerodynamic Physics Inspector & Live Parameter Tuning Panel.
@@ -31,48 +32,48 @@ export class DiagnosticsInspector {
     this.panel.className = 'diagnostics-panel';
     this.panel.innerHTML = `
       <div class="diag-header">
-        <span class="diag-title">🔬 실시간 물리 & 항공역학 진단기 (Physics Inspector)</span>
+        <span class="diag-title"><span data-i18n="physics.aerodynamics.inspector">🔬 실시간 물리 & 항공역학 진단기 (Physics Inspector)</span></span>
         <button id="diag-close" class="diag-close-btn">&times;</button>
       </div>
 
       <div class="diag-content">
         <!-- Performance Metrics -->
         <div class="diag-section">
-          <div class="diag-subheading">⚡ 성능 & 물리 연산 지표 (Metrics)</div>
+          <div class="diag-subheading"><span data-i18n="performance.physics.metrics">⚡ 성능 & 물리 연산 지표 (Metrics)</span></div>
           <div class="diag-row"><span class="k">FPS / Frame Time</span><span id="m-fps" class="v cyan">60 FPS (16.6 ms)</span></div>
-          <div class="diag-row"><span class="k">물리 연산 주파수 (Substep)</span><span id="m-substep" class="v">120 Hz (2 ticks/f)</span></div>
-          <div class="diag-row"><span class="k">현재 기체 질량</span><span id="m-mass" class="v">66,000 kg</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="physics.substep.frequency">물리 연산 주파수 (Substep)</span></span><span id="m-substep" class="v">120 Hz (2 ticks/f)</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="aircraft.mass">현재 기체 질량</span></span><span id="m-mass" class="v">66,000 kg</span></div>
         </div>
 
         <!-- Terrain PBR Rendering Metrics & Controls -->
         <div class="diag-section">
-          <div class="diag-subheading">🏔️ 지형 PBR 셰이더 & 트라이플래너 (Terrain)</div>
-          <div class="diag-row"><span class="k">품질 프리셋 (Quality)</span><span id="m-terrain-quality" class="v cyan">HIGH (5 Layers + Triplanar)</span></div>
-          <div class="diag-row"><span class="k">지표면 고도 (AGL Height)</span><span id="m-terrain-h" class="v">12.0 m</span></div>
-          <button id="btn-toggle-terrain-quality" class="btn btn-demo-skip" style="margin-top:6px; width:100%;">지형 품질 전환 [High ⇄ Low]</button>
+          <div class="diag-subheading"><span data-i18n="terrain.pbr.shaders.triplanar.mapping">🏔️ 지형 PBR 셰이더 & 트라이플래너 (Terrain)</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="quality.preset">품질 프리셋 (Quality)</span></span><span id="m-terrain-quality" class="v cyan">HIGH (5 Layers + Triplanar)</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="height.above.terrain.agl">지표면 고도 (AGL Height)</span></span><span id="m-terrain-h" class="v">12.0 m</span></div>
+          <button id="btn-toggle-terrain-quality" class="btn btn-demo-skip" style="margin-top:6px; width:100%;"><span data-i18n="toggle.terrain.quality.high.low">지형 품질 전환 [High ⇄ Low]</span></button>
         </div>
 
         <!-- Aircraft 3D Model & IBL Reflection Metrics -->
         <div class="diag-section">
-          <div class="diag-subheading">✈️ 기체 PBR 모델 & IBL 환경 반사 (Aircraft)</div>
-          <div class="diag-row"><span class="k">모델 포맷 (Model Format)</span><span id="m-aircraft-model" class="v cyan">GLTF PBR (237 KB)</span></div>
-          <div class="diag-row"><span class="k">환경 반사 (IBL Sky Map)</span><span id="m-aircraft-ibl" class="v green">ACTIVE (1K HDR)</span></div>
+          <div class="diag-subheading"><span data-i18n="aircraft.pbr.model.ibl.reflections">✈️ 기체 PBR 모델 & IBL 환경 반사 (Aircraft)</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="model.format">모델 포맷 (Model Format)</span></span><span id="m-aircraft-model" class="v cyan">GLTF PBR (237 KB)</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="environment.reflections.ibl.sky.map">환경 반사 (IBL Sky Map)</span></span><span id="m-aircraft-ibl" class="v green">ACTIVE (1K HDR)</span></div>
         </div>
 
         <!-- Live Forces & Aerodynamic Vectors -->
         <div class="diag-section">
-          <div class="diag-subheading">✈️ 실시간 공력 & 힘 벡터 (Forces)</div>
-          <div class="diag-row"><span class="k">양력 (Lift) / 중력 (Weight)</span><span id="m-lift" class="v green">0 kN / 647 kN</span></div>
-          <div class="diag-row"><span class="k">추력 (Thrust) / 항력 (Drag)</span><span id="m-thrust" class="v amber">0 kN / 0 kN</span></div>
-          <div class="diag-row"><span class="k">받음각 (AoA) / 옆미끄럼 (Beta)</span><span id="m-aoa" class="v">0.0° / 0.0°</span></div>
-          <div class="diag-row"><span class="k">동압 (Dynamic Pressure q)</span><span id="m-qdyn" class="v">0 Pa</span></div>
-          <div class="diag-row"><span class="k">대지 레이더 고도 (AGL)</span><span id="m-radalt" class="v">0 FT</span></div>
-          <div class="diag-row"><span class="k">실속 상태 (Stall Severity)</span><span id="m-stall" class="v status-green">NORMAL (0%)</span></div>
+          <div class="diag-subheading"><span data-i18n="aerodynamic.forces">✈️ 실시간 공력 & 힘 벡터 (Forces)</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="lift.weight">양력 (Lift) / 중력 (Weight)</span></span><span id="m-lift" class="v green">0 kN / 647 kN</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="thrust.drag">추력 (Thrust) / 항력 (Drag)</span></span><span id="m-thrust" class="v amber">0 kN / 0 kN</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="angle.of.attack.sideslip">받음각 (AoA) / 옆미끄럼 (Beta)</span></span><span id="m-aoa" class="v">0.0° / 0.0°</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="dynamic.pressure.q">동압 (Dynamic Pressure q)</span></span><span id="m-qdyn" class="v">0 Pa</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="radar.altitude.agl">대지 레이더 고도 (AGL)</span></span><span id="m-radalt" class="v">0 FT</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="stall.severity">실속 상태 (Stall Severity)</span></span><span id="m-stall" class="v status-green">NORMAL (0%)</span></div>
         </div>
 
         <!-- Telemetry Sparkline Canvas -->
         <div class="diag-section">
-          <div class="diag-subheading">📈 실시간 G-Force & 받음각 그래프</div>
+          <div class="diag-subheading"><span data-i18n="g.force.aoa.history">📈 실시간 G-Force & 받음각 그래프</span></div>
           <canvas id="diag-sparkline" width="320" height="60" class="sparkline-canvas"></canvas>
           <div class="sparkline-legend">
             <span class="leg-item"><span class="dot green"></span> G-Force</span>
@@ -82,39 +83,40 @@ export class DiagnosticsInspector {
 
         <!-- Live Tuning Sliders -->
         <div class="diag-section">
-          <div class="diag-subheading">🎛️ 실시간 물리 튜닝 (Live Tuning Sliders)</div>
+          <div class="diag-subheading"><span data-i18n="live.physics.tuning">🎛️ 실시간 물리 튜닝 (Live Tuning Sliders)</span></div>
           
           <div class="tune-control">
-            <div class="tune-lbl"><span>피치 반응성 (Elevator Authority)</span><span id="val-elev">1.0x</span></div>
+            <div class="tune-lbl"><span><span data-i18n="elevator.authority">피치 반응성 (Elevator Authority)</span></span><span id="val-elev">1.0x</span></div>
             <input type="range" id="tune-elev" min="0.3" max="2.5" step="0.05" value="1.0">
           </div>
 
           <div class="tune-control">
-            <div class="tune-lbl"><span>롤 반응성 (Aileron Authority)</span><span id="val-aileron">1.0x</span></div>
+            <div class="tune-lbl"><span><span data-i18n="aileron.authority">롤 반응성 (Aileron Authority)</span></span><span id="val-aileron">1.0x</span></div>
             <input type="range" id="tune-aileron" min="0.3" max="2.5" step="0.05" value="1.0">
           </div>
 
           <div class="tune-control">
-            <div class="tune-lbl"><span>러더/요 반응성 (Rudder Authority)</span><span id="val-rudder">1.0x</span></div>
+            <div class="tune-lbl"><span><span data-i18n="rudder.yaw.authority">러더/요 반응성 (Rudder Authority)</span></span><span id="val-rudder">1.0x</span></div>
             <input type="range" id="tune-rudder" min="0.3" max="2.5" step="0.05" value="1.0">
           </div>
 
           <div class="tune-control">
-            <div class="tune-lbl"><span>임계 실속각 (Stall Critical AoA)</span><span id="val-stall">15.5°</span></div>
+            <div class="tune-lbl"><span><span data-i18n="critical.stall.aoa">임계 실속각 (Stall Critical AoA)</span></span><span id="val-stall">15.5°</span></div>
             <input type="range" id="tune-stall" min="0.7" max="1.5" step="0.05" value="1.0">
           </div>
 
           <div class="tune-control">
-            <div class="tune-lbl"><span>지면 효과 강도 (Ground Effect)</span><span id="val-ge">1.0x</span></div>
+            <div class="tune-lbl"><span><span data-i18n="ground.effect.strength">지면 효과 강도 (Ground Effect)</span></span><span id="val-ge">1.0x</span></div>
             <input type="range" id="tune-ge" min="0.0" max="2.0" step="0.1" value="1.0">
           </div>
 
-          <button id="btn-reset-tuning" class="btn btn-reset">공장 초기치로 복원 (Reset Specs)</button>
+          <button id="btn-reset-tuning" class="btn btn-reset"><span data-i18n="reset.to.factory.specifications">공장 초기치로 복원 (Reset Specs)</span></button>
         </div>
       </div>
     `;
 
     document.body.appendChild(this.panel);
+    translateDOM(this.panel);
 
     // Sparkline Canvas context
     const cvs = document.getElementById('diag-sparkline');
@@ -187,7 +189,7 @@ export class DiagnosticsInspector {
       document.getElementById('val-stall').textContent = '15.5°';
       document.getElementById('val-ge').textContent = '1.0x';
 
-      this.sim.showToast('튜닝 수치가 Boeing 737 공장 사양으로 리셋되었습니다.');
+      this.sim.showToast(() => t('tuning.reset.to.boeing.737.factory.specifications'));
     });
 
     document.getElementById('btn-toggle-terrain-quality')?.addEventListener('click', () => {
@@ -200,7 +202,7 @@ export class DiagnosticsInspector {
         qEl.textContent = next === 'high' ? 'HIGH (5 Layers + Triplanar)' : 'LOW (2 Layers Planar)';
         qEl.className = next === 'high' ? 'v cyan' : 'v amber';
       }
-      this.sim.showToast(`지형 렌더링 품질: ${next.toUpperCase()}`);
+      this.sim.showToast(() => t('terrain.rendering.quality.value', { value: next.toUpperCase() }));
     });
   }
 

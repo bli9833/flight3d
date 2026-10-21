@@ -57,59 +57,59 @@
     </header>
 
     <!-- Minimized Demo Flight Showcase Pill (Tap to Reopen) -->
-    <button id="btn-demo-open" class="demo-pill-btn" style="display: none;" title="데모 비행 안내 팝업 열기" aria-label="데모 비행 안내 팝업 열기">
+    <button id="btn-demo-open" class="demo-pill-btn" style="display: none;" title="데모 비행 안내 팝업 열기" aria-label="데모 비행 안내 팝업 열기" data-i18n-title="open.demo.flight.guide" data-i18n-aria-label="open.demo.flight.guide">
       <span class="demo-dot"></span>
-      <span id="demo-pill-text" class="demo-pill-text">🎬 AUTO DEMO [안내 열기 ▾]</span>
+      <span id="demo-pill-text" class="demo-pill-text"><span data-i18n="auto.demo.open.guide">🎬 AUTO DEMO [안내 열기 ▾]</span></span>
     </button>
 
     <!-- Cinematic Demo Flight Showcase Banner -->
     <div id="demo-banner" class="demo-banner" style="display: none;">
-      <div class="demo-badge" title="클릭하여 안내 팝업 접기" role="button" tabindex="0">
+      <div class="demo-badge" title="클릭하여 안내 팝업 접기" role="button" tabindex="0" data-i18n-title="click.to.collapse.the.guide">
         <span class="demo-dot"></span>
         <span class="demo-badge-text">AUTO DEMO</span>
       </div>
       <div class="demo-info">
-        <div id="demo-stage-title" class="demo-stage-title">🚁 [1/8] 비행 전 드론 서클 점검 (Pre-Flight Drone Inspection)</div>
-        <div id="demo-stage-desc" class="demo-stage-desc">활주로 09L 대기 • 보잉 737 기체 외형 360° 공중 점검 • 플랩 5° 및 엔진 가동 준비</div>
+        <div id="demo-stage-title" class="demo-stage-title"><span data-i18n="1.8.pre.flight.drone.inspection">🚁 [1/8] 비행 전 드론 서클 점검 (Pre-Flight Drone Inspection)</span></div>
+        <div id="demo-stage-desc" class="demo-stage-desc"><span data-i18n="runway.09l.ready.boeing.737.exterior.inspection">활주로 09L 대기 • 보잉 737 기체 외형 360° 공중 점검 • 플랩 5° 및 엔진 가동 준비</span></div>
       </div>
       <div class="demo-actions">
-        <button id="btn-skip-demo" class="btn btn-demo-skip" title="수동 직접 조종으로 전환 (Esc)">직접 조종하기 [Esc]</button>
-        <button id="btn-demo-close" class="btn btn-demo-close" title="안내 팝업 닫기 (접기)" aria-label="안내 팝업 닫기">✕</button>
+        <button id="btn-skip-demo" class="btn btn-demo-skip" title="수동 직접 조종으로 전환 (Esc)" data-i18n-title="switch.to.manual.control.esc"><span data-i18n="take.control.esc">직접 조종하기 [Esc]</span></button>
+        <button id="btn-demo-close" class="btn btn-demo-close" title="안내 팝업 닫기 (접기)" aria-label="안내 팝업 닫기" data-i18n-title="close.guide.collapse" data-i18n-aria-label="close.guide">✕</button>
       </div>
     </div>
 
     <!-- Stall Warning Alert Banner -->
-    <div id="hud-stall" class="stall-banner">⚠️ STALL WARNING - PULL DOWN NOSE ⚠️</div>
+    <div id="hud-stall" class="stall-banner" data-i18n="warning.stall">⚠️ STALL WARNING - PULL DOWN NOSE ⚠️</div>
 
     <!-- Catastrophic Crash & Explosion Overlay -->
     <div id="crash-overlay" class="crash-overlay" style="display: none;">
       <div class="crash-vignette"></div>
       <div class="crash-card">
         <div class="crash-header">
-          <span class="crash-badge">💥 CATASTROPHIC IMPACT</span>
-          <span class="crash-status-tag">HULL LOSS</span>
+          <span class="crash-badge" data-i18n="crash.impact">💥 CATASTROPHIC IMPACT</span>
+          <span class="crash-status-tag" data-i18n="crash.hullLoss">HULL LOSS</span>
         </div>
-        <h1 id="crash-title" class="crash-title">관제탑 충돌 (CONTROL TOWER COLLISION)</h1>
-        <p id="crash-desc" class="crash-desc">공항 관제탑 시설에 기수 부위가 격돌했습니다.</p>
+        <h1 id="crash-title" class="crash-title"><span data-i18n="control.tower.collision">관제탑 충돌 (CONTROL TOWER COLLISION)</span></h1>
+        <p id="crash-desc" class="crash-desc"><span data-i18n="the.nose.struck.an.airport.control.tower">공항 관제탑 시설에 기수 부위가 격돌했습니다.</span></p>
         
         <div class="crash-telemetry-grid">
           <div class="crash-stat">
-            <span class="stat-label">충돌 대기속도</span>
+            <span class="stat-label"><span data-i18n="impact.airspeed">충돌 대기속도</span></span>
             <span id="crash-speed" class="stat-val">178 KT</span>
           </div>
           <div class="crash-stat">
-            <span class="stat-label">기체 피해 상태</span>
-            <span class="stat-val critical">전파 손실 (DESTROYED)</span>
+            <span class="stat-label"><span data-i18n="aircraft.damage">기체 피해 상태</span></span>
+            <span class="stat-val critical"><span data-i18n="destroyed">전파 손실 (DESTROYED)</span></span>
           </div>
           <div class="crash-stat">
-            <span class="stat-label">충돌 대상 분류</span>
+            <span class="stat-label"><span data-i18n="collision.target">충돌 대상 분류</span></span>
             <span id="crash-type" class="stat-val">AIRPORT TOWER</span>
           </div>
         </div>
 
         <div class="crash-actions">
           <button id="btn-crash-restart" class="btn btn-crash-restart">
-            <span class="btn-icon">🔄</span> 활주로 09L에서 즉시 재시작 [Space / R]
+            <span class="btn-icon">🔄</span> <span data-i18n="restart.on.runway.09l.space.r">활주로 09L에서 즉시 재시작 [Space / R]</span>
           </button>
         </div>
       </div>
@@ -120,39 +120,43 @@
 
     <!-- Quick Flight Presets & Airport Selector (Top Left) -->
     <div class="presets-bar">
+      <label class="language-control" for="language-select">
+        <span data-i18n="language.label">언어</span>
+        <select id="language-select" class="btn"></select>
+      </label>
       <div class="airport-group">
-        <span class="airport-tag">공항</span>
-        <button id="btn-airport-coastal" class="btn btn-airport" title="태평양 해안 국제공항 (Runway 09L)">🌊 국제공항</button>
-        <button id="btn-airport-lukla" class="btn btn-airport active" title="네팔 텐징-힐러리 공항 (루클라 VNLK 실존 DEM 3D 지형)">🏔️ 루클라 (VNLK)</button>
+        <span class="airport-tag"><span data-i18n="airport">공항</span></span>
+        <button id="btn-airport-coastal" class="btn btn-airport" title="태평양 해안 국제공항 (Runway 09L)" data-i18n-title="pacific.coastal.international.airport.runway.09l"><span data-i18n="coastal.airport">🌊 국제공항</span></button>
+        <button id="btn-airport-lukla" class="btn btn-airport active" title="네팔 텐징-힐러리 공항 (루클라 VNLK 실존 DEM 3D 지형)" data-i18n-title="tenzing.hillary.airport.nepal.lukla.vnlk.dem"><span data-i18n="lukla.vnlk">🏔️ 루클라 (VNLK)</span></button>
       </div>
-      <button id="btn-demo" class="btn btn-preset btn-demo-toggle" title="데모 비행 시연 (P)">🎬 데모 비행 [P]</button>
-      <button id="btn-touch-toggle" class="btn btn-preset btn-touch-toggle" title="모바일 / 온스크린 터치 조작 토글">📱 터치 조작</button>
-      <button id="btn-sound" class="btn btn-preset btn-sound-toggle" title="사운드 볼륨 조절 / 모바일 부스트 (M)">🔊 소리: 100%</button>
-      <button id="btn-preset-rwy" class="btn btn-preset" title="루클라 활주로 06 대기">🛫 루클라 06 대기</button>
-      <button id="btn-preset-app" class="btn btn-preset" title="두드코시 협곡 착륙 챌린지">🛬 협곡 착륙 챌린지</button>
-      <button id="btn-preset-cru" class="btn btn-preset" title="히말라야 설산 13,000피트 순항">✈️ 히말라야 순항 (13,000 FT)</button>
-      <button id="btn-preset-cliff" class="btn btn-preset btn-cliff" style="display: block;" title="루클라 24번 활주로 내리막 이륙">⚡ 내리막 이륙 (Rwy 24)</button>
+      <button id="btn-demo" class="btn btn-preset btn-demo-toggle" title="데모 비행 시연 (P)" data-i18n-title="demo.flight.p"><span data-i18n="demo.flight.p.40">🎬 데모 비행 [P]</span></button>
+      <button id="btn-touch-toggle" class="btn btn-preset btn-touch-toggle" title="모바일 / 온스크린 터치 조작 토글" data-i18n-title="toggle.mobile.on.screen.touch.controls"><span data-i18n="touch.controls">📱 터치 조작</span></button>
+      <button id="btn-sound" class="btn btn-preset btn-sound-toggle" title="사운드 볼륨 조절 / 모바일 부스트 (M)" data-i18n-title="sound.volume.mobile.boost.m"><span data-i18n="sound.100">🔊 소리: 100%</span></button>
+      <button id="btn-preset-rwy" class="btn btn-preset" title="루클라 활주로 06 대기" data-i18n-title="lukla.runway.06.ready"><span data-i18n="lukla.06.ready">🛫 루클라 06 대기</span></button>
+      <button id="btn-preset-app" class="btn btn-preset" title="두드코시 협곡 착륙 챌린지" data-i18n-title="dudh.kosi.canyon.landing.challenge"><span data-i18n="canyon.landing">🛬 협곡 착륙 챌린지</span></button>
+      <button id="btn-preset-cru" class="btn btn-preset" title="히말라야 설산 13,000피트 순항" data-i18n-title="himalayan.cruise.at.13.000.ft"><span data-i18n="himalayan.cruise.13.000.ft">✈️ 히말라야 순항 (13,000 FT)</span></button>
+      <button id="btn-preset-cliff" class="btn btn-preset btn-cliff" style="display: block;" title="루클라 24번 활주로 내리막 이륙" data-i18n-title="lukla.runway.24.downhill.takeoff"><span data-i18n="downhill.takeoff.rwy.24">⚡ 내리막 이륙 (Rwy 24)</span></button>
     </div>
 
     <!-- Action Controls (Bottom Right) -->
     <div class="action-panel">
       <div class="btn-group">
-        <button id="btn-flaps-ret" class="btn" title="플랩 접기 (V)">Flaps - [V]</button>
-        <button id="btn-flaps-ext" class="btn" title="플랩 펼치기 (F)">Flaps + [F]</button>
+        <button id="btn-flaps-ret" class="btn" title="플랩 접기 (V)" data-i18n-title="retract.flaps.v">Flaps - [V]</button>
+        <button id="btn-flaps-ext" class="btn" title="플랩 펼치기 (F)" data-i18n-title="extend.flaps.f">Flaps + [F]</button>
       </div>
       <div class="btn-group">
-        <button id="btn-gear" class="btn" title="랜딩 기어 접기/내리기 (G)">Gear [G]</button>
-        <button id="btn-spoilers" class="btn" title="스포일러/에어브레이크 (B)">Spoiler [B]</button>
-        <button id="btn-reverser" class="btn" title="역추진 작동 (R)">Rev [R]</button>
+        <button id="btn-gear" class="btn" title="랜딩 기어 접기/내리기 (G)" data-i18n-title="retract.extend.landing.gear.g">Gear [G]</button>
+        <button id="btn-spoilers" class="btn" title="스포일러/에어브레이크 (B)" data-i18n-title="spoilers.airbrakes.b">Spoiler [B]</button>
+        <button id="btn-reverser" class="btn" title="역추진 작동 (R)" data-i18n-title="reverse.thrust.r">Rev [R]</button>
       </div>
       <div class="btn-group">
-        <button id="btn-cam" class="btn" title="시점 변경 (C)">시점 [C]</button>
-        <button id="btn-cam-reset" class="btn" title="카메라 시선 정면 초기화 (O / 더블클릭)">시선 리셋 [O]</button>
-        <button id="btn-yokes" class="btn" aria-pressed="false" title="계기판을 가리는 조종간 표시/숨김 (J)">조종간 숨김 [J]</button>
-        <button id="btn-sound-action" class="btn" title="사운드 볼륨 / 모바일 부스트 (M)">🔊 소리 [M]</button>
-        <button id="btn-time" class="btn" title="시간대 변경 [ ]">시간대 [ / ]</button>
-        <button id="btn-diag" class="btn" title="실시간 물리 진단 & 튜닝 [`]">🔬 물리 진단 [`]</button>
-        <button id="btn-help" class="btn btn-accent" title="비행 가이드 (H)">조작 안내 [H]</button>
+        <button id="btn-cam" class="btn" title="시점 변경 (C)" data-i18n-title="change.camera.c"><span data-i18n="camera.c">시점 [C]</span></button>
+        <button id="btn-cam-reset" class="btn" title="카메라 시선 정면 초기화 (O / 더블클릭)" data-i18n-title="center.camera.view.o.double.click"><span data-i18n="center.view.o">시선 리셋 [O]</span></button>
+        <button id="btn-yokes" class="btn" aria-pressed="false" title="계기판을 가리는 조종간 표시/숨김 (J)" data-i18n-title="show.hide.instrument.panel.yokes.j"><span data-i18n="hide.yokes.j">조종간 숨김 [J]</span></button>
+        <button id="btn-sound-action" class="btn" title="사운드 볼륨 / 모바일 부스트 (M)" data-i18n-title="audio.volume.tooltip"><span data-i18n="sound.m">🔊 소리 [M]</span></button>
+        <button id="btn-time" class="btn" title="시간대 변경 [ ]" data-i18n-title="change.time.of.day"><span data-i18n="time">시간대 [ / ]</span></button>
+        <button id="btn-diag" class="btn" title="실시간 물리 진단 & 튜닝 [`]" data-i18n-title="live.physics.inspector.tuning"><span data-i18n="physics">🔬 물리 진단 [`]</span></button>
+        <button id="btn-help" class="btn btn-accent" title="비행 가이드 (H)" data-i18n-title="flight.guide.h"><span data-i18n="flight.guide.h.53">조작 안내 [H]</span></button>
       </div>
     </div>
   </div>
@@ -161,64 +165,64 @@
   <div id="help-modal" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>✈️ Boeing 737 조종 가이드 & 항공역학 시뮬레이션 안내</h2>
-        <button id="btn-help-close" class="modal-close">&times;</button>
+        <h2><span data-i18n="boeing.737.flight.guide.aerodynamics">✈️ Boeing 737 조종 가이드 & 항공역학 시뮬레이션 안내</span></h2>
+        <button id="btn-help-close" aria-label="도움말 닫기" data-i18n-aria-label="help.close" class="modal-close">&times;</button>
       </div>
       <div class="modal-body">
         <div class="help-grid">
           <div class="help-col">
-            <h3>🎮 비행 조작키 (Keyboard Controls)</h3>
+            <h3><span data-i18n="keyboard.controls">🎮 비행 조작키 (Keyboard Controls)</span></h3>
             <table class="key-table">
-              <tr><td><kbd>W</kbd> / <kbd>↑</kbd></td><td>피치 다운 (기수 내림 / 하강)</td></tr>
-              <tr><td><kbd>S</kbd> / <kbd>↓</kbd></td><td>피치 업 (기수 올림 / 상승)</td></tr>
-              <tr><td><kbd>A</kbd> / <kbd>←</kbd></td><td>롤 좌측 선회 (에일러론)</td></tr>
-              <tr><td><kbd>D</kbd> / <kbd>→</kbd></td><td>롤 우측 선회 (에일러론)</td></tr>
-              <tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>러더 좌/우 (지상 활주로 조향 & 요)</td></tr>
-              <tr><td><kbd>=</kbd> / <kbd>−</kbd></td><td>스로틀 엔진 출력 증가 / 감소</td></tr>
-              <tr><td><kbd>X</kbd> / <kbd>Z</kbd></td><td>최대 출력(TOGA 100%) / 아이들(Idle 22%)</td></tr>
-              <tr><td><kbd>Space</kbd></td><td>휠 브레이크 (지상 감속)</td></tr>
-              <tr><td><kbd>T</kbd> / <kbd>Y</kbd></td><td>피치 트림 (Trim Nose Down / Up)</td></tr>
+              <tr><td><kbd>W</kbd> / <kbd>↑</kbd></td><td><span data-i18n="pitch.down.lower.nose.descend">피치 다운 (기수 내림 / 하강)</span></td></tr>
+              <tr><td><kbd>S</kbd> / <kbd>↓</kbd></td><td><span data-i18n="pitch.up.raise.nose.climb">피치 업 (기수 올림 / 상승)</span></td></tr>
+              <tr><td><kbd>A</kbd> / <kbd>←</kbd></td><td><span data-i18n="roll.left.ailerons">롤 좌측 선회 (에일러론)</span></td></tr>
+              <tr><td><kbd>D</kbd> / <kbd>→</kbd></td><td><span data-i18n="roll.right.ailerons">롤 우측 선회 (에일러론)</span></td></tr>
+              <tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td><span data-i18n="rudder.left.right.ground.steering.yaw">러더 좌/우 (지상 활주로 조향 & 요)</span></td></tr>
+              <tr><td><kbd>=</kbd> / <kbd>−</kbd></td><td><span data-i18n="increase.decrease.engine.throttle">스로틀 엔진 출력 증가 / 감소</span></td></tr>
+              <tr><td><kbd>X</kbd> / <kbd>Z</kbd></td><td><span data-i18n="full.thrust.toga.100.idle.22">최대 출력(TOGA 100%) / 아이들(Idle 22%)</span></td></tr>
+              <tr><td><kbd>Space</kbd></td><td><span data-i18n="wheel.brakes.ground.deceleration">휠 브레이크 (지상 감속)</span></td></tr>
+              <tr><td><kbd>T</kbd> / <kbd>Y</kbd></td><td><span data-i18n="pitch.trim.nose.down.up">피치 트림 (Trim Nose Down / Up)</span></td></tr>
             </table>
           </div>
           <div class="help-col">
-            <h3>⚙️ 항공기 시스템 및 카메라</h3>
+            <h3><span data-i18n="aircraft.systems.cameras">⚙️ 항공기 시스템 및 카메라</span></h3>
             <table class="key-table">
-              <tr><td><kbd>F</kbd> / <kbd>V</kbd></td><td>플랩 전개 / 접기 (UP, 1°, 5°, 15°, 20°, 30°, 40°)</td></tr>
-              <tr><td><kbd>G</kbd></td><td>랜딩 기어 접기/펼치기 (Gear Up/Down)</td></tr>
-              <tr><td><kbd>B</kbd></td><td>스포일러 / 에어브레이크 전개 (양력 감쇄)</td></tr>
-              <tr><td><kbd>R</kbd></td><td>역추진 장치 (Reverser - 착륙 후 제동)</td></tr>
-              <tr><td><kbd>C</kbd></td><td>카메라 변경 (콕핏, 3인칭, 윙 뷰, 관제탑, 플라이바이, 랜딩 기어 뷰, 드론 서클 뷰, 자동 전환)</td></tr>
-              <tr><td><kbd>1</kbd>–<kbd>7</kbd></td><td>콕핏 / 3인칭 / 윙 / 관제탑 / 플라이바이 / 랜딩 기어 / 드론 바로 선택</td></tr>
-              <tr><td><kbd>8</kbd></td><td>자동 카메라: 10초마다 전환. 1–7로 수동 선택 시 해제</td></tr>
-              <tr><td><kbd>마우스 이동 / 드래그</kbd></td><td>카메라 시선 자유 조절 (화면 끝 도달 시 시선 지속 회전, 조종석 고개 회전, 3인칭 360° 공중 선회, 휠 줌)</td></tr>
-              <tr><td><kbd>더블클릭</kbd> / <kbd>O</kbd></td><td>카메라 시선 정면 초기화 (Center View)</td></tr>
-              <tr><td><kbd>마우스 휠 클릭</kbd></td><td>자유 시선 포인터 고정 모드 토글 (Pointer Lock)</td></tr>
-              <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td>시간대 변경 (새벽, 정오, 석양, 황혼, 야경)</td></tr>
-              <tr><td><kbd>M</kbd></td><td>사운드 볼륨 전환 (100% → 150% 부스트 → 음소거)</td></tr>
+              <tr><td><kbd>F</kbd> / <kbd>V</kbd></td><td><span data-i18n="extend.retract.flaps.up.1.5.15">플랩 전개 / 접기 (UP, 1°, 5°, 15°, 20°, 30°, 40°)</span></td></tr>
+              <tr><td><kbd>G</kbd></td><td><span data-i18n="retract.extend.landing.gear">랜딩 기어 접기/펼치기 (Gear Up/Down)</span></td></tr>
+              <tr><td><kbd>B</kbd></td><td><span data-i18n="deploy.spoilers.airbrakes.reduce.lift">스포일러 / 에어브레이크 전개 (양력 감쇄)</span></td></tr>
+              <tr><td><kbd>R</kbd></td><td><span data-i18n="reverse.thrust.braking.after.landing">역추진 장치 (Reverser - 착륙 후 제동)</span></td></tr>
+              <tr><td><kbd>C</kbd></td><td><span data-i18n="cycle.cameras.cockpit.chase.wing.tower.flyby">카메라 변경 (콕핏, 3인칭, 윙 뷰, 관제탑, 플라이바이, 랜딩 기어 뷰, 드론 서클 뷰, 자동 전환)</span></td></tr>
+              <tr><td><kbd>1</kbd>–<kbd>7</kbd></td><td><span data-i18n="select.cockpit.chase.wing.tower.flyby.landing">콕핏 / 3인칭 / 윙 / 관제탑 / 플라이바이 / 랜딩 기어 / 드론 바로 선택</span></td></tr>
+              <tr><td><kbd>8</kbd></td><td><span data-i18n="auto.camera.switch.every.10.seconds.select">자동 카메라: 10초마다 전환. 1–7로 수동 선택 시 해제</span></td></tr>
+              <tr><td><kbd><span data-i18n="mouse.move.drag">마우스 이동 / 드래그</span></kbd></td><td><span data-i18n="free.camera.look.continuous.edge.pan.cockpit">카메라 시선 자유 조절 (화면 끝 도달 시 시선 지속 회전, 조종석 고개 회전, 3인칭 360° 공중 선회, 휠 줌)</span></td></tr>
+              <tr><td><kbd><span data-i18n="double.click">더블클릭</span></kbd> / <kbd>O</kbd></td><td><span data-i18n="center.camera.view">카메라 시선 정면 초기화 (Center View)</span></td></tr>
+              <tr><td><kbd><span data-i18n="middle.mouse.button">마우스 휠 클릭</span></kbd></td><td><span data-i18n="toggle.pointer.lock.for.free.look">자유 시선 포인터 고정 모드 토글 (Pointer Lock)</span></td></tr>
+              <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td><span data-i18n="change.time.dawn.noon.sunset.dusk.night">시간대 변경 (새벽, 정오, 석양, 황혼, 야경)</span></td></tr>
+              <tr><td><kbd>M</kbd></td><td><span data-i18n="cycle.sound.volume.100.150.boost.muted">사운드 볼륨 전환 (100% → 150% 부스트 → 음소거)</span></td></tr>
             </table>
           </div>
           <div class="help-col help-col-wide">
-            <h3>📱 모바일 / 터치스크린 온스크린 조작 가이드</h3>
+            <h3><span data-i18n="mobile.touchscreen.controls">📱 모바일 / 터치스크린 온스크린 조작 가이드</span></h3>
             <table class="key-table">
-              <tr><td><kbd>우측 가상 스틱 (Yoke)</kbd></td><td>터치 드래그로 피치(기수 올림/내림) 및 롤(좌우 선회) 조작. 놓으면 중앙 복귀</td></tr>
-              <tr><td><kbd>좌측 수직 스로틀</kbd></td><td>위아래 슬라이더 드래그로 추력 0%~100% 조절 (TOGA, CLB, APP, IDLE 원터치 프리셋 지원)</td></tr>
-              <tr><td><kbd>중앙 하단 러더 바</kbd></td><td>좌우 슬라이더로 지상 활주로 조향(Nosewheel Steering) 및 공중 요 조작</td></tr>
-              <tr><td><kbd>BRAKE 버튼</kbd></td><td>누르고 있는 동안 휠 브레이크 최대 유압 제동 (감속 완료 후 해제)</td></tr>
-              <tr><td><kbd>📱 GYRO 버튼</kbd></td><td>기기 기울기 센서 모드: 스마트폰/태블릿을 전후좌우로 기울여 조종간처럼 비행</td></tr>
-              <tr><td><kbd>퀵 액션 필 버튼</kbd></td><td>사운드(VOL), 랜딩 기어(GEAR), 플랩(FLAP+/-), 스포일러(SPOIL), 역추진(REV), 카메라(CAM) 터치 토글</td></tr>
+              <tr><td><kbd><span data-i18n="right.virtual.stick.yoke">우측 가상 스틱 (Yoke)</span></kbd></td><td><span data-i18n="drag.to.control.pitch.and.roll.release">터치 드래그로 피치(기수 올림/내림) 및 롤(좌우 선회) 조작. 놓으면 중앙 복귀</span></td></tr>
+              <tr><td><kbd><span data-i18n="left.vertical.throttle">좌측 수직 스로틀</span></kbd></td><td><span data-i18n="drag.up.down.for.0.100.thrust">위아래 슬라이더 드래그로 추력 0%~100% 조절 (TOGA, CLB, APP, IDLE 원터치 프리셋 지원)</span></td></tr>
+              <tr><td><kbd><span data-i18n="bottom.center.rudder.bar">중앙 하단 러더 바</span></kbd></td><td><span data-i18n="slide.left.right.for.nosewheel.steering.and">좌우 슬라이더로 지상 활주로 조향(Nosewheel Steering) 및 공중 요 조작</span></td></tr>
+              <tr><td><kbd><span data-i18n="brake.button">BRAKE 버튼</span></kbd></td><td><span data-i18n="hold.for.full.wheel.braking.release.after">누르고 있는 동안 휠 브레이크 최대 유압 제동 (감속 완료 후 해제)</span></td></tr>
+              <tr><td><kbd><span data-i18n="gyro.button">📱 GYRO 버튼</span></kbd></td><td><span data-i18n="tilt.your.phone.or.tablet.forward.backward">기기 기울기 센서 모드: 스마트폰/태블릿을 전후좌우로 기울여 조종간처럼 비행</span></td></tr>
+              <tr><td><kbd><span data-i18n="quick.action.buttons">퀵 액션 필 버튼</span></kbd></td><td><span data-i18n="toggle.sound.vol.gear.gear.flaps.flap">사운드(VOL), 랜딩 기어(GEAR), 플랩(FLAP+/-), 스포일러(SPOIL), 역추진(REV), 카메라(CAM) 터치 토글</span></td></tr>
             </table>
           </div>
         </div>
 
         <div class="aero-info">
-          <h3>🔬 IL-2급 현실적 항공역학 & 시뮬레이션 특징</h3>
+          <h3><span data-i18n="realistic.aerodynamics.simulation.features">🔬 IL-2급 현실적 항공역학 & 시뮬레이션 특징</span></h3>
           <ul>
-            <li><strong>6-DOF 강체 동역학 & ISA 표준대기:</strong> 고도에 따른 공기밀도($\rho$), 기압, 온도 감율 및 동압($q=\frac{1}{2}\rho V^2$)에 따른 조작면 저항 적용.</li>
-            <li><strong>받음각(AoA) 및 실속(Stall) 모델:</strong> 한계 받음각 초과 시 급격한 양력 상실, 기수 꺾임, 콕핏 진동 버핏(Buffet), 경보음 발생.</li>
-            <li><strong>지면 효과 (Ground Effect):</strong> 활주로 접근 시 유도항력 감소 및 양력 증가로 현실적인 플레어(Flare) 부유감 구현.</li>
-            <li><strong>보잉 글래스 콕핏:</strong> 60 FPS 벡터 PFD (인공수평선, 대기속도 테이프, 고도계, VSI), ND (활주로 침로, 웨이포인트, 바람), EICAS (N1, EGT, N2, 연료유량, 기어/플랩 인디케이터).</li>
-            <li><strong>실감나는 환경:</strong> 햇빛 반사 거스트너 파도 수면, 부력으로 흔들리는 화물선·크루즈선·쾌속정, 65m 공항 관제탑과 회전 레이더, 순차 점멸 ALS 진입등.</li>
-            <li><strong>네팔 텐징-힐러리 공항 (루클라 VNLK):</strong> Copernicus 기반 주변 지형과 같은 좌표로 맞춘 ESRI 위성사진을 사용합니다. 활주로와 공항 시설은 근사 모델이며, 지형 해상도에 따른 차이가 있습니다. <a href="/terrain/lukla_sources.txt" target="_blank" rel="noopener">데이터 출처와 한계</a></li>
+            <li><strong><span data-i18n="6.dof.rigid.body.dynamics.isa.atmosphere">6-DOF 강체 동역학 & ISA 표준대기:</span></strong> <span data-i18n="altitude.dependent.air.density.pressure.and.temperature">고도에 따른 공기밀도($\rho$), 기압, 온도 감율 및 동압($q=\frac{1}{2}\rho V^2$)에 따른 조작면 저항 적용.</span></li>
+            <li><strong><span data-i18n="angle.of.attack.aoa.stall.model">받음각(AoA) 및 실속(Stall) 모델:</span></strong> <span data-i18n="exceeding.the.critical.aoa.causes.lift.loss">한계 받음각 초과 시 급격한 양력 상실, 기수 꺾임, 콕핏 진동 버핏(Buffet), 경보음 발생.</span></li>
+            <li><strong><span data-i18n="ground.effect">지면 효과 (Ground Effect):</span></strong> <span data-i18n="reduced.induced.drag.and.increased.lift.near">활주로 접근 시 유도항력 감소 및 양력 증가로 현실적인 플레어(Flare) 부유감 구현.</span></li>
+            <li><strong><span data-i18n="boeing.glass.cockpit">보잉 글래스 콕핏:</span></strong> <span data-i18n="60.fps.vector.pfd.attitude.airspeed.altitude">60 FPS 벡터 PFD (인공수평선, 대기속도 테이프, 고도계, VSI), ND (활주로 침로, 웨이포인트, 바람), EICAS (N1, EGT, N2, 연료유량, 기어/플랩 인디케이터).</span></li>
+            <li><strong><span data-i18n="immersive.environment">실감나는 환경:</span></strong> <span data-i18n="sunlit.gerstner.waves.buoyant.cargo.ships.cruise">햇빛 반사 거스트너 파도 수면, 부력으로 흔들리는 화물선·크루즈선·쾌속정, 65m 공항 관제탑과 회전 레이더, 순차 점멸 ALS 진입등.</span></li>
+            <li><strong><span data-i18n="tenzing.hillary.airport.lukla.vnlk.nepal">네팔 텐징-힐러리 공항 (루클라 VNLK):</span></strong> <span data-i18n="esri.satellite.imagery.is.aligned.with.copernicus">Copernicus 기반 주변 지형과 같은 좌표로 맞춘 ESRI 위성사진을 사용합니다. 활주로와 공항 시설은 근사 모델이며, 지형 해상도에 따른 차이가 있습니다.</span> <a href="/terrain/lukla_sources.txt" target="_blank" rel="noopener"><span data-i18n="data.sources.and.limitations">데이터 출처와 한계</span></a></li>
           </ul>
         </div>
       </div>
