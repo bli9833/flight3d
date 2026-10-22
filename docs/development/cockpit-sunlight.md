@@ -22,14 +22,40 @@ so real geometry cannot mask the aperture and would throw a solid shadow instead
 `WINDSHIELD_PANES` quads in `src/aircraft/CockpitAperture.js`, projected along the
 sun into the light's own shadow space. The cookie is recomputed only when the
 deck-local sun vector turns by more than 0.008 rad, and the shadow image is kept
-body-fixed by setting `shadow.camera.up` from the deck frame, so pitch and bank do
-not repaint it. Interior meshes still cast into the map at about 3 mm/texel, which
+body-fixed by setting `shadow.camera.up` from the deck frame, avoiding an extra image roll relative to the deck. Interior meshes still cast
+into the map at about 5 mm/texel, which
 is what puts the pillar and roof edges on the panel.
 
-Caster selection is geometric, not layered: per-light `layers` filtering does not
-exist in three r0.186. The shadow camera's near plane sits `DECK_SUN_CLIP_T` (0.45 m)
-aft of the aperture, so the nose skin and the airframe shadow proxy are clipped out
-of this map while the main sun keeps using them for aircraft-on-ground shadows.
+The shadow slab reaches 2.2 m sunward of the deck anchor, including both full
+window frames and the side consoles. Closed exterior shadow proxies opt out of
+this light's pass via paired `onBeforeShadow`/`onAfterShadow` hooks: their draw
+range is empty only for the tagged deck shadow camera, then restored for the
+main sun. No single near plane can both reject the closed skin and retain all
+pillars from every sun bearing.
+
+The depth image is cached while the deck-local sun and controls are steady.
+Yoke visibility/deflection, throttles, pedals and model readiness invalidate it.
+Pending invalidation survives multiple simulation substeps before a render;
+the world-to-shadow matrix still follows the aircraft when the image is frozen.
+
+The deck's PBR materials use reduced, directional sky fill instead of receiving
+the full outdoor ambient and HDR environment. The localized sun gain is 3.2;
+other surfaces are outside its cone. Instrument floods dim to 8% in full sun,
+with a 0.06 floor. Front-to-aft sunlight puts the yoke's cast shadow behind the
+pilot; AO makes its contact with nearby surfaces readable even when that cast
+shadow is out of view.
+
+`CockpitOcclusion` adds half-resolution, 16-sample SSAO in balanced quality
+(three-quarter resolution in high, capped at 960 px wide). It renders only opaque
+cockpit geometry with an 8 m AO depth range. A depth mask protects the exterior,
+and unlit instrument surfaces are redrawn after the multiply composite. Glass
+is excluded. Its thin tint overlay is unlit, so increasing deck sunlight does not
+add an opaque diffuse veil over the exterior. Performance quality and exterior/photo views skip AO entirely;
+render targets are allocated only on the first eligible cockpit render.
+The SSAO and depth-display shader ranges track that 8 m camera on every render,
+including near-plane changes; metre-based rejection bounds use the same range.
+AO darkening is capped at 25% so it cannot wash out the cast-sunlight bands.
+This is contact/crease shading, not a replacement for directional cast shadows.
 
 `SkyAtmosphere` owns the weather gate: `setCloudCover(0..1)` attenuates direct sun
 continuously, softens both shadow maps, lifts ambient skylight and greys the fog.
@@ -41,10 +67,6 @@ cockpit camera mode, which ramps over ~0.3 s rather than switching.
 
 ## Known limits
 
-- Deck surfaces closer to the sun than the clip plane read as flat, unshadowed,
-  un-cookied sun. With a steeply raked windshield this is the copilot console with
-  the sun abeam right; no single radial clip can exclude skin that is 0.51 m above
-  but 1.05 m to the side of the aperture.
 - A high sun barely enters: at 12:30 the sun is 64° up and the facing term falls to
   0.35, so the deck keeps most of its flood lighting. That is the windshield doing its
   job, but it means noon is the weakest frame for this feature.
@@ -58,8 +80,8 @@ cockpit camera mode, which ramps over ~0.3 s rather than switching.
   but `CockpitSunShadow` calls them with the `CockpitAperture.js` defaults, which are
   measured from the shipped 737 GLBs. Another cockpit needs its own aperture profile — by
   swapping that module, or by threading a per-instance profile into `update()` and
-  `repaintCookie()`. A model whose skin has real windshield openings can drop the cookie and
-  the near-plane clip, which only exist because this one does not.
+  `repaintCookie()`. A model whose skin has real windshield openings can drop the
+  cookie and exterior-proxy exclusion, which only exist because this one does not.
 
 ## Reproduce visual evidence
 
@@ -86,7 +108,7 @@ centroid, daylight factor, flood intensities and a centre-patch luma histogram f
 each. Screenshots and `deck-sun-report.json` land in `review-artifacts/issue90/`.
 
 The ablation stage renders the same frame with the deck sun multiplied out and
-diffs it, restricted to pixels that repeat-render stable. On this machine (Intel
+diffs it, restricted to pixels that repeat-render stable. Before the contrast/AO update, on this machine (Intel
 Graphics ADL-N through ANGLE Vulkan) it moves 6.1% of the frame, with the centroid
 at 64%/72% of the width and height, i.e. on the deck:
 
@@ -100,7 +122,7 @@ at 64%/72% of the width and height, i.e. on the deck:
 Cookie centroids mirror across the deck as expected: sun abeam left 0.461/0.483,
 abeam right 0.536/0.509; bank left 0.486/0.462, bank right 0.483/0.519.
 
-Frame cost on the same integrated GPU, cockpit view, frozen shadow map versus
+Historical frame cost before the contrast/AO update on the same integrated GPU, cockpit view, frozen shadow map versus
 forcing a repaint every frame: 122.8 ms versus 199.8 ms per frame. These are
 contended headless measurements, not frame-rate claims; they only establish that
 freezing the map is the cheaper of the two and that the rig does not force a
@@ -111,3 +133,30 @@ receivers, facing continuity through a 1° azimuth sweep, cookie projection boun
 the body-fixed shadow image, repaint-only-on-movement, the cloud gate, and the
 flood/daylight trade. Required checks are `npm run check`, `npm test` and
 `npm run build`.
+
+
+## Projection depth with logarithmic exterior rendering
+
+The beauty renderer uses logarithmic depth for the 45 km scene. Perspective
+spot-shadow lookups and SSAO, however, reconstruct ordinary projection depth.
+`CockpitDepth` removes the logarithmic fragment-depth write from the actual
+renderer-selected aircraft shadow depth variants and the AO normal material.
+It preserves shader customizations and the renderer's alpha/clipping/displacement
+variants, and registers asynchronously loaded or rebuilt aircraft meshes before
+rendering. Point-light distance materials keep their radial encoding. The
+exterior beauty depth remains logarithmic.
+
+At a receiver 40 m from the spot, near/far 37.8/45.2 m, regular projection depth
+is approximately 0.336 whereas logarithmic depth is approximately 0.969. Mixing
+these encodings falsely marks pillar-shadowed receivers as lit. Increasing map
+resolution does not fix this. The acceptance ablation now removes frame geometry
+only from the tagged cockpit sun pass; the external directional shadow remains
+unchanged, so it cannot hide this regression.
+
+Clear sunlight gain is 3.2 to emphasize lit/shaded separation, with cookie
+leak reduced to 1% to retain the previous outside-aperture light budget; daylight/flood
+normalization remains unchanged. The native 737 glareshield shades much of the
+vertical instrument panel. Pillar bands are clearest on the left sidewall and
+lower console at 16:48, heading 000 degrees, clear weather; this model does not
+put the same pattern on the panel as a fighter canopy. Screenshots capture the
+actual model and its cast shadows without adding substitute shadow geometry.

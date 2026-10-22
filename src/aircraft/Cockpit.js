@@ -1,6 +1,7 @@
 import { batchStaticCockpit } from './StaticCockpitBatch.js';
 import { bindGltfYokes, updateGltfYokes, bindGltfEngineControls, updateGltfEngineControls } from './GltfCockpitControls.js';
 import { WINDSHIELD_PANES } from './CockpitAperture.js';
+import { shadeCockpitMaterial } from './CockpitLighting.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
@@ -68,14 +69,15 @@ export class Cockpit {
 
   /**
    * Trade instrument flood light for daylight in the flight deck, continuously:
-   * `daylight` 0 keeps the warm night glow, 1 dims the floods to a quarter so the
+   * `daylight` 0 keeps the warm night glow, 1 dims the floods so the
    * sun pattern thrown through the windshield stays readable.
    */
   syncDaylight(daylight) {
-    const dim = 1 - 0.75 * Math.min(1, Math.max(0, daylight));
+    const dim = 1 - 0.92 * Math.min(1, Math.max(0, daylight));
     for (let i = 0; i < this.floods.length; i++) {
-      this.floods[i].intensity = Math.max(this.floodBaseIntensity[i] * dim, 0.15);
+      this.floods[i].intensity = Math.max(this.floodBaseIntensity[i] * dim, 0.06);
     }
+
   }
 
   /** Temporarily clear the instrument sightline without changing control input. */
@@ -186,6 +188,12 @@ export class Cockpit {
 
           // Build authentic Boeing 737 windshield glass & ceiling enclosure trims
           this.setupGltfCockpitFraming();
+
+          this.gltfCockpitGroup.traverse(node => {
+            if (!node.isMesh) return;
+            const materials = Array.isArray(node.material) ? node.material : [node.material];
+            materials.forEach(shadeCockpitMaterial);
+          });
 
           // Mount live 60 FPS flight displays onto the GLTF MIP & Pedestal
           this.setupGltfFlightDisplays();
@@ -404,12 +412,12 @@ export class Cockpit {
 
     // 3. Subtle Tinted Aviation Windshield Glass Panels, laid out from the shared
     // windshield aperture definition the deck sun rig also projects through.
-    const glassMat = new THREE.MeshStandardMaterial({
+    // This thin tint overlay transmits the exterior; opaque diffuse lighting
+    // would veil the outside view when the localized deck sun is strengthened.
+    const glassMat = new THREE.MeshBasicMaterial({
       color: 0x88b0cc,
       transparent: true,
       opacity: 0.05,
-      roughness: 0.06,
-      metalness: 0.30,
       depthWrite: false
     });
 

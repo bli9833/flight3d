@@ -1,5 +1,8 @@
 import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
+import { cockpitCasterState } from './aircraft/CockpitLighting.js';
+import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
+import { prepareCockpitShadowDepth } from './aircraft/CockpitDepth.js';
 import { Atmosphere } from './physics/Atmosphere.js';
 import { BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics } from './physics/Aerodynamics.js';
@@ -96,6 +99,7 @@ class FlightSimulator {
       this.cduCanvas
     );
     this.scene.add(this.aircraft.group);
+    this.cockpitOcclusion = new CockpitOcclusion(this.scene, this.camera, this.aircraft.cockpit);
     this.aircraft.cockpit.onModelReady = () => {
       const cockpit = this.aircraft.cockpit;
       const visible = cockpit.group.visible;
@@ -1243,6 +1247,7 @@ class FlightSimulator {
       quaternion: this.aircraft.group.quaternion,
       cockpitActive: isCockpit && !isPhotoCockpit,
       dt: simSeconds,
+      casterState: cockpitCasterState(this.aircraft.cockpit),
     });
     this.aircraft.cockpit.syncDaylight(stepDaylight);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
@@ -1345,6 +1350,7 @@ class FlightSimulator {
       quaternion: this.aircraft.group.quaternion,
       cockpitActive: isCockpit && !isPhotoCockpit,
       dt: frameDelta,
+      casterState: cockpitCasterState(this.aircraft.cockpit),
     });
     this.aircraft.cockpit.syncDaylight(daylight);
     if (this.cockpitPhotoOverlay) {
@@ -1381,8 +1387,7 @@ class FlightSimulator {
     this.foliage.update(this.camera.position);
 
     // 8. Render 3D Scene
-    this.sky.prepareRender(this.camera);
-    this.renderer.render(this.scene, this.camera);
+    this.renderScene();
     if (!this.hasRenderedFirstFrame) {
       this.hasRenderedFirstFrame = true;
       document.body.classList.remove('booting');
@@ -1516,6 +1521,16 @@ class FlightSimulator {
     this.toastTimeout = setTimeout(() => {
       toast.classList.remove('visible');
     }, 2500);
+  }
+
+  renderScene() {
+    prepareCockpitShadowDepth(this.aircraft.group);
+    this.sky.prepareRender(this.camera);
+    this.renderer.render(this.scene, this.camera);
+    if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT &&
+        (!this.cameraSystem.photoCockpit || this.cameraSystem.isLookingAwayFromCenter())) {
+      this.cockpitOcclusion.render(this.renderer, this.renderQuality);
+    }
   }
 
   setRenderQuality(value) {
