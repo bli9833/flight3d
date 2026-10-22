@@ -44,7 +44,7 @@ async function ev(expression) {
   return result.result.value;
 }
 async function nativeClick(selector, touch) {
-  const point = await ev(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`);
+  const point = await ev(`(()=>{const node=document.querySelector(${JSON.stringify(selector)}); if(node.closest('.flight-toolbar, .ap-panel')) node.scrollIntoView({block:'nearest',inline:'nearest'}); const r=node.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`);
   if (touch) {
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
     await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
@@ -103,7 +103,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   await ev(`window.simulator.touchControls.${showTouch ? 'enable' : 'disable'}()`);
   await new Promise(resolve => setTimeout(resolve, 400));
   const bounds = await ev(`(() => {
-    const selectors = '.flight-toolbar button,.hud-strip,.touch-throttle-card,.touch-stick-card,.touch-rudder-card,#touch-btn-brake,#menu-toggle,.ap-bar';
+    const selectors = '.flight-toolbar,.hud-strip,.touch-throttle-card,.touch-stick-card,.touch-rudder-card,#touch-btn-brake,#menu-toggle,.ap-bar';
     return [...document.querySelectorAll(selectors)]
       .filter(node => node.getBoundingClientRect().width && getComputedStyle(node).visibility !== 'hidden')
       .map(node => {
@@ -125,6 +125,72 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   })()`);
   assert.equal(cells.rows, 1, `${name}: the flattened strip renders on one row`);
   assert.deepEqual(cells.clipped, [], `${name}: telemetry text fits each cell`);
+  const direct = await ev(`(() => {
+    const strip = document.querySelector('.flight-toolbar').getBoundingClientRect();
+    const home = document.querySelector('#menu-toggle').getBoundingClientRect();
+    const ap = document.querySelector('.ap-bar').getBoundingClientRect();
+    return { stripButtons: [...document.querySelectorAll('.flight-toolbar button')].map(b => b.id),
+      rows: new Set([...document.querySelectorAll('.flight-toolbar button')].map(b => Math.round(b.getBoundingClientRect().top))).size,
+      buttons: [...document.querySelectorAll('.flight-toolbar button:not(#open-camera):not(#btn-mute)')].map(node => {
+      const r = node.getBoundingClientRect();
+      return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2, r.top+r.height/2)), height: r.height };
+    }), collapsed: document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded') === 'false',
+      anchor: ap.toJSON(), telemetryGap: strip.top - document.querySelector('.hud-strip').getBoundingClientRect().bottom, apGap: ap.top - strip.bottom, homeGap: home.top - strip.bottom, homeTarget: home.width >= 44 && home.height >= 44, alignedEdges: Math.abs(home.left - strip.left) < 1 && Math.abs(ap.right - strip.right) < 1 };
+  })()`);
+  assert.deepEqual(direct.stripButtons, ['open-camera', 'btn-mute', 'btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser'], `${name}: one strip in the requested order`);
+  assert.equal(direct.rows, 1, `${name}: controls stay on one concise row`);
+  assert.equal(direct.buttons.length, 5, `${name}: all Aircraft controls are flattened`);
+  assert.ok(direct.buttons.every(b => b.reachable && b.height >= 44), `${name}: all Aircraft controls have reachable 44px targets`);
+  assert.ok(direct.collapsed && direct.homeTarget && direct.alignedEdges && Math.abs(direct.telemetryGap - 4) < 1 && Math.abs(direct.apGap - 4) < 1 && Math.abs(direct.homeGap - 4) < 1, `${name}: upper strips and Home/AP use 4px gaps: ${JSON.stringify(direct)}`);
+  await nativeClick('#btn-ap-toggle', touch);
+  assert.equal(await ev(`document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded')`), 'true', `${name}: native tap expands AP`);
+  const expanded = await ev(`(() => {
+    const trigger = document.querySelector('#btn-ap-toggle').getBoundingClientRect();
+    const panel = document.querySelector('#ap-panel').getBoundingClientRect();
+    const toolbarTargets = [...document.querySelectorAll('.flight-toolbar button')].map(node => {
+      const r = node.getBoundingClientRect();
+      return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
+    });
+    const touchTargets = ['#touch-btn-brake', '.touch-stick-zone', '.touch-rudder-track', '.touch-throttle-track'].map(selector => {
+      const node = document.querySelector(selector), r = node.getBoundingClientRect();
+      return { selector, reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
+    });
+    const targets = [...document.querySelectorAll('#ap-panel button')].map(node => {
+      node.scrollIntoView({block:'nearest'});
+      const r = node.getBoundingClientRect();
+      return { id: node.id, width: r.width, height: r.height,
+        reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
+    });
+    document.querySelector('#ap-panel').scrollTop = 0;
+    return { trigger: trigger.toJSON(), panel: panel.toJSON(), visible: !document.querySelector('#ap-panel').hidden, toolbarTargets, touchTargets, targets };
+  })()`);
+  assert.ok(expanded.visible && Math.abs(expanded.trigger.x - direct.anchor.x) < 1 && Math.abs(expanded.trigger.y - direct.anchor.y) < 1, `${name}: AP trigger stays fixed when expanded`);
+  const landscapeSafeEdgePanel = touch && width <= 1024 && width >= 541 && height <= 400;
+  const panelRightAligned = landscapeSafeEdgePanel
+    ? Math.abs(expanded.panel.right - (width - 8)) < 1
+    : Math.abs(expanded.panel.right - expanded.trigger.right) < 1;
+  assert.ok(panelRightAligned && Math.abs(expanded.panel.top - expanded.trigger.bottom - 4) < 1, `${name}: AP panel opens 4px below in its safe-area alignment`);
+  assert.ok(expanded.toolbarTargets.every(b => b.reachable), `${name}: toolbar controls remain reachable while AP is expanded: ${JSON.stringify(expanded.toolbarTargets)}`);
+  if (name === 'landscape-small') assert.ok(expanded.touchTargets.every(target => target.reachable), `${name}: touch brake, stick, rudder and throttle remain reachable while AP is expanded: ${JSON.stringify(expanded.touchTargets)}`);
+  assert.ok(expanded.panel.left >= 0 && expanded.panel.bottom <= height && expanded.targets.length === 5 && expanded.targets.every(b => b.reachable && b.width >= 44 && b.height >= 44), `${name}: all expanded AP controls fit and are reachable`);
+  await nativeClick('#btn-ap', touch);
+  assert.ok(await ev(`window.simulator.autopilot.master && document.querySelector('#btn-ap-toggle').classList.contains('ap-active') && !document.querySelector('#ap-panel').hidden`), `${name}: native master toggle keeps panel open and trigger green`);
+  if (name === 'landscape-small') {
+    const activeTouchTargets = await ev(`['#touch-btn-brake', '.touch-stick-zone', '.touch-rudder-track', '.touch-throttle-track'].map(selector => { const node=document.querySelector(selector),r=node.getBoundingClientRect();return {selector,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))} })`);
+    assert.ok(activeTouchTargets.every(target => target.reachable), `${name}: touch flight controls remain reachable with active AP modes: ${JSON.stringify(activeTouchTargets)}`);
+  }
+  await nativeClick('#btn-ap-hdg', touch);
+  assert.equal(await ev('window.simulator.autopilot.lateralMode'), 'HDG', `${name}: native heading mode works from dropdown`);
+  await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}-ap-expanded.png`, Buffer.from(r.data, 'base64')));
+  await nativeClick('#btn-ap', touch);
+  assert.equal(await ev('window.simulator.autopilot.master'), false, `${name}: native master toggle disengages AP`);
+  direct.expanded = expanded;
+  await nativeClick('#btn-ap-toggle', touch);
+  assert.equal(await ev(`document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded')`), 'false', `${name}: native tap collapses AP`);
+  await nativeClick('#btn-ap-toggle', touch);
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  assert.ok(await ev(`document.querySelector('#ap-panel').hidden && document.body.dataset.flow === 'flight'`), `${name}: Escape closes AP without pausing flight`);
   await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}.png`, Buffer.from(r.data, 'base64')));
   await ev(`document.querySelector('#menu-toggle').click()`);
   const panel = await ev(`(() => {
@@ -204,10 +270,30 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     panel.restoresVolume = true;
   }
   console.log(`${name}: layout, telemetry and inspector passed`);
-  results.push({ name, width, height, touch, showTouch, bounds, cells, panel });
+  results.push({ name, width, height, touch, showTouch, bounds, cells, direct, panel });
 }
 console.log(`${results.length} viewport/input layouts passed`);
 fs.writeFileSync(`${out}/layout-results.json`, JSON.stringify(results, null, 2));
+
+await send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoints: 1 });
+await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await ev(`window.simulator.touchControls.disable(); window.simulator.demoDirector.start(); window.simulator.demoDirector.closeBanner()`);
+await new Promise(resolve => setTimeout(resolve, 2800));
+const demoPill = await ev(`(()=>{const node=document.querySelector('#btn-demo-open'),r=node.getBoundingClientRect(),t=document.querySelector('.flight-toolbar').getBoundingClientRect();return {visible:getComputedStyle(node).display!=='none',top:r.top,toolbarBottom:t.bottom,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}})()`);
+assert.ok(demoPill.visible && demoPill.top >= demoPill.toolbarBottom + 4 && demoPill.reachable, `desktop: demo reopen pill is clear and reachable below toolbar: ${JSON.stringify(demoPill)}`);
+await nativeClick('#btn-demo-open', false);
+assert.ok(await ev(`getComputedStyle(document.querySelector('#demo-banner')).display!=='none' && getComputedStyle(document.querySelector('#btn-demo-open')).display==='none'`), 'desktop: demo guide reopens from its pill');
+await ev(`window.simulator.demoDirector.stop()`);
+await nativeClick('#btn-ap-toggle', false);
+await nativeClick('#btn-ap', false);
+await nativeClick('#btn-ap-hdg', false);
+await ev(`document.querySelector('#hud-stall').style.display='block'`);
+const stallWarning = await ev(`(()=>{const node=document.querySelector('#hud-stall'),r=node.getBoundingClientRect(),t=document.querySelector('.flight-toolbar').getBoundingClientRect(),p=document.querySelector('#ap-panel').getBoundingClientRect();return {top:r.top,bottom:r.bottom,toolbarBottom:t.bottom,panelBottom:p.bottom,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)),height:r.height,modes:document.querySelector('#hud-ap-modes').textContent}})()`);
+assert.ok(stallWarning.top >= stallWarning.toolbarBottom + 4 && stallWarning.top >= stallWarning.panelBottom + 4 && stallWarning.reachable && stallWarning.height > 0 && stallWarning.modes, `desktop: stall warning sits below expanded AP modes and remains reachable: ${JSON.stringify(stallWarning)}`);
+await ev(`document.querySelector('#hud-stall').style.display='none'`);
+await nativeClick('#btn-ap', false);
+await nativeClick('#btn-ap-toggle', false);
+console.log('Desktop demo pill and stall alert reachability passed');
 
 const strip = await ev(`(() => {
   const items = [...document.querySelectorAll('.hud-strip .hud-item')];
@@ -224,10 +310,14 @@ await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints
 await send('Emulation.setDeviceMetricsOverride', { width: 568, height: 320, deviceScaleFactor: 1, mobile: true });
 await ev(`window.simulator.demoDirector.stop(); window.simulator.gameFlow.enterFlight(); window.simulator.setPreset('runway'); window.simulator.touchControls.enable(); document.activeElement?.blur()`);
 await new Promise(r => setTimeout(r, 200));
-await ev(`document.querySelector('#open-aircraft').click(); document.querySelector('#btn-flaps-ext').click(); document.querySelector('#btn-flaps-ext').click()`);
-assert.equal(await ev(`!document.querySelector('#panel-aircraft').hidden && window.simulator.aero.flapsIndex === 4`), true, 'repeated flap changes keep Aircraft open');
+await nativeClick('#btn-flaps-ext', true);
+await nativeClick('#btn-flaps-ext', true);
+assert.equal(await ev(`!document.querySelector('#panel-aircraft') && !document.querySelector('#open-aircraft') && window.simulator.aero.flapsIndex === 4`), true, 'repeated native flap changes work directly without a drawer');
+await nativeClick('#btn-ap-toggle', true);
+await nativeClick('#open-camera', true);
+assert.ok(await ev(`document.querySelector('#ap-panel').hidden`), 'native outside tap closes AP while camera remains usable');
 const cycleFrom = await ev(`window.simulator.cameraSystem.mode`);
-await ev(`document.querySelector('#panel-aircraft .panel-close').click(); document.querySelector('#open-camera').click(); document.querySelector('#open-camera').click()`);
+await ev(`document.querySelector('#open-camera').click(); document.querySelector('#open-camera').click()`);
 assert.equal(await ev(`window.simulator.cameraSystem.mode`), (cycleFrom + 2) % 8, 'repeated toolbar taps keep cycling cameras');
 await ev('document.activeElement?.blur()');
 await send('Input.dispatchKeyEvent', { type: 'keyDown', key: '2', code: 'Digit2', windowsVirtualKeyCode: 50 });
@@ -254,12 +344,12 @@ await ev(`document.querySelector('#btn-touch-toggle').click(); document.querySel
 await new Promise(r => setTimeout(r, 100));
 assert.equal(await ev(`document.querySelector('.lobby-settings .lobby-label').textContent`), '설정', 'language change refreshes menu settings labels');
 assert.equal(await ev(`document.body.dataset.flow`), 'lobby', 'language change keeps the menu open');
-await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('#open-aircraft').click()`);
+await ev(`document.querySelector('#menu-toggle').click()`);
 await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 1, mobile: true });
 await new Promise(r => setTimeout(r, 150));
-assert.equal(await ev(`!document.querySelector('#panel-aircraft').hidden`), true, 'rotation retains Aircraft panel');
+assert.equal(await ev(`document.querySelectorAll('.flight-toolbar button:not(#open-camera):not(#btn-mute)').length`), 5, 'rotation retains the five direct Aircraft controls');
 await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-aircraft-ko.png`, Buffer.from(r.data, 'base64')));
-await ev(`document.querySelector('#panel-aircraft .panel-close').click(); document.querySelector('#lobby-lang-en').click()`);
+await ev(`document.querySelector('#lobby-lang-en').click()`);
 fs.writeFileSync(`${out}/interaction-results.json`, JSON.stringify({ repeatedFlaps: true, directCamera: true, keyboardCamera: true, demoClosesPanel: true, nativeTouchScroll: after, cameraBefore: before, touchModeToggle: true, languageChange: true, rotation: true }, null, 2));
 console.log('Interaction scenarios passed');
 

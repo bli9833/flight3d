@@ -1723,10 +1723,10 @@ body.compact-ui {
   bottom: auto;
   top: calc(var(--edge-top) + 54px);
   left: calc(var(--edge-left) + 48px);
-  right: var(--edge-right);
+  right: calc(var(--edge-right) + 76px);
   transform: none;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
 }
 .compact-ui .flight-toolbar .btn {
@@ -1740,7 +1740,7 @@ body.compact-ui {
   max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 112px);
 }
 .compact-ui .demo-banner, .compact-ui .demo-pill-btn {
-  top: calc(var(--edge-top) + 106px);
+  top: calc(var(--edge-top) + 96px);
 }
 .compact-ui .demo-banner {
   max-height: min(135px, 28dvh);
@@ -1772,27 +1772,6 @@ body.compact-ui {
 }
 .touch-mode:not(.compact-ui) .touch-controls-overlay {
   padding-bottom: 70px;
-}
-@media (min-width: 1025px) {
-  body:not(.touch-mode) #panel-aircraft {
-    display: block;
-    bottom: 68px;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: max-content;
-    max-width: calc(100% - 24px);
-  }
-  body:not(.touch-mode) #panel-aircraft > header {
-    display: none;
-  }
-  body:not(.touch-mode) #panel-aircraft .flight-panel-body {
-    display: flex;
-    flex-wrap: wrap;
-  }
-  body:not(.touch-mode) #open-aircraft {
-    display: none;
-  }
 }
 @media (max-height: 450px) and (min-width: 541px) {
   .compact-ui .touch-throttle-track {
@@ -1829,12 +1808,7 @@ body.compact-ui {
 .flight-panel, .flight-panel-body, .flight-panel-body button, .flight-panel-body select {
   touch-action: pan-y;
 }
-.compact-ui #open-camera {
-  height: 44px;
-  padding: 2px;
-  font-size: 10px;
-  line-height: 12px;
-}
+
 .compact-ui .touch-throttle-card, .compact-ui .touch-stick-card, .compact-ui .touch-rudder-card, .btn-touch-brake {
   box-shadow: none;
 }
@@ -1848,12 +1822,6 @@ body.compact-ui {
 .flight-toolbar .btn, .flight-panel .btn {
   transition: background-color .15s, border-color .15s, color .15s;
 }
-#panel-aircraft .flight-panel-body {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-#panel-aircraft #btn-gear {
-  grid-column: 1 / -1;
-}
 
 /* Keep camera selection and one-tap mute on the primary touch toolbar. */
 .quick-mute { display: none; }
@@ -1865,7 +1833,7 @@ body.compact-ui {
   padding: 4px;
 }
 .compact-ui.touch-mode .flight-toolbar {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) 44px;
+  grid-template-columns: minmax(0, 1fr) 44px;
 }
 .compact-ui.touch-mode .quick-mute { font-size: 18px; }
 
@@ -1914,66 +1882,129 @@ body.compact-ui {
   .compact-ui .touch-rudder-card { background: rgba(15, 23, 42, .72); }
 }
 
-/* Compact autopilot & flight phase bar (issue #112) */
-.ap-bar {
-  position: absolute;
-  top: calc(var(--edge-top) + 56px);
-  left: var(--edge-left);
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.hud-strip {
+  top: var(--edge-top);
+  height: 44px;
   padding: 6px 10px;
-  background: rgba(10, 16, 26, 0.82);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  align-items: stretch;
+}
+
+/* One concise control strip: camera, sound | gear, flaps, spoilers, reverse. */
+.flight-toolbar, .compact-ui .flight-toolbar, .compact-ui.touch-mode .flight-toolbar {
+  top: calc(var(--edge-top) + 48px);
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: min(480px, calc(100% - var(--edge-left) - var(--edge-right)));
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
   border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  background: rgba(10, 16, 26, .88);
+}
+.flight-toolbar .btn, .compact-ui .flight-toolbar .btn {
+  flex: 1 0 44px;
+  transform: none;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
+  padding: 2px;
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  white-space: nowrap;
+}
+.flight-toolbar .btn + .btn { border-left: 1px solid #334155; }
+.flight-toolbar #btn-gear { border-left: 2px solid #64748b; }
+.flight-toolbar .btn[data-short-label] { font-size: 0; }
+.flight-toolbar .btn[data-short-label]::after {
+  content: attr(data-short-label);
+  font: 600 10px system-ui;
+}
+.flight-toolbar .quick-mute { display: block; font-size: 18px; }
+
+/* The AP trigger stays anchored while its panel opens directly below it. */
+.ap-bar, .compact-ui .ap-bar {
+  position: absolute;
+  top: calc(var(--edge-top) + 96px);
+  right: max(var(--edge-right), calc(50% - 240px));
+  left: auto;
+  bottom: auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  transform: none;
   pointer-events: auto;
-  z-index: 64;
+  z-index: 66;
 }
 .ap-btn {
-  min-width: 40px;
-  padding: 4px 8px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 6px;
   font: 700 11px "Courier New", Courier, monospace;
-  letter-spacing: 0.5px;
+  letter-spacing: .5px;
   color: #94a3b8;
-  background: rgba(148, 163, 184, 0.08);
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, .08);
+  border: 1px solid rgba(148, 163, 184, .35);
   border-radius: 6px;
+  box-shadow: none;
 }
 .ap-btn:hover { border-color: #38bdf8; color: #e2e8f0; }
 .ap-btn.ap-active { color: #02110a; background: #10b981; border-color: #34d399; }
 .ap-btn.ap-armed { color: #1a1206; background: #f59e0b; border-color: #fbbf24; }
+.ap-bar .ap-toggle-btn {
+  width: 44px;
+  height: 44px;
+  transform: none;
+  border-radius: 10px;
+}
+.ap-toggle-btn:not(.ap-active) {
+  background: rgba(10, 16, 26, .82);
+  border-color: rgba(56, 189, 248, .4);
+}
+.ap-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  width: min(296px, calc(100vw - var(--edge-left) - var(--edge-right)));
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 144px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  background: rgba(10, 16, 26, .96);
+  border: 1px solid rgba(56, 189, 248, .35);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+}
+.ap-panel[hidden] { display: none; }
+.ap-panel .ap-btn { transform: none; }
+.ap-phase-item { justify-content: center; }
 .ap-modes {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 4px;
   font: 700 11px "Courier New", Courier, monospace;
   color: #38bdf8;
-  min-width: 72px;
   text-align: center;
-  letter-spacing: 0.5px;
+  overflow-wrap: anywhere;
 }
-.ap-phase-item { margin-right: 4px; }
-.ap-toggle-btn { min-width: 32px; padding: 4px 6px; }
-.ap-bar.ap-collapsed > :not(.ap-toggle-btn) { display: none; }
-.ap-bar.ap-collapsed { padding: 4px 6px; }
-.ap-toggle-btn.ap-active { color: #02110a; background: #10b981; border-color: #34d399; }
-.compact-ui .ap-bar {
-  top: auto;
-  right: auto;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(var(--edge-bottom) + 184px);
-  max-width: calc(100% - var(--edge-left) - var(--edge-right));
-  gap: 4px;
-  padding: 4px 8px;
-}
-.compact-ui .ap-btn { min-height: 44px; min-width: 44px; padding: 4px 6px; }
-.compact-ui .ap-modes { min-width: 56px; }
 .ap-modes:empty { display: none; }
-.panel-open .ap-bar { visibility: hidden; }
-/* Small phones use the shallow single-row touch cards, so the bar sits lower. */
-@media (max-width: 600px), (max-width: 1024px) and (max-height: 500px) {
-  .compact-ui .ap-bar { bottom: calc(var(--edge-bottom) + 144px); }
+@media (max-height: 400px) and (min-width: 541px) {
+  /* In phone landscape, keep the brake and central touch controls outside the
+     dropdown. Align its narrower panel to the right safe edge. */
+  .compact-ui.touch-mode .ap-panel {
+    right: calc(240px + var(--edge-right) - 50vw);
+    width: min(268px, calc(100vw - var(--edge-left) - var(--edge-right)));
+    max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 210px);
+  }
 }
 
 /* ===== Lobby / pause flow overlays ===== */
@@ -2077,18 +2108,17 @@ body.booting .menu-toggle { display: none !important; }
 
 /* Persistent main-menu toggle. Floats above the lobby overlay (z 85) so it can
    open the menu over a flight and hide it again, but stays under toasts (96)
-   and modals (100). Desktop keeps it in the top-left corner, with the presets
-   bar pushed below it; compact/mobile drops it under the hamburger button. */
+   and modals (100). Align it with the left end of the control strip. */
 .menu-toggle {
   position: fixed;
-  top: 12px;
-  left: 12px;
+  top: calc(var(--edge-top) + 96px);
+  left: max(var(--edge-left), calc(50% - 240px));
   z-index: 90;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border-radius: 10px;
   border: 1px solid rgba(56, 189, 248, 0.4);
@@ -2098,13 +2128,37 @@ body.booting .menu-toggle { display: none !important; }
   pointer-events: auto;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
+/* With the strip hidden in the menu, keep its close affordance off the card. */
+body[data-flow="lobby"] .menu-toggle {
+  top: var(--edge-top);
+  left: var(--edge-left);
+}
 .menu-toggle:hover { background: rgba(30, 41, 59, 0.95); border-color: #38bdf8; }
 .menu-toggle:focus-visible { outline: 2px solid #67e8f9; }
 .menu-toggle .menu-toggle-glyph { font-size: 19px; line-height: 1; }
 @media (min-width: 961px) {
   .presets-bar { top: 60px; }
 }
-.compact-ui .menu-toggle { top: calc(var(--edge-top) + 48px); left: var(--edge-left); }
+
+/* Keep the demo guide and its reopen button below the relocated control strip. */
+.demo-banner, .demo-pill-btn {
+  top: calc(var(--edge-top) + 104px);
+}
+.compact-ui .demo-banner, .compact-ui .demo-pill-btn {
+  top: calc(var(--edge-top) + 104px);
+}
+
+/* Put the stall alert below the toolbar and expanded AP controls. */
+.stall-banner {
+  top: calc(var(--edge-top) + 320px);
+  z-index: 70;
+}
+@media (max-height: 400px) {
+  .stall-banner { top: calc(var(--edge-top) + 104px); }
+  body:has(#ap-panel:not([hidden])) .stall-banner {
+    top: calc(100dvh - var(--edge-bottom) - 56px);
+  }
+}
 
 /* Compact/touch: lobby becomes a scrollable bottom sheet. */
 .compact-ui #lobby-screen {
