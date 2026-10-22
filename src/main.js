@@ -423,12 +423,7 @@ class FlightSimulator {
     this.bodyContactStarted = false;
 
     if (this.isCrashed) {
-      this.isCrashed = false;
-      this.crashResult = null;
-      this.explosionSystem.clear();
-      this.aircraft.resetCrashVisuals();
-      const crashEl = document.getElementById('crash-overlay');
-      if (crashEl) crashEl.style.display = 'none';
+      this.clearCrashState();
     }
 
     if (this.activeAirport === 'lukla') {
@@ -1031,7 +1026,7 @@ class FlightSimulator {
     this.showCrashUI(crashResult);
   }
 
-  resetCrash() {
+  clearCrashState() {
     this.isCrashed = false;
     this.crashResult = null;
     this.explosionSystem.clear();
@@ -1039,7 +1034,10 @@ class FlightSimulator {
 
     const crashEl = document.getElementById('crash-overlay');
     if (crashEl) crashEl.style.display = 'none';
+  }
 
+  resetCrash() {
+    this.clearCrashState();
     this.setPreset('runway');
     this.showToast(() => t('aircraft.repaired.restarted.on.runway.09l'));
   }
@@ -1423,6 +1421,10 @@ class FlightSimulator {
       this.setPreset(this.lastPresetType || 'runway');
     });
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby());
+    document.getElementById('btn-hud-menu')?.addEventListener('click', () => {
+      if (this.isCrashed) this.clearCrashState();
+      this.gameFlow.returnToLobby();
+    });
 
     // ESC chain: the demo director consumes ESC first (take manual control);
     // otherwise panels/help modal close before the pause menu opens.
