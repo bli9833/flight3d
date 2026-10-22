@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Atmosphere } from './physics/Atmosphere.js';
 import { BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics } from './physics/Aerodynamics.js';
-import { EngineModel } from './physics/EngineModel.js';
+import { EngineModel, asymmetricThrustYawMoment } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
 import { AutopilotController } from './physics/Autopilot.js';
 import { solveTrim } from './physics/TrimSolver.js';
@@ -334,6 +334,24 @@ class FlightSimulator {
       this.engines.toggleReverser(this.telemetry.onGround);
     };
 
+    this.controls.onCycleEngineFailure = () => {
+      // Cycle: both running → #1 out → both out → #2 out → both running
+      const failed = this.engines.failed;
+      if (!failed[0] && !failed[1]) {
+        this.engines.setEngineFailure(0, true);
+        this.showToast(() => t('notice.engineFailure', { which: '1 (L)' }));
+      } else if (failed[0] && !failed[1]) {
+        this.engines.setEngineFailure(1, true);
+        this.showToast(() => t('notice.enginesBothFailed'));
+      } else if (failed[0] && failed[1]) {
+        this.engines.setEngineFailure(0, false);
+        this.showToast(() => t('notice.engineFailure', { which: '2 (R)' }));
+      } else {
+        this.engines.setEngineFailure(1, false);
+        this.showToast(() => t('notice.enginesRecovered'));
+      }
+    };
+
     this.controls.onCycleCamera = () => {
       const modeName = this.cameraSystem.cycleMode();
       if (this.demoDirector && this.demoDirector.isActive) {
@@ -645,6 +663,14 @@ class FlightSimulator {
       }
     }
 
+    // A preset marks a fresh segment: full tanks at the configured mass and no
+    // engine failures. Restoring from aero.massBaselineKg rather than adding the
+    // previous burn back means a demo-internal preset whose scenario just loaded
+    // its own mass (Lukla's 43 t) starts at that mass, not at it plus the burn.
+    this.engines.refuel(this.aero);
+    this.engines.failed[0] = false;
+    this.engines.failed[1] = false;
+
     if (type === 'approach' || type === 'cruise') this.applyComputedTrim();
 
     this.controls.clearVirtualInputs();
@@ -845,6 +871,11 @@ class FlightSimulator {
     const tas = this.linearVelocity.length();
     const engineData = this.engines.update(dt, altitudeMeters, tas, atmos.densityRatio);
 
+    // Live mass: the airframe sheds exactly the fuel burned since the last
+    // substep, so a scenario that replaces currentMassKg mid-flight keeps its
+    // baseline and still loses the weight it burns.
+    this.engines.shedBurnedFuelMass(this.aero);
+
     // 3. Terrain Height & Ground Clearance
     const groundHeight = this.currentTerrain.getHeight(this.position.x, this.position.z);
     const heightAboveGround = Math.max(0, this.position.y - groundHeight);
@@ -891,6 +922,12 @@ class FlightSimulator {
       engineData.totalThrust,
       gearResult.gearState
     );
+
+    // Engine-out asymmetric thrust: the surviving engine's moment about the
+    // centerline yaws the nose toward the dead engine. Body +Y is positive
+    // yaw-left, so the sign follows directly from (T_right - T_left).
+    aeroResult.momentBody.y += asymmetricThrustYawMoment(
+      engineData.engine1.thrust, engineData.engine2.thrust);
 
     // 6. Thrust Force in World Space
     // Engine thrust acts along forward longitudinal axis (-Z in Three.js aircraft space)
@@ -988,6 +1025,7 @@ class FlightSimulator {
       engine1: engineData.engine1,
       engine2: engineData.engine2,
       reverserActive: engineData.reverserActive,
+      fuelKg: engineData.fuelKg,
       gearState: gearResult.gearState,
       isTransit: gearResult.isTransit,
       compressions: gearResult.compressions,

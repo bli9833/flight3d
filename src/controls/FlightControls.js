@@ -48,6 +48,7 @@ export class FlightControls {
     this.onToggleSpoilers = null;
     this.onCycleFlaps = null;
     this.onToggleReverser = null;
+    this.onCycleEngineFailure = null;
     this.onCycleCamera = null;
     this.onSelectCamera = null;
     this.onToggleLights = null;
@@ -109,6 +110,13 @@ export class FlightControls {
         break;
       case 'KeyR':
         if (this.onToggleReverser) this.onToggleReverser();
+        break;
+      case 'KeyK':
+        // Cycle simulated engine failure. Deliberately not P: the demo director
+        // restarts the demo on P, which would reload the preset and clear the
+        // failure just injected. Repeat-guarded so holding the key cannot spin
+        // through the cycle.
+        if (!e.repeat && this.onCycleEngineFailure) this.onCycleEngineFailure();
         break;
       case 'KeyL':
         if (this.onToggleLights) this.onToggleLights();
