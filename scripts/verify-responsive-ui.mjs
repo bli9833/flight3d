@@ -68,7 +68,7 @@ for (let n = 0; n < 120; n++) {
 assert.ok(await ev(`window.__responsiveVerificationToken === ${JSON.stringify(token)} && !!window.simulator`), 'new simulator initialized');
 // Integration regression: the merged #104 removed the quality select before initUI.
 assert.deepEqual(exceptions, [], 'startup has no uncaught exceptions');
-assert.ok(await ev(`document.querySelector('#panel-environment #language-select') && document.querySelector('#panel-environment #render-quality')`), 'both settings selects survive panel initialization');
+assert.ok(await ev(`document.querySelector('#lobby-settings #render-quality') && !document.querySelector('#open-environment')`), 'settings initialize inside the main menu, not the flight toolbar');
 const frameBefore = await ev('window.simulator.renderer.info.render.frame');
 for (let n = 0; n < 60; n++) {
   if (await ev('window.simulator.renderer.info.render.frame') > frameBefore) break;
@@ -124,21 +124,22 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     return { rows: new Set(items.map(i => Math.round(i.getBoundingClientRect().top))).size, clipped };
   })()`);
   assert.equal(cells.rows, 1, `${name}: the flattened strip renders on one row`);
+  assert.deepEqual(cells.clipped, [], `${name}: telemetry text fits each cell`);
   await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}.png`, Buffer.from(r.data, 'base64')));
-  await ev(`document.querySelector('#open-environment').click()`);
+  await ev(`document.querySelector('#menu-toggle').click()`);
   const panel = await ev(`(() => {
-    const p = document.querySelector('#panel-environment');
-    const body = p.querySelector('.flight-panel-body');
+    const card = document.querySelector('.lobby-card');
+    const settings = document.querySelector('#lobby-settings');
     document.querySelector('#btn-sound').click();
     document.querySelector('#btn-sound').click();
-    body.scrollTop = 999;
-    const close = p.querySelector('.panel-close').getBoundingClientRect();
-    return { open: !p.hidden, scroll: body.scrollTop, scrollable: body.scrollHeight > body.clientHeight,
-      closeVisible: close.y >= 0 && close.bottom <= innerHeight, panelBottom: p.getBoundingClientRect().bottom,
-      bodyTouch: getComputedStyle(body).touchAction,
-      hitTargets: [...p.querySelectorAll('button, select')].flatMap(node => {
+    card.scrollTop = 999;
+    const fly = document.querySelector('#btn-fly').getBoundingClientRect();
+    return { open: document.body.dataset.flow === 'lobby', scroll: card.scrollTop, scrollable: card.scrollHeight > card.clientHeight,
+      flyVisible: fly.y >= 0 && fly.bottom <= innerHeight, settingsBottom: settings.getBoundingClientRect().bottom,
+      cardTouch: getComputedStyle(card).touchAction,
+      hitTargets: [...settings.querySelectorAll('button, select')].flatMap(node => {
         const r = node.getBoundingClientRect();
-        const clip = node.closest('.flight-panel-body')?.getBoundingClientRect() || p.getBoundingClientRect();
+        const clip = card.getBoundingClientRect();
         const y = r.top + r.height / 2;
         if (!r.width || !r.height || y <= clip.top || y >= clip.bottom) return [];
         return [r.left + 8, r.left + r.width / 2, r.right - 8].map(x => {
@@ -164,17 +165,26 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     panel.controlBandHeight = height - controlsTop;
   }
   assert.ok(bounds.every(b => !b.bad), `${name}: primary controls are in bounds`);
-  assert.ok(panel.open && panel.closeVisible && panel.bodyTouch === 'pan-y', `${name}: volume panel remains open with reachable close`);
+  assert.ok(panel.open && panel.flyVisible && panel.cardTouch === 'pan-y', `${name}: settings menu stays open with a scrollable card`);
   assert.ok(panel.hitTargets.length > 0, `${name}: visible settings controls were hit-tested`);
   assert.ok(panel.hitTargets.every(hit => hit.reachable), `${name}: settings obscured: ${JSON.stringify(panel.hitTargets.filter(hit => !hit.reachable))}`);
   if (showTouch && width > 1024) {
     await nativeClick('#btn-help', touch);
-    assert.ok(await ev(`document.querySelector('#help-modal').classList.contains('visible')`), `${name}: native input reaches Flight guide above the yoke`);
+    assert.ok(await ev(`document.querySelector('#help-modal').classList.contains('visible')`), `${name}: native input reaches Flight guide from the menu`);
     panel.nativeGuideClick = true;
     await ev(`document.querySelector('#btn-help-close').click()`);
-  } else {
-    await ev(`document.querySelector('#panel-environment .panel-close').click()`);
   }
+  await ev(`document.querySelector('#btn-diag').scrollIntoView({block: 'center'})`);
+  await nativeClick('#btn-diag', touch);
+  assert.ok(await ev(`document.querySelector('#diagnostics-panel').classList.contains('visible') && document.body.dataset.flow === 'lobby'`), `${name}: Physics opens over the menu`);
+  assert.ok(await ev(`(() => {
+    const node = document.querySelector('#diag-close');
+    const r = node.getBoundingClientRect();
+    return node.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+  })()`), `${name}: inspector close is reachable above menu`);
+  await nativeClick('#diag-close', touch);
+  assert.equal(await ev(`document.querySelector('#diagnostics-panel').classList.contains('visible')`), false, `${name}: native input closes inspector`);
+  await ev(`document.querySelector('#menu-toggle').click()`);
   if (showTouch) {
     assert.ok(await ev(`window.simulator.audio.volume <= 1 && window.simulator.audio.getVolumeState().level <= 1`), `${name}: audio has no boost modes`);
     const nextCamera = await ev(`(()=>{const c=window.simulator.cameraSystem;return ((c.autoSwitch ? 7 : (c.savedMode ?? c.mode)) + 1) % 8})()`);
@@ -193,6 +203,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     panel.oneTapMute = true;
     panel.restoresVolume = true;
   }
+  console.log(`${name}: layout, telemetry and inspector passed`);
   results.push({ name, width, height, touch, showTouch, bounds, cells, panel });
 }
 console.log(`${results.length} viewport/input layouts passed`);
@@ -224,8 +235,8 @@ await send('Input.dispatchKeyEvent', { type: 'keyUp', key: '2', code: 'Digit2', 
 await new Promise(r => setTimeout(r, 150));
 assert.equal(await ev(`window.simulator.cameraSystem.mode`), 1, 'digit keys still select a camera directly');
 assert.match(await ev(`document.querySelector('#open-camera').textContent`), /Chase/, 'keyboard camera state appears on the toolbar button');
-await ev(`document.querySelector('#open-environment').click(); document.querySelector('#panel-environment .flight-panel-body').scrollTop = 0`);
-const before = await ev(`(()=>{const r=document.querySelector('#panel-environment .flight-panel-body').getBoundingClientRect();const c=window.simulator.cameraSystem;return {x:r.x+6,y:r.bottom-12,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
+await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('.lobby-card').scrollTop = 0`);
+const before = await ev(`(()=>{const r=document.querySelector('.lobby-card').getBoundingClientRect();const c=window.simulator.cameraSystem;return {x:r.x+6,y:r.bottom-12,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
 await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: before.x, y: before.y }] });
 for (let n = 1; n <= 8; n++) {
   await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: before.x, y: before.y - n * 10 }] });
@@ -233,22 +244,22 @@ for (let n = 1; n <= 8; n++) {
 }
 await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 await new Promise(r => setTimeout(r, 200));
-const after = await ev(`(()=>{const c=window.simulator.cameraSystem;return {scroll:document.querySelector('#panel-environment .flight-panel-body').scrollTop,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
-assert.ok(after.scroll > 0, 'native touch gesture scrolls panel');
-assert.equal(after.yaw, before.yaw, 'panel scroll leaves camera yaw unchanged');
-assert.equal(after.pitch, before.pitch, 'panel scroll leaves camera pitch unchanged');
+const after = await ev(`(()=>{const c=window.simulator.cameraSystem;return {scroll:document.querySelector('.lobby-card').scrollTop,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
+assert.ok(after.scroll > 0, 'native touch gesture scrolls the menu card');
+assert.equal(after.yaw, before.yaw, 'menu scroll leaves camera yaw unchanged');
+assert.equal(after.pitch, before.pitch, 'menu scroll leaves camera pitch unchanged');
 await ev(`document.querySelector('#btn-touch-toggle').click()`);
 assert.equal(await ev('window.simulator.touchControls.enabled'), false, 'touch mode can be disabled from shared settings');
-await ev(`document.querySelector('#btn-touch-toggle').click(); const language = document.querySelector('#language-select'); language.value = 'ko'; language.dispatchEvent(new Event('change'))`);
+await ev(`document.querySelector('#btn-touch-toggle').click(); document.querySelector('#lobby-lang-ko').click()`);
 await new Promise(r => setTimeout(r, 100));
-assert.equal(await ev(`document.querySelector('#open-environment').textContent`), '설정', 'language change refreshes panel labels');
-assert.equal(await ev(`!document.querySelector('#panel-environment').hidden`), true, 'language change retains open panel');
-await ev(`document.querySelector('#panel-environment .panel-close').click(); document.querySelector('#open-aircraft').click()`);
+assert.equal(await ev(`document.querySelector('.lobby-settings .lobby-label').textContent`), '설정', 'language change refreshes menu settings labels');
+assert.equal(await ev(`document.body.dataset.flow`), 'lobby', 'language change keeps the menu open');
+await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('#open-aircraft').click()`);
 await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 1, mobile: true });
 await new Promise(r => setTimeout(r, 150));
 assert.equal(await ev(`!document.querySelector('#panel-aircraft').hidden`), true, 'rotation retains Aircraft panel');
 await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-aircraft-ko.png`, Buffer.from(r.data, 'base64')));
-await ev(`document.querySelector('#panel-aircraft .panel-close').click(); const language = document.querySelector('#language-select'); language.value = 'en'; language.dispatchEvent(new Event('change'))`);
+await ev(`document.querySelector('#panel-aircraft .panel-close').click(); document.querySelector('#lobby-lang-en').click()`);
 fs.writeFileSync(`${out}/interaction-results.json`, JSON.stringify({ repeatedFlaps: true, directCamera: true, keyboardCamera: true, demoClosesPanel: true, nativeTouchScroll: after, cameraBefore: before, touchModeToggle: true, languageChange: true, rotation: true }, null, 2));
 console.log('Interaction scenarios passed');
 
@@ -311,6 +322,60 @@ await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSy
 fs.writeFileSync(`${out}/safe-area-results.json`, JSON.stringify(safeArea, null, 2));
 await ev(`for (const edge of ['left','right','top','bottom']) document.body.style.removeProperty('--edge-'+edge)`);
 console.log('Simulated safe-area bounds passed');
+
+// Review regressions: every readout remains reachable, and the inspector accepts
+// tuning input while the main menu stays open.
+const reviewResults = [];
+for (const [width, height, touch] of [[320, 568, true], [568, 320, true], [1025, 700, false], [1440, 900, false]]) {
+  await send('Emulation.setTouchEmulationEnabled', { enabled: touch, maxTouchPoints: touch ? 5 : 1 });
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch });
+  await ev(`window.simulator.gameFlow.enterFlight(); document.querySelector('.hud-strip').scrollLeft = 0`);
+  await new Promise(r => setTimeout(r, 200));
+  const before = await ev(`(() => {
+    const strip = document.querySelector('.hud-strip');
+    const r = strip.getBoundingClientRect();
+    const camera = window.simulator.cameraSystem;
+    return { x: r.right - 20, y: r.top + r.height / 2, overflow: strip.scrollWidth > strip.clientWidth,
+      yaw: camera.chaseYaw, pitch: camera.chasePitch };
+  })()`);
+  if (before.overflow && touch) {
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: before.x, y: before.y }] });
+    for (let n = 1; n <= 8; n++) {
+      await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: before.x - n * 22, y: before.y }] });
+      await new Promise(r => setTimeout(r, 30));
+    }
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    assert.ok(await ev(`document.querySelector('.hud-strip').scrollLeft > 0`), 'native swipe scrolls telemetry');
+    assert.equal(await ev('window.simulator.cameraSystem.chaseYaw'), before.yaw, 'telemetry swipe preserves camera yaw');
+    assert.equal(await ev('window.simulator.cameraSystem.chasePitch'), before.pitch, 'telemetry swipe preserves camera pitch');
+  }
+  await ev(`document.querySelector('.hud-strip').focus()`);
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'End', code: 'End', windowsVirtualKeyCode: 35 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'End', code: 'End', windowsVirtualKeyCode: 35 });
+  await new Promise(r => setTimeout(r, 400));
+  const camera = await ev(`(() => {
+    const strip = document.querySelector('.hud-strip');
+    const s = strip.getBoundingClientRect(), c = document.querySelector('#hud-cam').getBoundingClientRect();
+    return { end: strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 1,
+      visible: c.left >= s.left && c.right <= s.right, scrollLeft: strip.scrollLeft };
+  })()`);
+  assert.ok(camera.end && camera.visible, `keyboard End reaches the final camera readout: ${JSON.stringify(camera)}`);
+  await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('#btn-diag').scrollIntoView({block: 'center'})`);
+  await nativeClick('#btn-diag', touch);
+  await ev(`document.querySelector('#tune-elev').scrollIntoView({block: 'center'})`);
+  const tuningBefore = await ev('window.simulator.aero.tuning.elevatorSensitivity');
+  await nativeClick('#tune-elev', touch);
+  const tuningAfter = await ev('window.simulator.aero.tuning.elevatorSensitivity');
+  assert.notEqual(tuningAfter, tuningBefore, 'native input adjusts inspector tuning above the menu');
+  await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/inspector-${width}.png`, Buffer.from(r.data, 'base64')));
+  await ev(`const slider = document.querySelector('#tune-elev'); slider.value = ${tuningBefore}; slider.dispatchEvent(new Event('input')); document.querySelector('#diag-close').scrollIntoView({block: 'center'})`);
+  await nativeClick('#diag-close', touch);
+  assert.equal(await ev(`document.querySelector('#diagnostics-panel').classList.contains('visible')`), false, 'scrolled inspector closes above the menu');
+  await ev(`document.querySelector('#menu-toggle').click()`);
+  reviewResults.push({ width, height, touch, overflow: before.overflow, camera, tuningBefore, tuningAfter });
+}
+fs.writeFileSync(`${out}/review-regressions.json`, JSON.stringify(reviewResults, null, 2));
+console.log('Telemetry swipe/keyboard and inspector tuning regressions passed');
 
 assert.deepEqual(exceptions, [], 'no uncaught browser exceptions');
 ws.close();
