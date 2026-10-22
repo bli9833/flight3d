@@ -2,7 +2,7 @@ import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../config/scenarioRegistry.js';
 
-const AIRPORT_BUTTONS = { coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla' };
+const AIRPORT_BUTTONS = { coastal: 'lobby-airport-coastal' };
 const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
 
 /**
@@ -18,7 +18,6 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
   for (const [id, handler] of [
     ['btn-fly', onFly],
     ['lobby-airport-coastal', () => onAirport('coastal')],
-    ['lobby-airport-lukla', () => onAirport('lukla')],
   ]) {
     document.getElementById(id)?.addEventListener('click', handler);
   }
@@ -35,13 +34,6 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
     if (Number.isFinite(hours)) onTime(hours);
   });
 
-  for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
-    const span = document.getElementById(scenario.lobbyButtonId)?.querySelector('span');
-    if (span) {
-      bindText(span, () => t(scenarioLabelKey(getAirport(), type) ?? 'lobby.spawn'));
-    }
-  }
-
   function refresh() {
     for (const [code, id] of Object.entries(LANGUAGE_BUTTONS)) {
       document.getElementById(id)?.classList.toggle('active', code === getLanguage());
@@ -49,6 +41,12 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
     const airport = getAirport();
     for (const [key, id] of Object.entries(AIRPORT_BUTTONS)) {
       document.getElementById(id)?.classList.toggle('active', key === airport);
+    }
+    for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
+      const span = document.getElementById(scenario.lobbyButtonId)?.querySelector('span');
+      if (span) {
+        bindText(span, () => t(scenarioLabelKey(getAirport(), type) ?? 'lobby.spawn'));
+      }
     }
     const preset = getPreset();
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
