@@ -39,7 +39,9 @@ export class CockpitShadowDemo {
       userModeSelected: sim.cameraSystem.userModeSelected, userLookOverridden: sim.cameraSystem.userLookOverridden,
       photo: sim.cameraSystem.photoCockpit,
       yaw: sim.cameraSystem.lookYaw, pitch: sim.cameraSystem.lookPitch };
+    sim.quietPresetToast = true;
     sim.setPreset('runway');
+    sim.quietPresetToast = false;
     // Settle the spawn once to produce consistent stationary flight displays.
     sim.integratePhysics(sim.physicsDt);
     sim.linearVelocity.set(0, 0, 0);
@@ -50,7 +52,7 @@ export class CockpitShadowDemo {
     sim.cameraSystem.setMode(0, true);
     sim.cameraSystem.photoCockpit = false;
     sim.cameraSystem.lookYaw = 0;
-    sim.cameraSystem.lookPitch = -0.45;
+    sim.cameraSystem.lookPitch = -0.25; // The standard pilot tilt: glareshield, panel and horizon in frame.
     sim.cameraSystem.snapToTarget(sim.aircraft.group);
     sim.sky.setCloudCover(0);
     sim.sky.setTimeOfDay(9, sim.position, sim.camera.position);
