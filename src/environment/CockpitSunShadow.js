@@ -6,6 +6,9 @@ import {
   DECK_SUN_AFT_REACH,
   DECK_SUN_RADIUS,
   DECK_SUN_CLIP_T,
+  directAdmittance,
+  referenceDirectAdmittance,
+  paneOutwardNormal,
 } from '../aircraft/CockpitAperture.js';
 
 /** Localized direct sun, balanced against the enclosed deck's reduced sky fill. */
@@ -35,7 +38,7 @@ const _paneMatrix = new THREE.Matrix4();
 const _paneCenter = new THREE.Vector3();
 const _paneQuat = new THREE.Quaternion();
 const _paneEuler = new THREE.Euler();
-const _apertureDir = new THREE.Vector3();
+const _paneNormal = new THREE.Vector3();
 const _invQuat = new THREE.Quaternion();
 const _point = new THREE.Vector3();
 const _corner = new THREE.Vector3();
@@ -94,6 +97,11 @@ export function projectPanesForCookie({
 
   for (let i = 0; i < panes.length; i++) {
     const pane = panes[i];
+    const quad = quads[i] ??= [];
+    quad.length = 0;
+    // A pane opens only toward the exterior. Projecting its back face would
+    // otherwise paint a beam through the opposite, closed side of the fuselage.
+    if (paneOutwardNormal(pane, _paneNormal).dot(sunDirLocal) <= 0) continue;
     _paneCenter.set(pane.center[0], pane.center[1], pane.center[2]);
     _paneEuler.set(pane.rotation[0], pane.rotation[1], pane.rotation[2]);
     _paneQuat.setFromEuler(_paneEuler);
@@ -101,9 +109,6 @@ export function projectPanesForCookie({
 
     const halfW = pane.size[0] / 2;
     const halfH = pane.size[1] / 2;
-    const quad = quads[i] ??= [];
-    quad.length = 0;
-
     for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
       _corner.set(sx * halfW, sy * halfH, 0).applyMatrix4(_paneMatrix);
       _point.copy(_corner).sub(_lightLocal);
@@ -184,17 +189,12 @@ export function computeDeckSunPose({
   pose.sunDirLocal = (pose.sunDirLocal ?? new THREE.Vector3())
     .copy(sunDir).applyQuaternion(_invQuat).normalize();
 
-  let facing = 0;
-  for (const pane of panes) {
-    // An aperture admits light from the hemisphere it opens onto, which is the direction
-    // from the deck out through the glass, not the glass plane's own normal.
-    _paneCenter.set(pane.center[0], pane.center[1], pane.center[2]).sub(anchor);
-    if (_paneCenter.lengthSq() < 1e-8) continue;
-    _apertureDir.copy(_paneCenter).normalize().applyQuaternion(quaternion);
-    facing = Math.max(facing, _apertureDir.dot(sunDir));
-  }
-
-  pose.facing = smoothstep(0.05, 0.45, facing);
+  // Measured in the deck frame, where the panes are authored: no world-space round trip,
+  // so only the sun's direction relative to the aircraft matters. A sun below the
+  // horizon still clears the pane normals, so the horizon gate stays in update().
+  const reference = referenceDirectAdmittance(panes);
+  pose.admittance = reference > 0
+    ? Math.min(1, directAdmittance(pose.sunDirLocal, panes) / reference) : 0;
   pose.apertureClipT = clipT;
   pose.near = Math.max(0.25, standOff - clipT);
   pose.far = Math.max(pose.near + 0.5, standOff + aftReach);
@@ -275,7 +275,9 @@ export class CockpitSunShadow {
       angle: this.pose.angle,
       quads: this._quads,
     });
-    drawCockpitCookie(this.context, quads, this.size);
+    // Keep the deliberate soft spill proportional to admitted flux, so an
+    // entirely back-facing aperture leaves a black cookie, including its background.
+    drawCockpitCookie(this.context, quads, this.size, COOKIE_LEAK * this.pose.admittance);
     this.texture.needsUpdate = true;
   }
 
@@ -322,7 +324,9 @@ export class CockpitSunShadow {
     this.light.target.position.copy(this.pose.targetPosition);
     this.light.angle = this.pose.angle;
     this.light.color.copy(sunColor);
-    this.light.intensity = sunIntensity * this.pose.facing * this.modeFactor * COCKPIT_SUN_GAIN;
+    // The cookie already projects the aperture area. Multiplying beam intensity
+    // by that area again would dim each surviving ray and count the loss twice.
+    this.light.intensity = sunIntensity * this.modeFactor * COCKPIT_SUN_GAIN;
     this.light.intensity *= smoothstep(-0.03, 0.08, sunDir.y);
 
     const shadowCamera = this.light.shadow.camera;
@@ -352,6 +356,6 @@ export class CockpitSunShadow {
 
   /** 0 at night or in an exterior view, 1 when the deck is in full sun. */
   get daylight() {
-    return Math.min(1, this.light.intensity / (COCKPIT_DAYLIGHT_REFERENCE * COCKPIT_SUN_GAIN));
+    return Math.min(1, (this.pose.admittance ?? 0) * this.light.intensity / (COCKPIT_DAYLIGHT_REFERENCE * COCKPIT_SUN_GAIN));
   }
 }
