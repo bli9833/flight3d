@@ -3,12 +3,16 @@ import assert from 'node:assert';
 import * as THREE from 'three';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
+import { Aerodynamics } from '../src/physics/Aerodynamics.js';
+import { EngineModel } from '../src/physics/EngineModel.js';
+import { LandingGear } from '../src/physics/LandingGear.js';
 
 function createMockSimulator(activeAirport = 'lukla') {
   const virtualInputs = {};
   return {
     activeAirport,
     position: new THREE.Vector3(0, 2800, 0),
+    linearVelocity: new THREE.Vector3(0, 0, 0),
     angularVelocity: new THREE.Vector3(0, 0, 0),
     telemetry: {
       altitudeFt: 9300,
@@ -28,25 +32,20 @@ function createMockSimulator(activeAirport = 'lukla') {
         this.parkingBrake = Boolean(v);
         if (this.parkingBrake) this.brakes = 1.0;
       },
-      setVirtualInput: (k, v) => { virtualInputs[k] = v; },
+      setVirtualInput: (k, v) => {
+        // A control law that divides by an unstarted simulation state would fly
+        // the demo with NaN surfaces, so every command has to be a real number.
+        assert.ok(Number.isFinite(v), `virtual input ${k} is not finite`);
+        virtualInputs[k] = v;
+      },
       clearVirtualInputs: () => {
         for (const k of Object.keys(virtualInputs)) delete virtualInputs[k];
       },
       getVirtualInput: (k) => virtualInputs[k]
     },
-    engines: {
-      setThrottle: () => {},
-      setReverser: () => {}
-    },
-    gear: {
-      brakes: 0.0,
-      setBrakes: function(v) { this.brakes = v; },
-      setGearTarget: () => {}
-    },
-    aero: {
-      spoilers: 0,
-      setFlapPosition: () => {}
-    },
+    engines: new EngineModel(),
+    gear: new LandingGear(),
+    aero: new Aerodynamics(),
     sky: {
       setTimeOfDay: () => {},
       getSunDirection: () => new THREE.Vector3(0, 1, 0)
@@ -328,6 +327,32 @@ describe('Airborne demo handoff', () => {
     director.stop();
     assert.equal(sim.controls.throttle,0);
     assert.equal(engineThrottle,0);
+  });
+
+  it('hands a rolling airframe over with its wheel brakes still held', () => {
+    const rolling = createMockSimulator('coastal');
+    rolling.gear.onGround = true;
+    rolling.telemetry.groundSpeedKnots = 95;
+    const director = new DemoFlightDirector(rolling);
+    director.isActive = true;
+    director.stop();
+    assert.equal(rolling.controls.parkingBrake, true);
+    assert.equal(rolling.controls.brakes, 1);
+    assert.equal(rolling.gear.brakes, 1);
+
+    for (const [label, patch] of [
+      ['stopped on the runway', { onGround: true, groundSpeedKnots: 0.2 }],
+      ['airborne', { onGround: false, groundSpeedKnots: 140 }],
+    ]) {
+      const sim = createMockSimulator('coastal');
+      sim.gear.onGround = patch.onGround;
+      sim.telemetry.groundSpeedKnots = patch.groundSpeedKnots;
+      const handedOff = new DemoFlightDirector(sim);
+      handedOff.isActive = true;
+      handedOff.stop();
+      assert.equal(sim.controls.parkingBrake, false, `brakes release when handing off ${label}`);
+      assert.equal(sim.gear.brakes, 0);
+    }
   });
 });
 
