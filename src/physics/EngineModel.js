@@ -41,13 +41,14 @@ export class EngineModel {
     this.windmillingN1 = propulsion.windmillingN1 ?? 9.0;
     this.momentArmMeters = propulsion.momentArmMeters ?? (this.numEngines > 1 ? 4.5 : 0.0);
 
-    const baseFuelFlow = propulsion.baseFuelFlowKgPerHour ?? 350.0;
+    this.baseFuelFlowKgPerHour = propulsion.baseFuelFlowKgPerHour ?? 350.0;
+    this.maxFuelFlowKgPerHour = propulsion.maxFuelFlowKgPerHour ?? (this.baseFuelFlowKgPerHour * 7.14);
 
     this.n1 = new Array(this.numEngines).fill(this.idleN1);
     this.targetN1 = new Array(this.numEngines).fill(this.idleN1);
     this.n2 = new Array(this.numEngines).fill(62.0);
     this.egt = new Array(this.numEngines).fill(420.0);
-    this.fuelFlow = new Array(this.numEngines).fill(baseFuelFlow);
+    this.fuelFlow = new Array(this.numEngines).fill(this.baseFuelFlowKgPerHour);
     this.thrust = new Array(this.numEngines).fill(0.0);
     this.contactDamage = new Array(this.numEngines).fill(0);
     this.failed = new Array(this.numEngines).fill(false);
@@ -143,7 +144,10 @@ export class EngineModel {
       this.egt[i] += (targetEgt - this.egt[i]) * Math.min(1.0, dt * 1.8);
 
       // Fuel Flow (kg/hour per engine); a flamed-out engine eases to zero burn
-      const runningFuelFlow = 300.0 + Math.pow(this.n1[i] / 100.0, 2.5) * 2200.0 * altitudeLapse;
+      const n1Range = Math.max(1.0, this.togaN1 - this.idleN1);
+      const n1Fraction = Math.max(0.0, Math.min(1.0, (this.n1[i] - this.idleN1) / n1Range));
+      const maxAdditionalFF = Math.max(0, this.maxFuelFlowKgPerHour - this.baseFuelFlowKgPerHour);
+      const runningFuelFlow = this.baseFuelFlowKgPerHour + Math.pow(n1Fraction, 2.5) * maxAdditionalFF * altitudeLapse;
       const targetFF = out ? 0.0 : runningFuelFlow * integrity;
       this.fuelFlow[i] += (targetFF - this.fuelFlow[i]) * Math.min(1.0, dt * (out ? 2.0 : 12.0));
 

@@ -45,6 +45,7 @@ export class LandingGear {
     this.maxImpactSpeed = 0;
     this.lastMomentBody = new THREE.Vector3();
     this.isFixed = false;
+    this.cgGroundHeightM = 3.5;
     this.gearState = 1.0; // 0.0 (UP) to 1.0 (DOWN & LOCKED)
     this.targetGearState = 1.0;
     this.gearTransitSpeed = 0.12; // ~8 seconds for full transit
@@ -122,6 +123,7 @@ export class LandingGear {
       this.gearTransitSpeed = 1.0 / Math.max(0.1, gear.gearTransitTimeSec);
     }
     this.isFixed = Boolean(gear.isFixed);
+    this.cgGroundHeightM = gear.cgGroundHeightM ?? 3.5;
     if (this.isFixed) {
       this.gearState = 1.0;
       this.targetGearState = 1.0;

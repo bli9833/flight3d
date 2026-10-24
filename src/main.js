@@ -505,6 +505,10 @@ class FlightSimulator {
     const config = AIRCRAFT_REGISTRY[aircraftId];
     if (!config) return;
 
+    if (this.demoDirector && this.demoDirector.isActive && aircraftId !== 'B738') {
+      this.demoDirector.stop(() => t('manual.control.engaged'));
+    }
+
     if (this.aircraft?.group) {
       this.scene.remove(this.aircraft.group);
     }
@@ -535,6 +539,10 @@ class FlightSimulator {
     }
 
     if (this.cameraSystem) {
+      if (aircraftId === 'C172' && this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {
+        this.cameraSystem.setMode(CameraSystem.MODES.CHASE, true);
+        this.showToast(() => t('notice.cockpit.unavailable'));
+      }
       this.cameraSystem.snapToTarget(this.aircraft.group);
     }
 
@@ -581,17 +589,19 @@ class FlightSimulator {
       this.clearCrashState();
     }
 
+    const groundClearance = this.gear?.cgGroundHeightM ?? 3.5;
+
     if (this.activeAirport === 'lukla') {
       const sin58 = 0.848048;
       const cos58 = 0.529919;
 
       if (type === 'runway') {
-        // Lukla takeoffs line up at the upper Runway 24 threshold (2,867m) and
+        // Lukla takeoffs line up at the upper Runway 24 threshold (2,864m + gear geometry) and
         // accelerate downhill toward the cliff on heading 238°; Runway 06 is the
         // landing-only direction. Same spawn as the 'cliff' preset: the 5m lateral
         // offset keeps the wide wing clear of the raised apron.
         // Spawn above the current wheel geometry, allowing suspension settling.
-        this.position.set(240.0 * sin58 - 5 * cos58, 2867.72, -240.0 * cos58 - 5 * sin58);
+        this.position.set(240.0 * sin58 - 5 * cos58, 2864.22 + groundClearance, -240.0 * cos58 - 5 * sin58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
 
@@ -646,7 +656,7 @@ class FlightSimulator {
         // Lukla Runway 24 Downhill Cliff Dive Takeoff!
         // Start near the upper threshold with wheel clearance; a 5m lateral
         // offset keeps the wide wing clear of the raised apron.
-        this.position.set(240.0 * sin58 - 5 * cos58, 2867.72, -240.0 * cos58 - 5 * sin58);
+        this.position.set(240.0 * sin58 - 5 * cos58, 2864.22 + groundClearance, -240.0 * cos58 - 5 * sin58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
         // Pitch nose down -6.71° along 11.7% downhill slope, Heading 238° (yaw -238°)
@@ -690,7 +700,7 @@ class FlightSimulator {
       // Coastal International Airport Presets
       if (type === 'runway') {
         // Aligned on Runway 09L Threshold (Heading 090° East)
-        this.position.set(-1350, 15.5, 0);
+        this.position.set(-1350, 12.0 + groundClearance, 0);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
         this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.5); // Face East (+X)

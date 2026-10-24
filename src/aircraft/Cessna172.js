@@ -81,7 +81,7 @@ export class Cessna172 {
       group: new THREE.Group(),
       yokesVisible: false,
       gltfYokes: [],
-      cockpitModelFailed: false,
+      cockpitModelFailed: true,
       gltfCockpitGroup: new THREE.Group(),
       syncDaylight: () => {},
       toggleYokes: () => false,

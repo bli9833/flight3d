@@ -5,7 +5,8 @@ import { Cessna172 } from '../src/aircraft/Cessna172.js';
 import { CESSNA_172, BOEING_737_800 } from '../src/config/aircraftConfigs.js';
 import { CollisionDetector, C172_COLLISION_PROBES, B738_COLLISION_PROBES } from '../src/physics/CollisionDetector.js';
 import { LandingGear } from '../src/physics/LandingGear.js';
-import { asymmetricThrustYawMoment } from '../src/physics/EngineModel.js';
+import { EngineModel, asymmetricThrustYawMoment } from '../src/physics/EngineModel.js';
+import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 
 describe('Cessna 172 Skyhawk Aircraft Model', () => {
@@ -166,5 +167,43 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
     const director = new DemoFlightDirector(fakeSim);
     director.start('lukla');
     assert.strictEqual(switchedAircraft, 'B738', 'Demo flight director forces B738 airframe and aero');
+  });
+
+  it('should scale fuel flow and capacity correctly for Cessna 172 propulsion', () => {
+    const engines = new EngineModel(CESSNA_172);
+    assert.strictEqual(engines.numEngines, 1);
+    assert.strictEqual(engines.fuelCapacityKg, 144.0);
+
+    // At idle (throttle = 0)
+    engines.setThrottle(0.0);
+    for (let i = 0; i < 20; i++) engines.update(0.1, 0, 0, 1.0);
+    assert.ok(engines.fuelFlow[0] <= 32.0, `Idle fuel flow should be near 28 kg/h, got ${engines.fuelFlow[0]}`);
+
+    // At full throttle TOGA (throttle = 1.0)
+    engines.setThrottle(1.0);
+    for (let i = 0; i < 30; i++) engines.update(0.1, 0, 45, 1.0);
+    assert.ok(engines.fuelFlow[0] <= 55.0, `TOGA fuel flow should be near 48 kg/h, not 2500 kg/h, got ${engines.fuelFlow[0]}`);
+    assert.ok(engines.fuelFlow[0] >= 40.0);
+  });
+
+  it('should dynamically update flap detent angles when loading C172 config in Aerodynamics', () => {
+    const aero = new Aerodynamics(BOEING_737_800);
+    assert.strictEqual(aero.flapAngles.length, 7);
+    aero.setFlapPosition(5); // Flaps 30
+
+    aero.loadConfig(CESSNA_172);
+    assert.deepStrictEqual(aero.flapAngles, [0, 10, 20, 30]);
+    assert.ok(aero.flapsIndex <= 3, 'Flap index clamped within C172 detent count');
+    assert.strictEqual(aero.currentFlapAngle, aero.flapAngles[aero.flapsIndex]);
+  });
+
+  it('should report cockpitModelFailed = true to allow camera fallback to chase view', () => {
+    const c172 = new Cessna172();
+    assert.strictEqual(c172.cockpit.cockpitModelFailed, true, 'Flags missing 3D cockpit model for auto-fallback');
+  });
+
+  it('should provide calibrated resting CG height for gentle runway contact', () => {
+    const gear = new LandingGear(CESSNA_172);
+    assert.strictEqual(gear.cgGroundHeightM, 1.35, 'C172 resting CG ground height is 1.35m');
   });
 });
