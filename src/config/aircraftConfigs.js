@@ -89,6 +89,7 @@ export const BOEING_737_800 = {
 
   // 4. Landing Gear & Ground Interaction
   landingGear: {
+    isFixed: false,
     gearTransitTimeSec: 8.0,
     contacts: [
       {
@@ -209,6 +210,7 @@ export const F16_FALCON = {
 
   // 4. Landing Gear & Ground Interaction
   landingGear: {
+    isFixed: false,
     gearTransitTimeSec: 5.0,
     contacts: [
       {
@@ -329,6 +331,7 @@ export const CESSNA_172 = {
 
   // 4. Landing Gear & Ground Interaction (Fixed Tricycle Gear)
   landingGear: {
+    isFixed: true,
     gearTransitTimeSec: 0.1,
     bodySupportPoints: C172_BODY_SUPPORT_POINTS,
     contacts: [

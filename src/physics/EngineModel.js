@@ -8,7 +8,7 @@
  *   moment = arm * (T_right - T_left)
  */
 export function asymmetricThrustYawMoment(thrustLeft, thrustRight, armMeters = 4.5) {
-  if (thrustLeft === undefined || thrustRight === undefined) return 0;
+  if (thrustLeft === undefined || thrustRight === undefined || armMeters === 0) return 0;
   return armMeters * (thrustRight - thrustLeft);
 }
 

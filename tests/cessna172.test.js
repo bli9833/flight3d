@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Cessna172 } from '../src/aircraft/Cessna172.js';
 import { CESSNA_172, BOEING_737_800 } from '../src/config/aircraftConfigs.js';
+import { CollisionDetector, C172_COLLISION_PROBES, B738_COLLISION_PROBES } from '../src/physics/CollisionDetector.js';
+import { LandingGear } from '../src/physics/LandingGear.js';
+import { asymmetricThrustYawMoment } from '../src/physics/EngineModel.js';
+import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 
 describe('Cessna 172 Skyhawk Aircraft Model', () => {
   it('should initialize procedural hierarchy with all subassemblies', () => {
@@ -36,13 +40,13 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
     const initialAngle = c172.propAngle;
 
     // Simulate idle running
-    c172.update(0.1, { engine1N1: 30.0 });
+    c172.update(0.1, { engine1: { n1: 30.0 } });
     assert.ok(c172.propAngle > initialAngle, 'Propeller spins forward during engine idle');
     assert.strictEqual(c172.propBlurDisk.material.opacity, 0.0, 'Blur disk is transparent at low RPM');
 
     // Simulate full throttle (TOGA 100% N1)
     for (let i = 0; i < 10; i++) {
-      c172.update(0.1, { engine1N1: 100.0 });
+      c172.update(0.1, { engine1: { n1: 100.0 } });
     }
     assert.ok(c172.propBlurDisk.material.opacity > 0.1, 'Blur disk fades in at high RPM');
   });
@@ -52,8 +56,8 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
 
     // Command right bank (aileron = 1.0)
     c172.update(0.016, { aileron: 1.0, elevator: 0.0, rudder: 0.0, flapDegree: 0 });
-    assert.ok(c172.aileronL.rotation.x < 0, 'Left aileron deflects down to increase lift');
-    assert.ok(c172.aileronR.rotation.x > 0, 'Right aileron deflects up to dump lift');
+    assert.ok(c172.aileronL.rotation.x > 0, 'Left aileron deflects down (+X) to increase lift');
+    assert.ok(c172.aileronR.rotation.x < 0, 'Right aileron deflects up (-X) to dump lift');
 
     // Command pitch up (stick back, elevator = 1.0)
     c172.update(0.016, { aileron: 0.0, elevator: 1.0, rudder: 0.0, flapDegree: 0 });
@@ -103,5 +107,64 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
     c172.resetCrashVisuals();
     assert.strictEqual(c172.isCrashed, false);
     assert.strictEqual(c172.lightsGroup.visible, true, 'Lights and airframe restored on reset');
+  });
+
+  it('should prevent fixed landing gear from retracting', () => {
+    const gear = new LandingGear(CESSNA_172);
+    assert.strictEqual(gear.isFixed, true);
+    assert.strictEqual(gear.gearState, 1.0);
+    assert.strictEqual(gear.targetGearState, 1.0);
+
+    // Try toggling gear
+    gear.toggleGear();
+    assert.strictEqual(gear.targetGearState, 1.0, 'Fixed gear ignores toggleGear');
+
+    // Try setting target to retracted
+    gear.setGearTarget(false);
+    assert.strictEqual(gear.targetGearState, 1.0, 'Fixed gear ignores setGearTarget(false)');
+    assert.strictEqual(gear.gearState, 1.0);
+
+    // Update step maintains deployed state
+    const mesh = new THREE.Object3D();
+    gear.update(0.1, mesh, new THREE.Vector3(), new THREE.Vector3(), () => 0);
+    assert.strictEqual(gear.gearState, 1.0);
+    assert.strictEqual(gear.isTransit, false);
+  });
+
+  it('should configure collision probe points for C172 airframe dimensions', () => {
+    const cd = new CollisionDetector();
+    assert.strictEqual(cd.probePoints.length, B738_COLLISION_PROBES.length);
+
+    cd.loadAircraftConfig(CESSNA_172);
+    assert.strictEqual(cd.probePoints.length, C172_COLLISION_PROBES.length);
+    const wingL = cd.probePoints.find(p => p.id === 'wingL');
+    assert.ok(wingL, 'Left wingtip probe exists');
+    assert.strictEqual(wingL.pos.x, -5.5, 'C172 wing probe uses ~11m wingspan, not 34m 737 span');
+    assert.strictEqual(wingL.radius, 0.5);
+  });
+
+  it('should yield zero asymmetric thrust yaw moment for single-engine aircraft', () => {
+    // Single engine centerline thrust arm = 0.0
+    const yawMoment = asymmetricThrustYawMoment(3200, 0, CESSNA_172.propulsion.momentArmMeters);
+    assert.strictEqual(yawMoment, 0.0, 'Centerline engine produces no asymmetric yaw moment');
+  });
+
+  it('should switch aircraft to B738 when DemoFlightDirector starts', () => {
+    let switchedAircraft = null;
+    const fakeSim = {
+      currentAircraftId: 'C172',
+      activeAirport: 'lukla',
+      luklaAirport: true,
+      setAircraft: (id) => { switchedAircraft = id; fakeSim.currentAircraftId = id; },
+      controls: { setAircraftControlsDisabled: () => {}, setVirtualInput: () => {} },
+      autopilot: { disengage: () => {} },
+      cameraSystem: { setMode: () => {} },
+      sky: { getSunDirection: () => new THREE.Vector3(), setTimeOfDay: () => {} },
+      engines: { setThrottle: () => {} },
+      gear: { setBrakes: () => {} }
+    };
+    const director = new DemoFlightDirector(fakeSim);
+    director.start('lukla');
+    assert.strictEqual(switchedAircraft, 'B738', 'Demo flight director forces B738 airframe and aero');
   });
 });

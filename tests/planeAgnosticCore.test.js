@@ -120,15 +120,22 @@ describe('Plane-Agnostic Core Infrastructure', () => {
 
     it('should support fast or fixed gear transit times', () => {
       const gear = new LandingGear(CESSNA_172);
-      // C172 has fixed gear with 0.1s transit time -> fast transit speed
-      assert.ok(gear.gearTransitSpeed >= 10.0, 'Fixed gear transit speed is near-instantaneous');
+      assert.strictEqual(gear.isFixed, true);
+      assert.strictEqual(gear.gearState, 1.0);
 
       gear.toggleGear();
       const mockMesh = new THREE.Object3D();
       mockMesh.position.set(0, 50, 0);
       mockMesh.updateMatrixWorld();
       gear.update(0.15, mockMesh, new THREE.Vector3(), new THREE.Vector3(), () => 0);
-      assert.strictEqual(gear.gearState, 0.0, 'Fixed gear cycles instantly');
+      assert.strictEqual(gear.gearState, 1.0, 'Fixed gear stays down and locked');
+
+      // Retractable fast transit gear cycles
+      const fastGear = new LandingGear({ landingGear: { isFixed: false, gearTransitTimeSec: 0.1 } });
+      assert.ok(fastGear.gearTransitSpeed >= 10.0, 'Fast gear transit speed is near-instantaneous');
+      fastGear.toggleGear();
+      fastGear.update(0.15, mockMesh, new THREE.Vector3(), new THREE.Vector3(), () => 0);
+      assert.strictEqual(fastGear.gearState, 0.0, 'Retractable fast gear cycles instantly');
     });
 
     it('should load custom friction parameters from config', () => {

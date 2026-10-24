@@ -489,7 +489,7 @@ export class Cessna172 {
   update(dt, flightState = {}) {
     if (this.isCrashed) return;
 
-    const n1 = flightState.engine1N1 ?? 25.0; // Piston engine RPM indicator
+    const n1 = flightState.engine1?.n1 ?? flightState.engine1N1 ?? 25.0; // Piston engine RPM indicator
     const aileron = flightState.aileron ?? 0.0;
     const elevator = flightState.elevator ?? 0.0;
     const rudder = flightState.rudder ?? 0.0;
@@ -524,9 +524,10 @@ export class Cessna172 {
 
       // 2. Control Surface Deflections
       // Ailerons (opposite deflections, ~15 deg max)
+      // Positive aileron input commands right roll: left aileron trailing edge down (+X), right aileron up (-X)
       const aileronRad = aileron * THREE.MathUtils.degToRad(16.0);
-      if (this.aileronL) this.aileronL.rotation.x = -aileronRad;
-      if (this.aileronR) this.aileronR.rotation.x = aileronRad;
+      if (this.aileronL) this.aileronL.rotation.x = aileronRad;
+      if (this.aileronR) this.aileronR.rotation.x = -aileronRad;
 
       // Elevators (pitch control, ~20 deg max)
       const elevRad = -elevator * THREE.MathUtils.degToRad(20.0);

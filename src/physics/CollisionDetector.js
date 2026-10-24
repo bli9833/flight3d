@@ -1,6 +1,27 @@
 import { t } from '../i18n/index.js';
 import * as THREE from 'three';
 
+export const B738_COLLISION_PROBES = Object.freeze([
+  { id: 'nose', pos: [0, -0.2, -17.5], radius: 1.5, descKey: 'nose.radome' },
+  { id: 'tail', pos: [0, 1.2, 17.5], radius: 1.2, descKey: 'tail.empennage' },
+  { id: 'fin', pos: [0, 9.2, 16.0], radius: 0.8, descKey: 'vertical.fin' },
+  { id: 'wingL', pos: [-17.2, 0.6, 2.8], radius: 1.0, descKey: 'left.wingtip' },
+  { id: 'wingR', pos: [17.2, 0.6, 2.8], radius: 1.0, descKey: 'right.wingtip' },
+  { id: 'engineL', pos: [-5.06, -1.95, -5.22], radius: 1.0, descKey: 'left.engine' },
+  { id: 'engineR', pos: [5.06, -1.95, -5.22], radius: 1.0, descKey: 'right.engine' },
+  { id: 'belly', pos: [0, -1.75, 0.0], radius: 1.8, descKey: 'belly.fuselage' }
+]);
+
+export const C172_COLLISION_PROBES = Object.freeze([
+  { id: 'nose', pos: [0, 0.0, -2.4], radius: 0.6, descKey: 'nose.radome' },
+  { id: 'tail', pos: [0, 0.4, 4.2], radius: 0.5, descKey: 'tail.empennage' },
+  { id: 'fin', pos: [0, 2.0, 3.7], radius: 0.4, descKey: 'vertical.fin' },
+  { id: 'wingL', pos: [-5.5, 0.92, -0.3], radius: 0.5, descKey: 'left.wingtip' },
+  { id: 'wingR', pos: [5.5, 0.92, -0.3], radius: 0.5, descKey: 'right.wingtip' },
+  { id: 'engineL', pos: [0, 0.15, -2.0], radius: 0.5, descKey: 'left.engine' },
+  { id: 'belly', pos: [0, -0.35, 0.0], radius: 0.7, descKey: 'belly.fuselage' }
+]);
+
 /**
  * High-Performance Aircraft Collision & Obstacle Detector
  * Checks 6-DOF aircraft collision against:
@@ -24,17 +45,7 @@ export class CollisionDetector {
     this.shipClosest = new THREE.Vector3();
 
     // Aircraft collision probe points in aircraft local body coordinates (meters)
-    // Nose forward (-Z), Right (+X), Up (+Y), Wingtip span ~34.4m, Length ~35m
-    this.probePoints = [
-      { id: 'nose', pos: new THREE.Vector3(0, -0.2, -17.5), radius: 1.5, get desc() { return t('nose.radome'); } },
-      { id: 'tail', pos: new THREE.Vector3(0, 1.2, 17.5), radius: 1.2, get desc() { return t('tail.empennage'); } },
-      { id: 'fin', pos: new THREE.Vector3(0, 9.2, 16.0), radius: 0.8, get desc() { return t('vertical.fin'); } },
-      { id: 'wingL', pos: new THREE.Vector3(-17.2, 0.6, 2.8), radius: 1.0, get desc() { return t('left.wingtip'); } },
-      { id: 'wingR', pos: new THREE.Vector3(17.2, 0.6, 2.8), radius: 1.0, get desc() { return t('right.wingtip'); } },
-      { id: 'engineL', pos: new THREE.Vector3(-5.06, -1.95, -5.22), radius: 1.0, get desc() { return t('left.engine'); } },
-      { id: 'engineR', pos: new THREE.Vector3(5.06, -1.95, -5.22), radius: 1.0, get desc() { return t('right.engine'); } },
-      { id: 'belly', pos: new THREE.Vector3(0, -1.75, 0.0), radius: 1.8, get desc() { return t('belly.fuselage'); } }
-    ];
+    this.loadAircraftConfig();
 
     // Spatial hash grids for O(1) broadphase lookups
     this.gridCellSize = 150.0; // meters per cell
@@ -42,6 +53,17 @@ export class CollisionDetector {
     this.buildingGrid = new Map();
 
     this.buildSpatialGrids();
+  }
+
+  loadAircraftConfig(config = {}) {
+    const isC172 = config?.id === 'C172';
+    const probes = isC172 ? C172_COLLISION_PROBES : B738_COLLISION_PROBES;
+    this.probePoints = probes.map(p => ({
+      id: p.id,
+      pos: new THREE.Vector3(...p.pos),
+      radius: p.radius,
+      get desc() { return t(p.descKey); }
+    }));
   }
 
   getGridKey(x, z) {

@@ -498,6 +498,7 @@ class FlightSimulator {
     if (this.engines?.loadConfig) this.engines.loadConfig(config);
     if (this.gear?.loadConfig) this.gear.loadConfig(config);
     if (this.cameraSystem?.loadAircraftConfig) this.cameraSystem.loadAircraftConfig(config);
+    if (this.collisionDetector?.loadAircraftConfig) this.collisionDetector.loadAircraftConfig(config);
   }
 
   setAircraft(aircraftId = 'B738') {
@@ -509,6 +510,9 @@ class FlightSimulator {
     }
 
     this.currentAircraftId = aircraftId;
+    if (this.lobby) {
+      this.lobby.aircraft = aircraftId;
+    }
 
     if (aircraftId === 'C172') {
       this.aircraft = new Cessna172();
@@ -559,7 +563,7 @@ class FlightSimulator {
       this.tireSmokeSystem.clear();
     }
     this.lastOnGround = (type === 'runway');
-    this.lastGearTarget = (type !== 'cruise');
+    this.lastGearTarget = this.gear.isFixed ? true : (type !== 'cruise');
     this.airborneTime = (type === 'runway') ? 0.0 : 15.0;
     this.hasTouchedDownThisFlight = false;
     this.gear.resetContacts();
@@ -675,7 +679,7 @@ class FlightSimulator {
         this.controls.throttle = 0.65;
         this.engines.setThrottle(0.65);
         this.gear.setGearTarget(false);
-        this.gear.gearState = 0.0;
+        this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
         this.aero.setFlapPosition(0);
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 2.5;
@@ -731,7 +735,7 @@ class FlightSimulator {
         this.controls.throttle = 0.65;
         this.engines.setThrottle(0.65);
         this.gear.setGearTarget(false);
-        this.gear.gearState = 0.0;
+        this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
         this.aero.setFlapPosition(0); // Clean
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 2.5;
@@ -1025,7 +1029,7 @@ class FlightSimulator {
     // centerline yaws the nose toward the dead engine. Body +Y is positive
     // yaw-left, so the sign follows directly from (T_right - T_left).
     aeroResult.momentBody.y += asymmetricThrustYawMoment(
-      engineData.engine1.thrust, engineData.engine2.thrust);
+      engineData.engine1.thrust, engineData.engine2.thrust, this.engines.momentArmMeters);
 
     // 6. Thrust Force in World Space
     // Engine thrust acts along forward longitudinal axis (-Z in Three.js aircraft space)
