@@ -103,6 +103,9 @@ class FlightSimulator {
     );
     this.scene.add(this.aircraft.group);
     this.cockpitOcclusion = new CockpitOcclusion(this.scene, this.camera, this.aircraft.cockpit);
+    try {
+      this.cockpitOcclusion.enabled = localStorage.getItem('flight3d.cockpitQuality') !== 'performance';
+    } catch { /* Use detailed cockpit shading. */ }
     this.aircraft.cockpit.onModelReady = () => {
       const cockpit = this.aircraft.cockpit;
       const visible = cockpit.group.visible;
@@ -1634,6 +1637,12 @@ class FlightSimulator {
   }
 
   initUI() {
+    const cockpitQuality = document.getElementById('cockpit-quality');
+    cockpitQuality.value = this.cockpitOcclusion.enabled ? 'detailed' : 'performance';
+    cockpitQuality.addEventListener('change', () => {
+      this.cockpitOcclusion.enabled = cockpitQuality.value !== 'performance';
+      try { localStorage.setItem('flight3d.cockpitQuality', cockpitQuality.value); } catch { /* Session-only setting. */ }
+    });
     const qualitySelect = document.getElementById('render-quality');
     qualitySelect.value = this.renderQuality;
     qualitySelect.addEventListener('change', () => this.setRenderQuality(qualitySelect.value));
