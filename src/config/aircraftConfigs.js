@@ -1,3 +1,5 @@
+import { C172_BODY_SUPPORT_POINTS } from '../physics/groundContacts.js';
+
 /**
  * @file aircraftConfigs.js
  * @description Centralized, typed, and extensible Aircraft Specification & Aerodynamic Configurations.
@@ -82,11 +84,14 @@ export const BOEING_737_800 = {
     spoolDownTimeSec: 2.4,               // TOGA to Idle lag
     reverseThrustEfficiency: 0.45,       // 45% reverse thrust deflection
     baseFuelFlowKgPerHour: 350.0,
+    maxFuelFlowKgPerHour: 2500.0,
     fuelCapacityKg: 14200.0
   },
 
   // 4. Landing Gear & Ground Interaction
   landingGear: {
+    isFixed: false,
+    cgGroundHeightM: 3.5,
     gearTransitTimeSec: 8.0,
     contacts: [
       {
@@ -201,12 +206,15 @@ export const F16_FALCON = {
     spoolDownTimeSec: 1.5,
     reverseThrustEfficiency: 0.0,
     baseFuelFlowKgPerHour: 600.0,
+    maxFuelFlowKgPerHour: 4500.0,
     fuelCapacityKg: 3200.0,
     momentArmMeters: 0.0
   },
 
   // 4. Landing Gear & Ground Interaction
   landingGear: {
+    isFixed: false,
+    cgGroundHeightM: 1.85,
     gearTransitTimeSec: 5.0,
     contacts: [
       {
@@ -321,13 +329,17 @@ export const CESSNA_172 = {
     spoolDownTimeSec: 0.8,
     reverseThrustEfficiency: 0.0,
     baseFuelFlowKgPerHour: 28.0,
+    maxFuelFlowKgPerHour: 48.0,
     fuelCapacityKg: 144.0,
     momentArmMeters: 0.0
   },
 
   // 4. Landing Gear & Ground Interaction (Fixed Tricycle Gear)
   landingGear: {
+    isFixed: true,
+    cgGroundHeightM: 1.35,
     gearTransitTimeSec: 0.1,
+    bodySupportPoints: C172_BODY_SUPPORT_POINTS,
     contacts: [
       {
         id: 'nose',

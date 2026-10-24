@@ -156,6 +156,10 @@ export class DemoFlightDirector {
   }
 
   start(targetAirport = null) {
+    if (this.sim?.setAircraft && this.sim.currentAircraftId !== 'B738') {
+      this.sim.setAircraft('B738');
+    }
+
     const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaAirport ? 'lukla' : 'coastal');
     if (this.sim.setAirport && this.sim.activeAirport !== airport) {
       this.sim.setAirport(airport);

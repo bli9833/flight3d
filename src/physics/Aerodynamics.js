@@ -110,6 +110,14 @@ export class Aerodynamics {
     this.gearDrag = aero.gearDrag ?? 0.024;
     this.spoilerDrag = aero.spoilerDrag ?? 0.075;
     this.transonicMachBuffet = aero.transonicMachBuffet ?? 0.78;
+
+    if (aero.flapAngles && Array.isArray(aero.flapAngles) && aero.flapAngles.length > 0) {
+      this.flapAngles = [...aero.flapAngles];
+    } else {
+      this.flapAngles = [0, 1, 5, 15, 20, 30, 40];
+    }
+    this.flapsIndex = Math.max(0, Math.min(this.flapAngles.length - 1, this.flapsIndex ?? 0));
+    this.currentFlapAngle = this.flapAngles[this.flapsIndex];
   }
 
   setFlapPosition(index) {

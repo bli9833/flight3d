@@ -44,6 +44,8 @@ export class LandingGear {
     this.failure = null;
     this.maxImpactSpeed = 0;
     this.lastMomentBody = new THREE.Vector3();
+    this.isFixed = false;
+    this.cgGroundHeightM = 3.5;
     this.gearState = 1.0; // 0.0 (UP) to 1.0 (DOWN & LOCKED)
     this.targetGearState = 1.0;
     this.gearTransitSpeed = 0.12; // ~8 seconds for full transit
@@ -120,6 +122,13 @@ export class LandingGear {
     if (gear.gearTransitTimeSec !== undefined) {
       this.gearTransitSpeed = 1.0 / Math.max(0.1, gear.gearTransitTimeSec);
     }
+    this.isFixed = Boolean(gear.isFixed);
+    this.cgGroundHeightM = gear.cgGroundHeightM ?? 3.5;
+    if (this.isFixed) {
+      this.gearState = 1.0;
+      this.targetGearState = 1.0;
+      this.isTransit = false;
+    }
     if (gear.contacts && Array.isArray(gear.contacts) && gear.contacts.length > 0) {
       this.contacts = gear.contacts.map(c => ({
         id: c.id,
@@ -174,6 +183,7 @@ export class LandingGear {
   }
 
   toggleGear() {
+    if (this.isFixed) return;
     if (this.targetGearState > 0.5) {
       this.targetGearState = 0.0;
     } else {
@@ -182,6 +192,12 @@ export class LandingGear {
   }
 
   setGearTarget(down) {
+    if (this.isFixed) {
+      this.targetGearState = 1.0;
+      this.gearState = 1.0;
+      this.isTransit = false;
+      return;
+    }
     this.targetGearState = down ? 1.0 : 0.0;
   }
 
@@ -208,7 +224,11 @@ export class LandingGear {
    */
   update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null, sampleIsOnRunway = null) {
     // Animate gear transit
-    if (Math.abs(this.targetGearState - this.gearState) > 0.001) {
+    if (this.isFixed) {
+      this.targetGearState = 1.0;
+      this.gearState = 1.0;
+      this.isTransit = false;
+    } else if (Math.abs(this.targetGearState - this.gearState) > 0.001) {
       this.isTransit = true;
       const step = Math.sign(this.targetGearState - this.gearState) * this.gearTransitSpeed * dt;
       this.gearState = Math.max(0.0, Math.min(1.0, this.gearState + step));
