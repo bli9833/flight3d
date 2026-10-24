@@ -182,6 +182,7 @@ class FlightSimulator {
     this.cameraSystem.onResetLook = () => {
       this.showToast(() => t('camera.view.centered'));
     };
+    this.loadAircraftConfig(BOEING_737_800);
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
     this.shadowDemo = new CockpitShadowDemo(this, () => this.updateShadowDemoUi());
@@ -350,6 +351,12 @@ class FlightSimulator {
     };
 
     this.controls.onCycleEngineFailure = () => {
+      if (this.engines.numEngines === 1) {
+        const isFailed = !this.engines.failed[0];
+        this.engines.setEngineFailure(0, isFailed);
+        this.showToast(() => isFailed ? t('notice.engineFailure', { which: '1' }) : t('notice.enginesRecovered'));
+        return;
+      }
       // Cycle: both running → #1 out → both out → #2 out → both running
       const failed = this.engines.failed;
       if (!failed[0] && !failed[1]) {
@@ -483,6 +490,14 @@ class FlightSimulator {
     this.showToast(() => t('notice.time', { time: timeStr }));
   }
 
+  loadAircraftConfig(config = BOEING_737_800) {
+    this.currentAircraftConfig = config;
+    if (this.aero?.loadConfig) this.aero.loadConfig(config);
+    if (this.engines?.loadConfig) this.engines.loadConfig(config);
+    if (this.gear?.loadConfig) this.gear.loadConfig(config);
+    if (this.cameraSystem?.loadAircraftConfig) this.cameraSystem.loadAircraftConfig(config);
+  }
+
   setPreset(type, isDemoInternal = false) {
     // Scenario availability depends on the active airport; an unavailable
     // pick (e.g. cliff at coastal) falls back instead of leaving a stale pose.
@@ -493,7 +508,7 @@ class FlightSimulator {
     }
     this.shadowDemo?.stop();
     this.lastPresetType = type;
-    if (!isDemoInternal) this.aero.loadConfig(BOEING_737_800);
+    if (!isDemoInternal) this.loadAircraftConfig(this.currentAircraftConfig || BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
     }
@@ -691,8 +706,7 @@ class FlightSimulator {
     // previous burn back means a demo-internal preset whose scenario just loaded
     // its own mass (Lukla's 43 t) starts at that mass, not at it plus the burn.
     this.engines.refuel(this.aero);
-    this.engines.failed[0] = false;
-    this.engines.failed[1] = false;
+    this.engines.failed.fill(false);
     this.engines.contactDamage.fill(0);
 
     if (type === 'approach' || type === 'cruise') this.applyComputedTrim();
@@ -893,8 +907,12 @@ class FlightSimulator {
     const atmos = Atmosphere.getConditions(altitudeMeters);
     const tas = this.linearVelocity.length();
     // Damage remains until repair, even if an engine restart is commanded.
-    this.engines.contactDamage[0] = this.gear.bodyDamage.engineL;
-    this.engines.contactDamage[1] = this.gear.bodyDamage.engineR;
+    if (this.gear.bodyDamage?.engineL !== undefined) {
+      this.engines.contactDamage[0] = this.gear.bodyDamage.engineL;
+    }
+    if (this.engines.numEngines > 1 && this.gear.bodyDamage?.engineR !== undefined) {
+      this.engines.contactDamage[1] = this.gear.bodyDamage.engineR;
+    }
     const engineData = this.engines.update(dt, altitudeMeters, tas, atmos.densityRatio);
 
     // Live mass: the airframe sheds exactly the fuel burned since the last

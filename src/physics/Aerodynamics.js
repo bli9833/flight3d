@@ -106,6 +106,10 @@ export class Aerodynamics {
     this.Cn_b = -Math.abs(aero.cnBeta !== undefined ? aero.cnBeta : 0.22);
     this.Cn_dr = aero.cnDr || -0.12;
     this.Cn_r = aero.cnR || -0.32;
+
+    this.gearDrag = aero.gearDrag ?? 0.024;
+    this.spoilerDrag = aero.spoilerDrag ?? 0.075;
+    this.transonicMachBuffet = aero.transonicMachBuffet ?? 0.78;
   }
 
   setFlapPosition(index) {
@@ -249,12 +253,12 @@ export class Aerodynamics {
     // Flap drag
     cdParasitic += 0.0012 * this.currentFlapAngle + 0.000045 * (this.currentFlapAngle * this.currentFlapAngle);
     // Landing gear drag
-    cdParasitic += 0.024 * gearState;
+    cdParasitic += this.gearDrag * gearState;
     // Spoiler drag
-    cdParasitic += 0.075 * this.spoilers;
+    cdParasitic += this.spoilerDrag * this.spoilers;
     // Wave drag / high mach compressibility drag
-    if (this.mach > 0.78) {
-      cdParasitic += Math.pow(this.mach - 0.78, 3.5) * 8.0;
+    if (this.mach > this.transonicMachBuffet) {
+      cdParasitic += Math.pow(this.mach - this.transonicMachBuffet, 3.5) * 8.0;
     }
 
     // Induced drag: C_Di = (C_L^2) / (pi * AR * e) * geFactor
