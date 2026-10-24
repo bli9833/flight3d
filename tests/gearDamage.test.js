@@ -161,6 +161,21 @@ describe('Independent gear damage and body support', () => {
     assert.ok(gear.contacts.some(c => c.damage > 0));
     assert.equal(gear.failure?.reason, 'excursion');
   });
+  it('relaxes turf engagement continuously across pavement boundaries rather than switching discretely', () => {
+    const gear = new LandingGear();
+    // Step 1: on pavement (turfEngagement = 0)
+    sample(gear, { velocity: [0, 0, -30], onRunway: () => true });
+    assert.equal(gear.contacts[0].turfEngagement, 0);
+
+    // Step 2: 1 frame on grass (1/120s dt): turf engagement should transition smoothly, not jump to 1.0
+    sample(gear, { velocity: [0, 0, -30], dt: 1 / 120, onRunway: () => false });
+    const firstStepTurf = gear.contacts[0].turfEngagement;
+    assert.ok(firstStepTurf > 0 && firstStepTurf < 0.1, `First step turf engagement (${firstStepTurf}) must be smooth relaxation`);
+
+    // Multiple steps on grass: gradually reaches ~1.0
+    for (let i = 0; i < 120; i++) sample(gear, { velocity: [0, 0, -30], dt: 1 / 120, onRunway: () => false });
+    assert.ok(gear.contacts[0].turfEngagement > 0.95);
+  });
   it('permits controlled runway scraping but retains catastrophic, obstacle and off-runway crashes', () => {
     const terrain = { getHeight: () => 12 };
     const airport = { isOnRunway: (x, z) => Math.abs(x) < 50 && Math.abs(z) < 1500,

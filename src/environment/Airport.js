@@ -632,8 +632,10 @@ export class Airport {
     const rsaW = this.runwayWidth * 0.5 + 25;   // 55m
     const inRunwayRsa = Math.abs(x) <= rsaL && Math.abs(z) <= rsaW;
     const inTaxiwayRsa = Math.abs(x) <= rsaL && Math.abs(z - 160) <= 30;
+    const distToConnector = Math.min(Math.abs(x % 600), 600 - Math.abs(x % 600));
+    const inConnectorRsa = Math.abs(x) <= 1300 && distToConnector <= 25 && z >= -15 && z <= 175;
     const inApronRsa = Math.abs(x) <= 760 && z >= 150 && z <= 390;
 
-    return inRunwayRsa || inTaxiwayRsa || inApronRsa;
+    return inRunwayRsa || inTaxiwayRsa || inConnectorRsa || inApronRsa;
   }
 }

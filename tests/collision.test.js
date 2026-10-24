@@ -60,6 +60,34 @@ test('CollisionDetector (Multi-Obstacle & Crash Detection System)', async (t) =>
     assert.equal(result, null, 'Safe runway roll should not trigger collision');
   });
 
+  await t.test('should permit high-speed roll on paved connector taxiway without excursion crash', async () => {
+    const { Airport } = await import('../src/environment/Airport.js');
+    const coastalAirport = {
+      runwayLength: 3200,
+      runwayWidth: 60,
+      isOnRunway: Airport.prototype.isOnRunway,
+      isRunwaySafetyArea: Airport.prototype.isRunwaySafetyArea
+    };
+    const realDetector = new CollisionDetector(mockTerrain, coastalAirport, mockFoliage, mockShips, null);
+    // Position on connector taxiway at x = 1200, z = 90 rolling at 16 m/s (Codex review scenario)
+    const pos = new THREE.Vector3(1200, 15.5, 90);
+    const quat = new THREE.Quaternion();
+    const vel = new THREE.Vector3(0, 0, 16);
+    const groundContact = {
+      onGround: true,
+      contacts: [
+        { id: 'nose', isGrounded: true, damageState: 'normal', worldPos: new THREE.Vector3(1200, 12, 100) },
+        { id: 'mainLeft', isGrounded: true, damageState: 'normal', worldPos: new THREE.Vector3(1197, 12, 88) },
+        { id: 'mainRight', isGrounded: true, damageState: 'normal', worldPos: new THREE.Vector3(1203, 12, 88) }
+      ]
+    };
+
+    assert.equal(coastalAirport.isOnRunway(1200, 90), true, 'Connector taxiway at (1200, 90) must be paved runway/taxiway');
+    assert.equal(coastalAirport.isRunwaySafetyArea(1200, 90), true, 'Connector taxiway must be within safety area');
+    const result = realDetector.checkCollision(pos, quat, vel, 1.0, 0, 0, groundContact);
+    assert.equal(result, null, 'Paved connector taxiway roll at 16 m/s must not trigger excursion crash');
+  });
+
   await t.test('should detect off-runway excursion when moving on ground outside runway', () => {
     // Aircraft outside runway at z = 80m (in grass), on ground at 15.5m (12m ground + 3.5m gear), rolling at 50 m/s
     const pos = new THREE.Vector3(-1000, 15.5, 80);

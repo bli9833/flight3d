@@ -163,6 +163,7 @@ export class LandingGear {
       c.isGrounded = false;
       c.compression = 0;
       c.touchdownThisFrame = false;
+      c.turfEngagement = 0;
     }
     this.bodyGrounded = new Set();
     this.structuralDamage = 0;
@@ -328,8 +329,16 @@ export class LandingGear {
         // Tire forces, Coulomb-limited by the strut load. These are both what
         // pushes the airframe around and what the leg structure has to react,
         // so the damage model reads the same numbers the solver delivers.
+        // Continuous turf engagement relaxation: rate-limited physical surface transition (tau ~ 0.25s / 0.4s)
         const onRunway = sampleIsOnRunway ? sampleIsOnRunway(c.worldPos.x, c.worldPos.z) : true;
-        let muBrake = onRunway ? (this.rollingFriction ?? 0.02) : 0.18; // Baseline rolling resistance (higher on unpaved turf/grass)
+        const targetTurf = onRunway ? 0.0 : 1.0;
+        const tauTurf = targetTurf > (c.turfEngagement || 0) ? 0.25 : 0.40;
+        c.turfEngagement = (c.turfEngagement || 0) + (targetTurf - (c.turfEngagement || 0)) * Math.min(1.0, dt / tauTurf);
+
+        // Continuous rolling resistance derived from turf engagement state
+        const baseRolling = this.rollingFriction ?? 0.02;
+        const muRolling = THREE.MathUtils.lerp(baseRolling, 0.18, c.turfEngagement);
+        let muBrake = muRolling;
         if (this.brakes > 0.01) {
           muBrake += this.brakes * (this.maxBrakingFriction ?? 0.58); // Anti-skid brake friction
         }
@@ -340,15 +349,14 @@ export class LandingGear {
         const muLateral = this.tireLateralFriction ?? 0.75;
         const fLateralMag = -Math.sign(vLateral) * Math.min(Math.abs(vLateral) * 35000.0, normalForceMag * muLateral);
 
-        // Dynamic roughness loads when moving at speed on unpaved terrain
+        // Dynamic roughness loads continuously scaling with speed and turf engagement
         let dynamicNormalLoad = normalForceMag;
         let dynamicLateralLoad = Math.abs(fLateralMag);
         let dynamicLongitudinalLoad = Math.abs(fForwardMag);
         const limits = GEAR_DAMAGE_LIMITS[c.id === 'nose' ? 'nose' : 'main'];
-        if (!onRunway && Math.abs(vForward) > 10.0) {
+        if (c.turfEngagement > 0.01 && Math.abs(vForward) > 10.0) {
           const excessSpeed = Math.abs(vForward) - 10.0;
-          // Unpaved terrain dynamic shock loads scaling with speed
-          const shockRatio = excessSpeed / 20.0;
+          const shockRatio = (excessSpeed / 20.0) * c.turfEngagement;
           dynamicNormalLoad += limits.vertical * shockRatio;
           dynamicLateralLoad += limits.lateral * 0.5 * shockRatio;
           dynamicLongitudinalLoad += limits.longitudinal * 0.5 * shockRatio;
@@ -366,7 +374,7 @@ export class LandingGear {
         }, dt, limits);
         if (stateBefore !== c.damageState) {
           this.failure ??= { contact: c.id, sinkRate, penetration,
-            reason: sinkRate > limits.impact ? 'impact' : normalPenetration > c.restLength + 0.08 ? 'bottom-out' : !onRunway ? 'excursion' : gearDeploy < 0.99 || this.targetGearState !== 1 ? 'unlocked' : 'overload' };
+            reason: sinkRate > limits.impact ? 'impact' : normalPenetration > c.restLength + 0.08 ? 'bottom-out' : c.turfEngagement > 0.5 ? 'excursion' : gearDeploy < 0.99 || this.targetGearState !== 1 ? 'unlocked' : 'overload' };
           damageEvents.push({ id: c.id, state: c.damageState, damage: c.damage });
         }
         if (c.damageState === 'collapsed') {

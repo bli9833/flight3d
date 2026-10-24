@@ -522,11 +522,11 @@ export class CollisionDetector {
 
     // Fatal excursion conditions:
     // 1. Structural gear collapse from sustained off-runway stress while moving
-    // 2. High-speed deep excursion outside the airport safety area (> 15 m/s)
+    // 2. High-speed deep excursion outside paved runway and airport safety area (> 15 m/s)
     // 3. Catastrophic hull impact while off-runway
     const isExcursionCrash = isWheelGrounded && isMoving && (
       (gearCollapsed && (!onRunway || wheelOffRunway)) ||
-      (!inSafetyArea && speedMs > 15.0) ||
+      (!onRunway && !inSafetyArea && speedMs > 15.0) ||
       (catastrophicHullLoss && !onRunway)
     );
 
