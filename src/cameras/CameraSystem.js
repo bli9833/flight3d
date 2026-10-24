@@ -653,6 +653,48 @@ export class CameraSystem {
     this.droneInitialized = false;
   }
 
+  loadAircraftConfig(config = {}) {
+    const cockpit = config.cockpit || {};
+    const aero = config.aerodynamics || {};
+    const span = aero.wingspanM ?? 35.8;
+
+    if (cockpit.captainEyePos) {
+      const p = cockpit.captainEyePos;
+      this.cockpitHeadOffset.set(p.x, p.y, p.z);
+    }
+    if (cockpit.defaultLookPitchRad !== undefined) {
+      this.lookPitch = cockpit.defaultLookPitchRad;
+    }
+    if (cockpit.chaseDistance !== undefined) {
+      this.chaseDistance = cockpit.chaseDistance;
+    } else if (span) {
+      this.chaseDistance = Math.max(12.0, span * 1.5);
+    }
+    if (cockpit.chaseHeight !== undefined) {
+      this.chaseHeight = cockpit.chaseHeight;
+    } else if (span) {
+      this.chaseHeight = Math.max(3.0, this.chaseDistance * 0.19);
+    }
+    if (cockpit.droneDistance !== undefined) {
+      this.droneDistance = cockpit.droneDistance;
+    } else if (span) {
+      this.droneDistance = Math.max(10.0, span * 1.05);
+    }
+    if (cockpit.droneHeight !== undefined) {
+      this.droneHeight = cockpit.droneHeight;
+    } else if (span) {
+      this.droneHeight = Math.max(3.0, this.droneDistance * 0.30);
+    }
+    if (cockpit.gearCamOffset) {
+      const g = cockpit.gearCamOffset;
+      this.gearCamOffset.set(g.x, g.y, g.z);
+    }
+    if (cockpit.gearLookTarget) {
+      const gt = cockpit.gearLookTarget;
+      this.gearLookTarget.set(gt.x, gt.y, gt.z);
+    }
+  }
+
   setTerrain(terrain) {
     if (typeof terrain === 'function') {
       this.getTerrainHeight = terrain;

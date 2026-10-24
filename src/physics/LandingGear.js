@@ -39,7 +39,7 @@ const AXIS_FWD = new THREE.Vector3(0, 0, -1);
  * and realistic gear retraction/extension cycle.
  */
 export class LandingGear {
-  constructor() {
+  constructor(config = null) {
     this.bodySupportPoints ??= BODY_SUPPORT_POINTS;
     this.failure = null;
     this.maxImpactSpeed = 0;
@@ -48,6 +48,9 @@ export class LandingGear {
     this.targetGearState = 1.0;
     this.gearTransitSpeed = 0.12; // ~8 seconds for full transit
     this.isTransit = false;
+    this.rollingFriction = 0.02;
+    this.maxBrakingFriction = 0.58;
+    this.tireLateralFriction = 0.75;
 
     // Contact points relative to aircraft Center of Gravity (m)
     // In Three.js aircraft local coordinates:
@@ -100,12 +103,50 @@ export class LandingGear {
       }
     ];
 
-    this.resetDamage();
+    if (config) {
+      this.loadConfig(config);
+    } else {
+      this.resetDamage();
+    }
     this.brakes = 0.0; // 0.0 to 1.0
     this.steerAngle = 0.0; // Radians
     this.onGround = false;
     this.totalWeightOnWheels = 0;
     this.touchdownEvent = false;
+  }
+
+  loadConfig(config = {}) {
+    const gear = config?.landingGear || config || {};
+    if (gear.gearTransitTimeSec !== undefined) {
+      this.gearTransitSpeed = 1.0 / Math.max(0.1, gear.gearTransitTimeSec);
+    }
+    if (gear.contacts && Array.isArray(gear.contacts) && gear.contacts.length > 0) {
+      this.contacts = gear.contacts.map(c => ({
+        id: c.id,
+        name: c.name || c.id,
+        localPos: c.localPos instanceof THREE.Vector3
+          ? c.localPos.clone()
+          : new THREE.Vector3(c.localPos.x, c.localPos.y, c.localPos.z),
+        wheelRadius: c.wheelRadius ?? (c.id === 'nose' ? 0.38 : 0.48),
+        restLength: c.restLength ?? 0.9,
+        kSpring: c.kSpring ?? (c.id === 'nose' ? 420000 : 850000),
+        cDamper: c.cDamper ?? (c.id === 'nose' ? 48000 : 72000),
+        isSteerable: Boolean(c.isSteerable),
+        maxSteeringDeg: c.maxSteeringDeg ?? 55.0,
+        compression: 0,
+        isGrounded: false,
+        touchdownThisFrame: false,
+        worldPos: new THREE.Vector3(),
+        prevWorldPos: new THREE.Vector3()
+      }));
+    }
+    if (gear.bodySupportPoints) {
+      this.bodySupportPoints = gear.bodySupportPoints;
+    }
+    if (gear.rollingFriction !== undefined) this.rollingFriction = gear.rollingFriction;
+    if (gear.maxBrakingFriction !== undefined) this.maxBrakingFriction = gear.maxBrakingFriction;
+    if (gear.tireLateralFriction !== undefined) this.tireLateralFriction = gear.tireLateralFriction;
+    this.resetDamage();
   }
 
   resetContacts() {
@@ -287,15 +328,15 @@ export class LandingGear {
         // Tire forces, Coulomb-limited by the strut load. These are both what
         // pushes the airframe around and what the leg structure has to react,
         // so the damage model reads the same numbers the solver delivers.
-        let muBrake = 0.02; // Baseline rolling resistance
+        let muBrake = this.rollingFriction ?? 0.02; // Baseline rolling resistance
         if (this.brakes > 0.01) {
-          muBrake += this.brakes * 0.58; // Boeing 737 anti-skid carbon brake friction
+          muBrake += this.brakes * (this.maxBrakingFriction ?? 0.58); // Anti-skid brake friction
         }
         // Preserve static braking on sloped taxiways/runways.
         const stoppingGain = this.brakes > 0.5 ? normalForceMag / (9.80665 * Math.max(dt, 0.001)) : 25000;
         const fForwardMag = -Math.sign(vForward) * Math.min(Math.abs(vForward) * stoppingGain, normalForceMag * muBrake);
 
-        const muLateral = 0.75;
+        const muLateral = this.tireLateralFriction ?? 0.75;
         const fLateralMag = -Math.sign(vLateral) * Math.min(Math.abs(vLateral) * 35000.0, normalForceMag * muLateral);
 
         const limits = GEAR_DAMAGE_LIMITS[c.id === 'nose' ? 'nose' : 'main'];
