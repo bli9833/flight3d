@@ -34,3 +34,15 @@ export const FALLBACK_BODY_SUPPORT_POINTS = Object.freeze([
   ['wingR', [18.5, 0.5, 0]], ['wingR', [18.5, 0.5, 2.3]],
 ].map(([id, position], index, points) =>
   ({ id, key: `${id}:${index}`, position, weight: 1 / points.filter(p => p[0] === id).length })));
+
+// Compact single-engine general aviation profile (Cessna 172)
+export const C172_BODY_SUPPORT_POINTS = Object.freeze([
+  ['engineL', [0, 0.15, -2.2]],
+  ['engineR', [0, 0.15, -2.2]],
+  ['belly', [0, -0.45, 0]],
+  ['nose', [0, -0.4, -1.8]],
+  ['tail', [0, 0.35, 3.8]],
+  ['wingL', [-5.5, 0.92, -0.3]],
+  ['wingR', [5.5, 0.92, -0.3]],
+].map(([id, position], index, points) =>
+  ({ id, key: `${id}:${index}`, position, weight: 1 / points.filter(p => p[0] === id).length })));

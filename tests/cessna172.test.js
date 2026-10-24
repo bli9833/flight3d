@@ -1,0 +1,209 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { Cessna172 } from '../src/aircraft/Cessna172.js';
+import { CESSNA_172, BOEING_737_800 } from '../src/config/aircraftConfigs.js';
+import { CollisionDetector, C172_COLLISION_PROBES, B738_COLLISION_PROBES } from '../src/physics/CollisionDetector.js';
+import { LandingGear } from '../src/physics/LandingGear.js';
+import { EngineModel, asymmetricThrustYawMoment } from '../src/physics/EngineModel.js';
+import { Aerodynamics } from '../src/physics/Aerodynamics.js';
+import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
+
+describe('Cessna 172 Skyhawk Aircraft Model', () => {
+  it('should initialize procedural hierarchy with all subassemblies', () => {
+    const c172 = new Cessna172();
+    assert.ok(c172.group instanceof THREE.Group);
+    assert.strictEqual(c172.group.name, 'Aircraft_Cessna172');
+
+    assert.ok(c172.fuselageGroup, 'Fuselage group must exist');
+    assert.ok(c172.wingGroup, 'High-wing group must exist');
+    assert.ok(c172.tailGroup, 'Tail empennage group must exist');
+    assert.ok(c172.gearGroup, 'Landing gear group must exist');
+    assert.ok(c172.propellerGroup, 'Propeller group must exist');
+    assert.ok(c172.lightsGroup, 'Lights group must exist');
+    assert.ok(c172.cockpit, 'Cockpit interface must exist for engine compatibility');
+  });
+
+  it('should have all articulated control surfaces and steerable gear', () => {
+    const c172 = new Cessna172();
+    assert.ok(c172.aileronL, 'Left aileron exists');
+    assert.ok(c172.aileronR, 'Right aileron exists');
+    assert.ok(c172.flapL, 'Left flap exists');
+    assert.ok(c172.flapR, 'Right flap exists');
+    assert.ok(c172.elevatorL, 'Left elevator exists');
+    assert.ok(c172.elevatorR, 'Right elevator exists');
+    assert.ok(c172.rudder, 'Rudder exists');
+    assert.ok(c172.noseFork, 'Steerable nose fork exists');
+  });
+
+  it('should animate propeller spin and blur disk based on engine state', () => {
+    const c172 = new Cessna172();
+    const initialAngle = c172.propAngle;
+
+    // Simulate idle running
+    c172.update(0.1, { engine1: { n1: 30.0 } });
+    assert.ok(c172.propAngle > initialAngle, 'Propeller spins forward during engine idle');
+    assert.strictEqual(c172.propBlurDisk.material.opacity, 0.0, 'Blur disk is transparent at low RPM');
+
+    // Simulate full throttle (TOGA 100% N1)
+    for (let i = 0; i < 10; i++) {
+      c172.update(0.1, { engine1: { n1: 100.0 } });
+    }
+    assert.ok(c172.propBlurDisk.material.opacity > 0.1, 'Blur disk fades in at high RPM');
+  });
+
+  it('should deflect ailerons, elevators, rudder, and flaps according to flight controls', () => {
+    const c172 = new Cessna172();
+
+    // Command right bank (aileron = 1.0)
+    c172.update(0.016, { aileron: 1.0, elevator: 0.0, rudder: 0.0, flapDegree: 0 });
+    assert.ok(c172.aileronL.rotation.x > 0, 'Left aileron deflects down (+X) to increase lift');
+    assert.ok(c172.aileronR.rotation.x < 0, 'Right aileron deflects up (-X) to dump lift');
+
+    // Command pitch up (stick back, elevator = 1.0)
+    c172.update(0.016, { aileron: 0.0, elevator: 1.0, rudder: 0.0, flapDegree: 0 });
+    assert.ok(c172.elevatorL.rotation.x < 0, 'Elevator deflects up for pitch up');
+    assert.ok(c172.elevatorR.rotation.x < 0, 'Right elevator tracks left elevator');
+
+    // Command right yaw (rudder = 1.0)
+    c172.update(0.016, { aileron: 0.0, elevator: 0.0, rudder: 1.0, flapDegree: 0 });
+    assert.ok(c172.rudder.rotation.y < 0, 'Rudder deflects trailing edge left');
+
+    // Command flaps 20 degrees
+    c172.update(0.016, { aileron: 0.0, elevator: 0.0, rudder: 0.0, flapDegree: 20 });
+    assert.ok(c172.flapL.rotation.x > 0.3, 'Flap L deploys downward');
+    assert.ok(c172.flapR.rotation.x > 0.3, 'Flap R deploys downward');
+
+    // Steer nose wheel on ground
+    c172.update(0.016, { rudder: 1.0, onGround: true });
+    assert.ok(Math.abs(c172.noseFork.rotation.y) > 0.1, 'Nose gear steers with rudder on ground');
+
+    // Nose wheel centers in the air
+    c172.update(0.016, { rudder: 1.0, onGround: false });
+    assert.strictEqual(c172.noseFork.rotation.y, 0, 'Nose gear centers when airborne');
+  });
+
+  it('should toggle cockpit mode cleanly and prevent interior clipping', () => {
+    const c172 = new Cessna172();
+    assert.strictEqual(c172.fuselageGroup.visible, true);
+
+    c172.setCockpitMode(true, true);
+    assert.strictEqual(c172.fuselageGroup.visible, false, 'Fuselage exterior hidden in cockpit view');
+    assert.strictEqual(c172.cockpit.group.visible, true, 'Cockpit interior shown in cockpit view');
+
+    c172.setCockpitMode(false, false);
+    assert.strictEqual(c172.fuselageGroup.visible, true, 'Fuselage exterior restored in exterior view');
+    assert.strictEqual(c172.cockpit.group.visible, false, 'Cockpit interior hidden in exterior view');
+  });
+
+  it('should manage crash visuals and light state', () => {
+    const c172 = new Cessna172();
+    assert.strictEqual(c172.isCrashed, false);
+    assert.strictEqual(c172.lightsGroup.visible, true);
+
+    c172.triggerCrashVisuals('terrain');
+    assert.strictEqual(c172.isCrashed, true);
+    assert.strictEqual(c172.lightsGroup.visible, false, 'Lights extinguish on impact');
+
+    c172.resetCrashVisuals();
+    assert.strictEqual(c172.isCrashed, false);
+    assert.strictEqual(c172.lightsGroup.visible, true, 'Lights and airframe restored on reset');
+  });
+
+  it('should prevent fixed landing gear from retracting', () => {
+    const gear = new LandingGear(CESSNA_172);
+    assert.strictEqual(gear.isFixed, true);
+    assert.strictEqual(gear.gearState, 1.0);
+    assert.strictEqual(gear.targetGearState, 1.0);
+
+    // Try toggling gear
+    gear.toggleGear();
+    assert.strictEqual(gear.targetGearState, 1.0, 'Fixed gear ignores toggleGear');
+
+    // Try setting target to retracted
+    gear.setGearTarget(false);
+    assert.strictEqual(gear.targetGearState, 1.0, 'Fixed gear ignores setGearTarget(false)');
+    assert.strictEqual(gear.gearState, 1.0);
+
+    // Update step maintains deployed state
+    const mesh = new THREE.Object3D();
+    gear.update(0.1, mesh, new THREE.Vector3(), new THREE.Vector3(), () => 0);
+    assert.strictEqual(gear.gearState, 1.0);
+    assert.strictEqual(gear.isTransit, false);
+  });
+
+  it('should configure collision probe points for C172 airframe dimensions', () => {
+    const cd = new CollisionDetector();
+    assert.strictEqual(cd.probePoints.length, B738_COLLISION_PROBES.length);
+
+    cd.loadAircraftConfig(CESSNA_172);
+    assert.strictEqual(cd.probePoints.length, C172_COLLISION_PROBES.length);
+    const wingL = cd.probePoints.find(p => p.id === 'wingL');
+    assert.ok(wingL, 'Left wingtip probe exists');
+    assert.strictEqual(wingL.pos.x, -5.5, 'C172 wing probe uses ~11m wingspan, not 34m 737 span');
+    assert.strictEqual(wingL.radius, 0.5);
+  });
+
+  it('should yield zero asymmetric thrust yaw moment for single-engine aircraft', () => {
+    // Single engine centerline thrust arm = 0.0
+    const yawMoment = asymmetricThrustYawMoment(3200, 0, CESSNA_172.propulsion.momentArmMeters);
+    assert.strictEqual(yawMoment, 0.0, 'Centerline engine produces no asymmetric yaw moment');
+  });
+
+  it('should switch aircraft to B738 when DemoFlightDirector starts', () => {
+    let switchedAircraft = null;
+    const fakeSim = {
+      currentAircraftId: 'C172',
+      activeAirport: 'lukla',
+      luklaAirport: true,
+      setAircraft: (id) => { switchedAircraft = id; fakeSim.currentAircraftId = id; },
+      controls: { setAircraftControlsDisabled: () => {}, setVirtualInput: () => {} },
+      autopilot: { disengage: () => {} },
+      cameraSystem: { setMode: () => {} },
+      sky: { getSunDirection: () => new THREE.Vector3(), setTimeOfDay: () => {} },
+      engines: { setThrottle: () => {} },
+      gear: { setBrakes: () => {} }
+    };
+    const director = new DemoFlightDirector(fakeSim);
+    director.start('lukla');
+    assert.strictEqual(switchedAircraft, 'B738', 'Demo flight director forces B738 airframe and aero');
+  });
+
+  it('should scale fuel flow and capacity correctly for Cessna 172 propulsion', () => {
+    const engines = new EngineModel(CESSNA_172);
+    assert.strictEqual(engines.numEngines, 1);
+    assert.strictEqual(engines.fuelCapacityKg, 144.0);
+
+    // At idle (throttle = 0)
+    engines.setThrottle(0.0);
+    for (let i = 0; i < 20; i++) engines.update(0.1, 0, 0, 1.0);
+    assert.ok(engines.fuelFlow[0] <= 32.0, `Idle fuel flow should be near 28 kg/h, got ${engines.fuelFlow[0]}`);
+
+    // At full throttle TOGA (throttle = 1.0)
+    engines.setThrottle(1.0);
+    for (let i = 0; i < 30; i++) engines.update(0.1, 0, 45, 1.0);
+    assert.ok(engines.fuelFlow[0] <= 55.0, `TOGA fuel flow should be near 48 kg/h, not 2500 kg/h, got ${engines.fuelFlow[0]}`);
+    assert.ok(engines.fuelFlow[0] >= 40.0);
+  });
+
+  it('should dynamically update flap detent angles when loading C172 config in Aerodynamics', () => {
+    const aero = new Aerodynamics(BOEING_737_800);
+    assert.strictEqual(aero.flapAngles.length, 7);
+    aero.setFlapPosition(5); // Flaps 30
+
+    aero.loadConfig(CESSNA_172);
+    assert.deepStrictEqual(aero.flapAngles, [0, 10, 20, 30]);
+    assert.ok(aero.flapsIndex <= 3, 'Flap index clamped within C172 detent count');
+    assert.strictEqual(aero.currentFlapAngle, aero.flapAngles[aero.flapsIndex]);
+  });
+
+  it('should report cockpitModelFailed = true to allow camera fallback to chase view', () => {
+    const c172 = new Cessna172();
+    assert.strictEqual(c172.cockpit.cockpitModelFailed, true, 'Flags missing 3D cockpit model for auto-fallback');
+  });
+
+  it('should provide calibrated resting CG height for gentle runway contact', () => {
+    const gear = new LandingGear(CESSNA_172);
+    assert.strictEqual(gear.cgGroundHeightM, 1.35, 'C172 resting CG ground height is 1.35m');
+  });
+});

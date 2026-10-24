@@ -175,6 +175,13 @@
       <div class="lobby-panels">
         <section id="lobby-panel-scenario" class="lobby-tab-panel" role="tabpanel" aria-labelledby="lobby-tab-scenario" tabindex="0">
           <div class="lobby-group" role="group">
+            <span class="lobby-label" data-i18n="lobby.aircraft">기체</span>
+            <div class="lobby-buttons">
+              <button id="lobby-aircraft-b738" class="btn btn-aircraft active"><span data-i18n="aircraft.b738">✈️ Boeing 737</span></button>
+              <button id="lobby-aircraft-c172" class="btn btn-aircraft"><span data-i18n="aircraft.c172">🛩️ Cessna 172</span></button>
+            </div>
+          </div>
+          <div class="lobby-group" role="group">
             <span class="lobby-label" data-i18n="lobby.airport">공항</span>
             <div class="lobby-buttons">
               <button id="lobby-airport-coastal" class="btn btn-airport active"><span data-i18n="coastal.airport">🌊 국제공항</span></button>
@@ -233,6 +240,13 @@
           <option value="high" data-i18n="quality.high">높음</option>
           <option value="balanced" data-i18n="quality.balanced">균형</option>
           <option value="performance" data-i18n="quality.performance">성능 우선</option>
+        </select>
+      </label>
+      <label class="language-control" for="cockpit-quality">
+        <span data-i18n="cockpit.quality.label">콕핏 음영</span>
+        <select id="cockpit-quality" class="btn">
+          <option value="detailed" data-i18n="cockpit.quality.detailed">정밀</option>
+          <option value="performance" data-i18n="cockpit.quality.performance">성능 우선 (접촉 음영 끄기)</option>
         </select>
       </label>
       <button id="btn-touch-toggle" class="btn btn-preset btn-touch-toggle" title="모바일 / 온스크린 터치 조작 토글" data-i18n-title="toggle.mobile.on.screen.touch.controls"><span data-i18n="touch.controls">📱 터치 조작</span></button>

@@ -3,6 +3,7 @@ import { lobbyBriefing } from './lobbyBriefing.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../config/scenarioRegistry.js';
 
 const AIRPORT_BUTTONS = { coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla' };
+const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172' };
 const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
 
 /**
@@ -10,7 +11,7 @@ const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onPreset, onTime, onFly }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const timeSelect = document.getElementById('lobby-time-select');
@@ -44,6 +45,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
     ['btn-fly', onFly],
     ['lobby-airport-coastal', () => onAirport('coastal')],
     ['lobby-airport-lukla', () => onAirport('lukla')],
+    ['lobby-aircraft-b738', () => { onAircraft?.('B738'); refresh(); }],
+    ['lobby-aircraft-c172', () => { onAircraft?.('C172'); refresh(); }],
   ]) {
     document.getElementById(id)?.addEventListener('click', handler);
   }
@@ -67,6 +70,10 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
     const airport = getAirport();
     for (const [key, id] of Object.entries(AIRPORT_BUTTONS)) {
       document.getElementById(id)?.classList.toggle('active', key === airport);
+    }
+    const aircraft = getAircraft?.() ?? 'B738';
+    for (const [key, id] of Object.entries(AIRCRAFT_BUTTONS)) {
+      document.getElementById(id)?.classList.toggle('active', key === aircraft);
     }
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
       const span = document.getElementById(scenario.lobbyButtonId)?.querySelector('span');

@@ -1,3 +1,5 @@
+import { C172_BODY_SUPPORT_POINTS } from '../physics/groundContacts.js';
+
 /**
  * @file aircraftConfigs.js
  * @description Centralized, typed, and extensible Aircraft Specification & Aerodynamic Configurations.
@@ -81,18 +83,23 @@ export const BOEING_737_800 = {
     spoolUpTimeSec: 3.2,                 // Idle to TOGA response lag
     spoolDownTimeSec: 2.4,               // TOGA to Idle lag
     reverseThrustEfficiency: 0.45,       // 45% reverse thrust deflection
-    baseFuelFlowKgPerHour: 350.0
+    baseFuelFlowKgPerHour: 350.0,
+    maxFuelFlowKgPerHour: 2500.0,
+    fuelCapacityKg: 14200.0
   },
 
   // 4. Landing Gear & Ground Interaction
   landingGear: {
+    isFixed: false,
+    cgGroundHeightM: 3.5,
     gearTransitTimeSec: 8.0,
     contacts: [
       {
         id: 'nose',
         name: 'Nose Gear',
-        localPos: { x: 0.0, y: -2.1, z: -13.8 },
-        restLength: 1.2,
+        localPos: { x: 0.0, y: -3.27, z: -12.5 },
+        wheelRadius: 0.38,
+        restLength: 0.9,
         kSpring: 420000, // N/m
         cDamper: 48000,  // N/(m/s)
         isSteerable: true,
@@ -101,19 +108,21 @@ export const BOEING_737_800 = {
       {
         id: 'mainLeft',
         name: 'Left Main Gear',
-        localPos: { x: -2.86, y: -2.2, z: 1.8 },
-        restLength: 1.1,
-        kSpring: 650000,
-        cDamper: 62000,
+        localPos: { x: -3.2, y: -3.30, z: 1.8 },
+        wheelRadius: 0.48,
+        restLength: 0.9,
+        kSpring: 850000,
+        cDamper: 72000,
         isSteerable: false
       },
       {
         id: 'mainRight',
         name: 'Right Main Gear',
-        localPos: { x: 2.86, y: -2.2, z: 1.8 },
-        restLength: 1.1,
-        kSpring: 650000,
-        cDamper: 62000,
+        localPos: { x: 3.2, y: -3.30, z: 1.8 },
+        wheelRadius: 0.48,
+        restLength: 0.9,
+        kSpring: 850000,
+        cDamper: 72000,
         isSteerable: false
       }
     ],
@@ -124,10 +133,263 @@ export const BOEING_737_800 = {
 
   // 5. Cockpit Camera & Instrument Layout
   cockpit: {
-    captainEyePos: { x: -0.48, y: 1.02, z: -12.02 },
-    defaultLookPitchRad: -0.22,
+    captainEyePos: { x: -0.39, y: 0.85, z: -12.35 },
+    defaultLookPitchRad: -0.25,
     defaultFov: 68.0,
-    exteriorFov: 55.0
+    exteriorFov: 55.0,
+    chaseDistance: 55.0,
+    chaseHeight: 10.5,
+    droneDistance: 38.0,
+    droneHeight: 11.5,
+    gearCamOffset: { x: 2.2, y: -2.4, z: 6.2 },
+    gearLookTarget: { x: -0.5, y: -1.9, z: -2.5 }
+  }
+};
+
+export const F16_FALCON = {
+  id: 'F16',
+  name: 'F-16 Fighting Falcon',
+  description: 'Single-engine supersonic multirole fighter aircraft with afterburning turbofan',
+
+  // 1. Mass & Inertial Properties
+  massProperties: {
+    emptyWeightKg: 8570,
+    maxTakeoffWeightKg: 19200,
+    currentMassKg: 12000.0,
+    Ixx: 12800.0,
+    Iyy: 75000.0,
+    Izz: 82000.0
+  },
+
+  // 2. Aerodynamic Geometry & Stability Derivatives
+  aerodynamics: {
+    wingspanM: 9.96,
+    wingAreaM2: 27.87,
+    meanChordM: 3.45,
+    oswaldEfficiency: 0.75,
+
+    cl0Clean: 0.05,
+    claPerRad: 4.2,
+    alphaStallDeg: 28.0,
+    clFlapBoostMax: 0.35,
+    spoilerLiftDump: 0.25,
+
+    cd0Clean: 0.015,
+    gearDrag: 0.030,
+    spoilerDrag: 0.080,
+    transonicMachBuffet: 0.95,
+
+    cm0: 0.0,
+    cma: -0.45,
+    cmDe: -1.8,
+    cmQ: -12.0,
+
+    clBeta: -0.08,
+    clDa: 0.35,
+    clP: -0.45,
+    cnBeta: 0.18,
+    cnDr: -0.15,
+    cnR: -0.25,
+    adverseYaw: -0.010,
+
+    flapAngles: [0, 20]
+  },
+
+  // 3. Propulsion System (Single Afterburning Turbofan)
+  propulsion: {
+    numEngines: 1,
+    engineName: 'F110-GE-129',
+    maxStaticThrustPerEngineN: 131000.0,
+    idleN1Percent: 60.0,
+    togaN1Percent: 100.0,
+    spoolUpTimeSec: 1.2,
+    spoolDownTimeSec: 1.5,
+    reverseThrustEfficiency: 0.0,
+    baseFuelFlowKgPerHour: 600.0,
+    maxFuelFlowKgPerHour: 4500.0,
+    fuelCapacityKg: 3200.0,
+    momentArmMeters: 0.0
+  },
+
+  // 4. Landing Gear & Ground Interaction
+  landingGear: {
+    isFixed: false,
+    cgGroundHeightM: 1.85,
+    gearTransitTimeSec: 5.0,
+    contacts: [
+      {
+        id: 'nose',
+        name: 'Nose Gear',
+        localPos: { x: 0.0, y: -1.6, z: -4.5 },
+        wheelRadius: 0.25,
+        restLength: 0.8,
+        kSpring: 350000,
+        cDamper: 32000,
+        isSteerable: true,
+        maxSteeringDeg: 35.0
+      },
+      {
+        id: 'mainLeft',
+        name: 'Left Main Gear',
+        localPos: { x: -1.2, y: -1.7, z: 1.2 },
+        wheelRadius: 0.35,
+        restLength: 0.8,
+        kSpring: 450000,
+        cDamper: 40000,
+        isSteerable: false
+      },
+      {
+        id: 'mainRight',
+        name: 'Right Main Gear',
+        localPos: { x: 1.2, y: -1.7, z: 1.2 },
+        wheelRadius: 0.35,
+        restLength: 0.8,
+        kSpring: 450000,
+        cDamper: 40000,
+        isSteerable: false
+      }
+    ],
+    rollingFriction: 0.02,
+    maxBrakingFriction: 0.55,
+    tireLateralFriction: 0.80
+  },
+
+  // 5. Cockpit Camera & Instrument Layout
+  cockpit: {
+    captainEyePos: { x: 0.0, y: 0.85, z: -2.8 },
+    defaultLookPitchRad: -0.10,
+    defaultFov: 75.0,
+    exteriorFov: 60.0,
+    chaseDistance: 18.0,
+    chaseHeight: 4.5,
+    droneDistance: 14.0,
+    droneHeight: 4.8,
+    gearCamOffset: { x: 1.0, y: -1.0, z: 2.5 },
+    gearLookTarget: { x: 0.0, y: -1.2, z: -1.0 }
+  }
+};
+
+export const CESSNA_172 = {
+  id: 'C172',
+  name: 'Cessna 172 Skyhawk',
+  description: 'Single-engine four-seat high-wing general aviation aircraft with piston engine',
+
+  // 1. Mass & Inertial Properties
+  massProperties: {
+    emptyWeightKg: 767,
+    maxTakeoffWeightKg: 1157,
+    currentMassKg: 1050.0,
+    Ixx: 1285.0,
+    Iyy: 1825.0,
+    Izz: 2667.0
+  },
+
+  // 2. Aerodynamic Geometry & Stability Derivatives
+  aerodynamics: {
+    wingspanM: 11.0,
+    wingAreaM2: 16.2,
+    meanChordM: 1.47,
+    oswaldEfficiency: 0.80,
+
+    cl0Clean: 0.35,
+    claPerRad: 5.1,
+    alphaStallDeg: 14.0,
+    clFlapBoostMax: 0.65,
+    spoilerLiftDump: 0.0,
+
+    cd0Clean: 0.027,
+    gearDrag: 0.015,
+    spoilerDrag: 0.0,
+    transonicMachBuffet: 0.60,
+
+    cm0: -0.04,
+    cma: -0.75,
+    cmDe: -1.35,
+    cmQ: -14.0,
+
+    clBeta: -0.09,
+    clDa: 0.22,
+    clP: -0.50,
+    cnBeta: 0.12,
+    cnDr: -0.09,
+    cnR: -0.18,
+    adverseYaw: -0.020,
+
+    flapAngles: [0, 10, 20, 30]
+  },
+
+  // 3. Propulsion System (Single Piston Engine)
+  propulsion: {
+    numEngines: 1,
+    engineName: 'Lycoming IO-360-L2A',
+    maxStaticThrustPerEngineN: 3200.0,
+    idleN1Percent: 25.0,
+    togaN1Percent: 100.0,
+    spoolUpTimeSec: 0.8,
+    spoolDownTimeSec: 0.8,
+    reverseThrustEfficiency: 0.0,
+    baseFuelFlowKgPerHour: 28.0,
+    maxFuelFlowKgPerHour: 48.0,
+    fuelCapacityKg: 144.0,
+    momentArmMeters: 0.0
+  },
+
+  // 4. Landing Gear & Ground Interaction (Fixed Tricycle Gear)
+  landingGear: {
+    isFixed: true,
+    cgGroundHeightM: 1.35,
+    gearTransitTimeSec: 0.1,
+    bodySupportPoints: C172_BODY_SUPPORT_POINTS,
+    contacts: [
+      {
+        id: 'nose',
+        name: 'Nose Gear',
+        localPos: { x: 0.0, y: -1.1, z: -1.5 },
+        wheelRadius: 0.20,
+        restLength: 0.5,
+        kSpring: 120000,
+        cDamper: 15000,
+        isSteerable: true,
+        maxSteeringDeg: 30.0
+      },
+      {
+        id: 'mainLeft',
+        name: 'Left Main Gear',
+        localPos: { x: -1.05, y: -1.15, z: 0.4 },
+        wheelRadius: 0.25,
+        restLength: 0.5,
+        kSpring: 180000,
+        cDamper: 20000,
+        isSteerable: false
+      },
+      {
+        id: 'mainRight',
+        name: 'Right Main Gear',
+        localPos: { x: 1.05, y: -1.15, z: 0.4 },
+        wheelRadius: 0.25,
+        restLength: 0.5,
+        kSpring: 180000,
+        cDamper: 20000,
+        isSteerable: false
+      }
+    ],
+    rollingFriction: 0.025,
+    maxBrakingFriction: 0.40,
+    tireLateralFriction: 0.70
+  },
+
+  // 5. Cockpit Camera & Instrument Layout
+  cockpit: {
+    captainEyePos: { x: -0.28, y: 0.35, z: -0.4 },
+    defaultLookPitchRad: -0.15,
+    defaultFov: 70.0,
+    exteriorFov: 55.0,
+    chaseDistance: 14.0,
+    chaseHeight: 3.2,
+    droneDistance: 12.0,
+    droneHeight: 3.5,
+    gearCamOffset: { x: 0.8, y: -0.6, z: 1.2 },
+    gearLookTarget: { x: 0.0, y: -0.8, z: -0.2 }
   }
 };
 
@@ -135,7 +397,9 @@ export const BOEING_737_800 = {
  * Registry of available aircraft configurations
  */
 export const AIRCRAFT_REGISTRY = {
-  B738: BOEING_737_800
+  B738: BOEING_737_800,
+  F16: F16_FALCON,
+  C172: CESSNA_172
 };
 
 export const DEFAULT_AIRCRAFT_ID = 'B738';

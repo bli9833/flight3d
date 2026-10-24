@@ -32,7 +32,7 @@ export function initFlightPanels({ onCycleCamera }) {
   bar.append(cameraButton);
   // Settings belong to the main menu, not the in-flight HUD.
   const settings = document.getElementById('lobby-settings');
-  for (const selector of ['.language-control[for="render-quality"]', '#btn-sound', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-help']) {
+  for (const selector of ['.language-control[for="render-quality"]', '.language-control[for="cockpit-quality"]', '#btn-sound', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-help']) {
     const node = document.querySelector(selector);
     if (node) settings.append(node);
   }

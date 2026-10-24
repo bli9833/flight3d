@@ -8,41 +8,50 @@
  *   moment = arm * (T_right - T_left)
  */
 export function asymmetricThrustYawMoment(thrustLeft, thrustRight, armMeters = 4.5) {
+  if (thrustLeft === undefined || thrustRight === undefined || armMeters === 0) return 0;
   return armMeters * (thrustRight - thrustLeft);
 }
 
 /**
- * High-Bypass Turbofan Engine Simulation (Boeing 737 CFM56-7B / LEAP-1B class)
- * Simulates twin jet engines with realistic spool latency, thrust lapse with altitude/speed,
+ * High-Bypass Turbofan and Piston Engine Simulation
+ * Simulates 1, 2, or multi-engine configurations with realistic spool latency, thrust lapse with altitude/speed,
  * EGT, N1%, N2%, Fuel Flow, thrust reversers, engine failure (windmilling) and fuel burn.
  */
 export class EngineModel {
-  constructor() {
-    this.numEngines = 2;
-    this.maxStaticThrustPerEngine = 121000; // Newtons (~27,000 lbf each)
-
-    // Current states for Engine 1 (Left) and Engine 2 (Right)
+  constructor(config = null) {
     this.throttleCommand = 0.0; // 0.0 to 1.0 (Idle to TOGA)
     this.reverserActive = false;
     this.reverserDeployment = 0.0; // 0.0 to 1.0
 
-    this.n1 = [22.0, 22.0];       // Fan RPM % (Idle ~22%, TOGA 100%)
-    this.targetN1 = [22.0, 22.0];
-    this.n2 = [62.0, 62.0];       // Core RPM % (Idle ~62%, TOGA ~98%)
-    this.egt = [420.0, 420.0];    // Exhaust Gas Temp (°C)
-    this.fuelFlow = [350.0, 350.0];// kg/h per engine
-    this.thrust = [0.0, 0.0];     // Newtons per engine
+    this.loadConfig(config);
+  }
 
-    this.spoolUpTime = 3.2;       // Seconds from idle to TOGA
-    this.spoolDownTime = 2.4;     // Seconds from TOGA to idle
-
-    this.contactDamage = [0, 0]; // Persistent ground abrasion, repaired by preset only.
-    this.failed = [false, false]; // In-flight shutdown: fan windmills, no combustion
-    this.windmillingN1 = 9.0;     // Fan % driven by the airstream with the core offline
-
-    this.fuelCapacityKg = 14200;  // Matches the EICAS total fuel readout
+  loadConfig(config = null) {
+    const propulsion = config?.propulsion || config || {};
+    this.numEngines = propulsion.numEngines ?? 2;
+    this.maxStaticThrustPerEngine = propulsion.maxStaticThrustPerEngineN ?? propulsion.maxStaticThrustPerEngine ?? 121000;
+    this.idleN1 = propulsion.idleN1Percent ?? 22.0;
+    this.togaN1 = propulsion.togaN1Percent ?? 100.0;
+    this.spoolUpTime = propulsion.spoolUpTimeSec ?? propulsion.spoolUpTime ?? 3.2;
+    this.spoolDownTime = propulsion.spoolDownTimeSec ?? propulsion.spoolDownTime ?? 2.4;
+    this.reverseThrustEfficiency = propulsion.reverseThrustEfficiency ?? 0.45;
+    this.fuelCapacityKg = propulsion.fuelCapacityKg ?? 14200;
     this.fuelKg = this.fuelCapacityKg;
-    this.appliedFuelLoadKg = 0;   // Burn already shed from aero.mass; see shedBurnedFuelMass
+    this.appliedFuelLoadKg = 0;
+    this.windmillingN1 = propulsion.windmillingN1 ?? 9.0;
+    this.momentArmMeters = propulsion.momentArmMeters ?? (this.numEngines > 1 ? 4.5 : 0.0);
+
+    this.baseFuelFlowKgPerHour = propulsion.baseFuelFlowKgPerHour ?? 350.0;
+    this.maxFuelFlowKgPerHour = propulsion.maxFuelFlowKgPerHour ?? (this.baseFuelFlowKgPerHour * 7.14);
+
+    this.n1 = new Array(this.numEngines).fill(this.idleN1);
+    this.targetN1 = new Array(this.numEngines).fill(this.idleN1);
+    this.n2 = new Array(this.numEngines).fill(62.0);
+    this.egt = new Array(this.numEngines).fill(420.0);
+    this.fuelFlow = new Array(this.numEngines).fill(this.baseFuelFlowKgPerHour);
+    this.thrust = new Array(this.numEngines).fill(0.0);
+    this.contactDamage = new Array(this.numEngines).fill(0);
+    this.failed = new Array(this.numEngines).fill(false);
   }
 
   setThrottle(val) {
@@ -94,11 +103,11 @@ export class EngineModel {
 
     // Target N1 based on throttle and reverser
     let targetN1Value;
-    if (this.reverserDeployment > 0.5) {
+    if (this.reverserDeployment > 0.5 && this.reverseThrustEfficiency > 0) {
       // Reverser spool to ~75% N1
-      targetN1Value = 22.0 + (this.throttleCommand > 0.1 ? this.throttleCommand : 0.65) * 55.0;
+      targetN1Value = this.idleN1 + (this.throttleCommand > 0.1 ? this.throttleCommand : 0.65) * (this.togaN1 - this.idleN1) * 0.70;
     } else {
-      targetN1Value = 22.0 + this.throttleCommand * 78.0; // 22% to 100%
+      targetN1Value = this.idleN1 + this.throttleCommand * (this.togaN1 - this.idleN1);
     }
 
     const altitudeLapse = Math.pow(Math.max(0.1, densityRatio), 0.75);
@@ -135,7 +144,10 @@ export class EngineModel {
       this.egt[i] += (targetEgt - this.egt[i]) * Math.min(1.0, dt * 1.8);
 
       // Fuel Flow (kg/hour per engine); a flamed-out engine eases to zero burn
-      const runningFuelFlow = 300.0 + Math.pow(this.n1[i] / 100.0, 2.5) * 2200.0 * altitudeLapse;
+      const n1Range = Math.max(1.0, this.togaN1 - this.idleN1);
+      const n1Fraction = Math.max(0.0, Math.min(1.0, (this.n1[i] - this.idleN1) / n1Range));
+      const maxAdditionalFF = Math.max(0, this.maxFuelFlowKgPerHour - this.baseFuelFlowKgPerHour);
+      const runningFuelFlow = this.baseFuelFlowKgPerHour + Math.pow(n1Fraction, 2.5) * maxAdditionalFF * altitudeLapse;
       const targetFF = out ? 0.0 : runningFuelFlow * integrity;
       this.fuelFlow[i] += (targetFF - this.fuelFlow[i]) * Math.min(1.0, dt * (out ? 2.0 : 12.0));
 
@@ -146,8 +158,8 @@ export class EngineModel {
       let grossThrust = this.maxStaticThrustPerEngine * thrustFactor * altitudeLapse * ramLapse;
 
       // Reverse thrust effect
-      if (this.reverserDeployment > 0.05) {
-        grossThrust = -grossThrust * 0.45 * this.reverserDeployment;
+      if (this.reverserDeployment > 0.05 && this.reverseThrustEfficiency > 0) {
+        grossThrust = -grossThrust * this.reverseThrustEfficiency * this.reverserDeployment;
       }
 
       this.thrust[i] = grossThrust * integrity;
@@ -155,27 +167,39 @@ export class EngineModel {
     }
 
     // Burn the fuel the running engines metered this step
-    this.fuelKg = Math.max(0.0, this.fuelKg - (this.fuelFlow[0] + this.fuelFlow[1]) * dt / 3600.0);
+    let stepFuelBurn = 0;
+    for (let i = 0; i < this.numEngines; i++) {
+      stepFuelBurn += this.fuelFlow[i];
+    }
+    this.fuelKg = Math.max(0.0, this.fuelKg - stepFuelBurn * dt / 3600.0);
+
+    const makeEngineState = (idx) => {
+      if (idx >= this.numEngines) {
+        return {
+          n1: 0,
+          n2: 0,
+          egt: 15.0,
+          fuelFlow: 0,
+          thrust: 0,
+          failed: true
+        };
+      }
+      return {
+        n1: this.n1[idx],
+        n2: this.n2[idx],
+        egt: this.egt[idx],
+        fuelFlow: this.fuelFlow[idx],
+        thrust: this.thrust[idx],
+        failed: this.failed[idx] || fuelStarved || this.contactDamage[idx] >= 1
+      };
+    };
 
     return {
       totalThrust,
       fuelKg: this.fuelKg,
-      engine1: {
-        n1: this.n1[0],
-        n2: this.n2[0],
-        egt: this.egt[0],
-        fuelFlow: this.fuelFlow[0],
-        thrust: this.thrust[0],
-        failed: this.failed[0] || fuelStarved || this.contactDamage[0] >= 1
-      },
-      engine2: {
-        n1: this.n1[1],
-        n2: this.n2[1],
-        egt: this.egt[1],
-        fuelFlow: this.fuelFlow[1],
-        thrust: this.thrust[1],
-        failed: this.failed[1] || fuelStarved || this.contactDamage[1] >= 1
-      },
+      engine1: makeEngineState(0),
+      engine2: makeEngineState(1),
+      engines: Array.from({ length: this.numEngines }, (_, i) => makeEngineState(i)),
       reverserActive: this.reverserActive,
       reverserDeployment: this.reverserDeployment
     };

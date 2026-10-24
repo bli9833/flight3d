@@ -1,6 +1,27 @@
 import { t } from '../i18n/index.js';
 import * as THREE from 'three';
 
+export const B738_COLLISION_PROBES = Object.freeze([
+  { id: 'nose', pos: [0, -0.2, -17.5], radius: 1.5, descKey: 'nose.radome' },
+  { id: 'tail', pos: [0, 1.2, 17.5], radius: 1.2, descKey: 'tail.empennage' },
+  { id: 'fin', pos: [0, 9.2, 16.0], radius: 0.8, descKey: 'vertical.fin' },
+  { id: 'wingL', pos: [-17.2, 0.6, 2.8], radius: 1.0, descKey: 'left.wingtip' },
+  { id: 'wingR', pos: [17.2, 0.6, 2.8], radius: 1.0, descKey: 'right.wingtip' },
+  { id: 'engineL', pos: [-5.06, -1.95, -5.22], radius: 1.0, descKey: 'left.engine' },
+  { id: 'engineR', pos: [5.06, -1.95, -5.22], radius: 1.0, descKey: 'right.engine' },
+  { id: 'belly', pos: [0, -1.75, 0.0], radius: 1.8, descKey: 'belly.fuselage' }
+]);
+
+export const C172_COLLISION_PROBES = Object.freeze([
+  { id: 'nose', pos: [0, 0.0, -2.4], radius: 0.6, descKey: 'nose.radome' },
+  { id: 'tail', pos: [0, 0.4, 4.2], radius: 0.5, descKey: 'tail.empennage' },
+  { id: 'fin', pos: [0, 2.0, 3.7], radius: 0.4, descKey: 'vertical.fin' },
+  { id: 'wingL', pos: [-5.5, 0.92, -0.3], radius: 0.5, descKey: 'left.wingtip' },
+  { id: 'wingR', pos: [5.5, 0.92, -0.3], radius: 0.5, descKey: 'right.wingtip' },
+  { id: 'engineL', pos: [0, 0.15, -2.0], radius: 0.5, descKey: 'left.engine' },
+  { id: 'belly', pos: [0, -0.35, 0.0], radius: 0.7, descKey: 'belly.fuselage' }
+]);
+
 /**
  * High-Performance Aircraft Collision & Obstacle Detector
  * Checks 6-DOF aircraft collision against:
@@ -24,17 +45,7 @@ export class CollisionDetector {
     this.shipClosest = new THREE.Vector3();
 
     // Aircraft collision probe points in aircraft local body coordinates (meters)
-    // Nose forward (-Z), Right (+X), Up (+Y), Wingtip span ~34.4m, Length ~35m
-    this.probePoints = [
-      { id: 'nose', pos: new THREE.Vector3(0, -0.2, -17.5), radius: 1.5, get desc() { return t('nose.radome'); } },
-      { id: 'tail', pos: new THREE.Vector3(0, 1.2, 17.5), radius: 1.2, get desc() { return t('tail.empennage'); } },
-      { id: 'fin', pos: new THREE.Vector3(0, 9.2, 16.0), radius: 0.8, get desc() { return t('vertical.fin'); } },
-      { id: 'wingL', pos: new THREE.Vector3(-17.2, 0.6, 2.8), radius: 1.0, get desc() { return t('left.wingtip'); } },
-      { id: 'wingR', pos: new THREE.Vector3(17.2, 0.6, 2.8), radius: 1.0, get desc() { return t('right.wingtip'); } },
-      { id: 'engineL', pos: new THREE.Vector3(-5.06, -1.95, -5.22), radius: 1.0, get desc() { return t('left.engine'); } },
-      { id: 'engineR', pos: new THREE.Vector3(5.06, -1.95, -5.22), radius: 1.0, get desc() { return t('right.engine'); } },
-      { id: 'belly', pos: new THREE.Vector3(0, -1.75, 0.0), radius: 1.8, get desc() { return t('belly.fuselage'); } }
-    ];
+    this.loadAircraftConfig();
 
     // Spatial hash grids for O(1) broadphase lookups
     this.gridCellSize = 150.0; // meters per cell
@@ -42,6 +53,17 @@ export class CollisionDetector {
     this.buildingGrid = new Map();
 
     this.buildSpatialGrids();
+  }
+
+  loadAircraftConfig(config = {}) {
+    const isC172 = config?.id === 'C172';
+    const probes = isC172 ? C172_COLLISION_PROBES : B738_COLLISION_PROBES;
+    this.probePoints = probes.map(p => ({
+      id: p.id,
+      pos: new THREE.Vector3(...p.pos),
+      radius: p.radius,
+      get desc() { return t(p.descKey); }
+    }));
   }
 
   getGridKey(x, z) {
@@ -486,6 +508,13 @@ export class CollisionDetector {
     return Math.abs(x) < 1650 && Math.abs(z) < 40;
   }
 
+  isPositionInSafetyArea(x, z) {
+    if (this.airport && typeof this.airport.isRunwaySafetyArea === 'function') {
+      return this.airport.isRunwaySafetyArea(x, z);
+    }
+    return Math.abs(x) < 1750 && Math.abs(z) < 60;
+  }
+
   checkTerrain(aircraftPos, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity = null, groundContact = null) {
     if (!this.terrain) return null;
 
@@ -501,16 +530,29 @@ export class CollisionDetector {
     // Evaluate off-runway ground excursion: when the aircraft moves on the ground outside the runway
     const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
     const gearHeight = gearState >= 0.5 ? 3.85 : 1.85;
-    const isGrounded = groundContact !== null
-      ? Boolean(groundContact.onGround)
+    const isWheelGrounded = groundContact !== null
+      ? Boolean(groundContact.contacts?.some(c => c.isGrounded))
       : (aircraftPos.y - groundH <= gearHeight && aircraftPos.y - groundH >= -2.0);
 
-    const isMoving = speedMs > 0.5;
+    const isMoving = speedMs > 5.0; // Low-speed taxi into grass halts safely rather than detonating
+    const inSafetyArea = this.isPositionInSafetyArea(aircraftPos.x, aircraftPos.z);
+    const gearCollapsed = groundContact?.contacts?.some(c => c.damageState === 'collapsed');
+    const catastrophicHullLoss = Boolean(groundContact?.catastrophicImpact);
     const wheelOffRunway = groundContact?.contacts?.some(c =>
       c.isGrounded && !this.isPositionOnRunway(c.worldPos.x, c.worldPos.z)
     );
 
-    if (isGrounded && isMoving && (!onRunway || wheelOffRunway)) {
+    // Fatal excursion conditions:
+    // 1. Structural gear collapse from sustained off-runway stress while moving
+    // 2. High-speed deep excursion outside paved runway and airport safety area (> 15 m/s)
+    // 3. Catastrophic hull impact while off-runway
+    const isExcursionCrash = isWheelGrounded && isMoving && (
+      (gearCollapsed && (!onRunway || wheelOffRunway)) ||
+      (!onRunway && !inSafetyArea && speedMs > 15.0) ||
+      (catastrophicHullLoss && !onRunway)
+    );
+
+    if (isExcursionCrash) {
       return {
         get name() { return t('runway.excursion'); },
         point: aircraftPos.clone(),
