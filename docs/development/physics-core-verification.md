@@ -19,7 +19,7 @@ all other assets and modules come from the same checkout. The updated run
 uses the normal Vite modules. Automatic RAF is disabled during deterministic
 stepping; real WebGL rendering is tested separately.
 
-The final run seeds Math.random identically in both contexts and warms up
+The seeded runs initialize Math.random identically in both contexts and warm up
 10 simulated seconds before heap sampling. It then runs runway, cruise,
 approach, runway-reset (12 seconds each), plus a forced runway touchdown
 (8 seconds). All 56 once-per-second snapshots match exactly, covering 6,720
@@ -32,7 +32,7 @@ The render check resumes cruise, selects chase view and drives 120 real
 browser animation callbacks through animate(); frame statistics exclude the
 first 61 callbacks. Captured images were inspected separately.
 
-| Final seeded run | Baseline | Updated |
+| First seeded run | Baseline | Updated |
 | --- | ---: | ---: |
 | p95 one-second simulation batch (120 steps plus displays), ms | 61.5 | 40.3 |
 | p99 simulation batch, ms | 79.8 | 44.3 |
@@ -40,12 +40,23 @@ first 61 callbacks. Captured images were inspected separately.
 | p95 displayed frame interval, ms | 69.6 | 39.9 |
 | p99 displayed frame interval, ms | 78.7 | 52.4 |
 
+Repeating the committed verifier also passed all state comparisons and browser
+checks, but produced the following timings and allocation samples:
+
+| Seeded repeat | Baseline | Updated |
+| --- | ---: | ---: |
+| p95 simulation batch, ms | 83.5 | 89.1 |
+| p99 simulation batch, ms | 94.7 | 104.4 |
+| CDP sampled allocation bytes | 508,660,584 | 499,235,204 |
+| p95 displayed frame interval, ms | 98.8 | 89.4 |
+| p99 displayed frame interval, ms | 158.5 | 99.4 |
+
 These are diagnostic samples, not a performance guarantee. Two earlier
 unseeded short runs showed mixed results, including higher allocations and
 worse frame tails for the updated run. Scene randomization, compilation,
 profiling overhead, run order and background work affect these measurements.
-The final run is also baseline-first, not a randomized repeated benchmark.
-It cannot establish that these percentage changes were caused by this patch.
+The seeded runs are also baseline-first, not a randomized repeated benchmark.
+They cannot establish that these percentage changes were caused by this patch.
 The directly established allocation reduction is two vectors and one output
 object per live aerodynamic call. GC pause durations/frequency, mobile,
 Lukla full circuits and the complete demo/crash acceptance suites were not
