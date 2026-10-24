@@ -316,7 +316,8 @@ body, html {
   pointer-events: auto;
 }
 
-.btn-airport {
+.btn-airport,
+.btn-aircraft {
   font-size: 11px;
   font-weight: 700;
   padding: 5px 9px;
@@ -329,13 +330,15 @@ body, html {
   white-space: nowrap;
 }
 
-.btn-airport:hover {
+.btn-airport:hover,
+.btn-aircraft:hover {
   background: rgba(51, 65, 85, 0.9);
   color: #f8fafc;
   border-color: #38bdf8;
 }
 
-.btn-airport.active {
+.btn-airport.active,
+.btn-aircraft.active {
   background: linear-gradient(135deg, #0284c7, #0369a1);
   border-color: #38bdf8;
   color: #ffffff;
@@ -2154,7 +2157,8 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 }
 .lobby-card .btn:hover { background: rgba(148, 163, 184, .12); color: #e2e8f0; border-color: rgba(148, 163, 184, .35); }
 .lobby-card .btn.active { background: rgba(56, 189, 248, .12); color: #bae6fd; border-color: rgba(56, 189, 248, .45); }
-.lobby-card .btn-airport { flex: 1; }
+.lobby-card .btn-airport,
+.lobby-card .btn-aircraft { flex: 1; }
 .lobby-scenarios .btn-preset { flex: 1 1 100%; text-align: left; }
 .lobby-language .btn { min-height: 28px; padding: 4px 7px; font-size: 10px; }
 /* Panel content scrolls vertically; the tabs and flight action stay in place. */

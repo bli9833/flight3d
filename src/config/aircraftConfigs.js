@@ -1,3 +1,5 @@
+import { C172_BODY_SUPPORT_POINTS } from '../physics/groundContacts.js';
+
 /**
  * @file aircraftConfigs.js
  * @description Centralized, typed, and extensible Aircraft Specification & Aerodynamic Configurations.
@@ -328,6 +330,7 @@ export const CESSNA_172 = {
   // 4. Landing Gear & Ground Interaction (Fixed Tricycle Gear)
   landingGear: {
     gearTransitTimeSec: 0.1,
+    bodySupportPoints: C172_BODY_SUPPORT_POINTS,
     contacts: [
       {
         id: 'nose',

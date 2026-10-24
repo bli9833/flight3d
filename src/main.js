@@ -5,7 +5,7 @@ import { CockpitShadowDemo, SHADOW_VIEWS } from './director/CockpitShadowDemo.js
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
 import { prepareCockpitShadowDepth } from './aircraft/CockpitDepth.js';
 import { Atmosphere } from './physics/Atmosphere.js';
-import { BOEING_737_800 } from './config/aircraftConfigs.js';
+import { AIRCRAFT_REGISTRY, BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics } from './physics/Aerodynamics.js';
 import { EngineModel, asymmetricThrustYawMoment } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
@@ -20,6 +20,7 @@ import { MCPCanvas } from './aircraft/MCPCanvas.js';
 import { ISFDCanvas } from './aircraft/ISFDCanvas.js';
 import { CDUCanvas } from './aircraft/CDUCanvas.js';
 import { Boeing737 } from './aircraft/Boeing737.js';
+import { Cessna172 } from './aircraft/Cessna172.js';
 import { Terrain } from './environment/Terrain.js';
 import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality } from './config/renderQuality.js';
 import { WaterOcean } from './environment/WaterOcean.js';
@@ -193,7 +194,8 @@ class FlightSimulator {
       isDemoWaiting: () => this.demoDirector.waitingForTerrain === true,
       onStateChange: () => this.syncFlowUi(),
     });
-    this.lobby = { airport: 'coastal', preset: 'runway' };
+    this.lobby = { airport: 'coastal', preset: 'runway', aircraft: 'B738' };
+    this.currentAircraftId = 'B738';
     this.lastPresetType = 'runway';
 
     // 7. Collision Detection & Explosion & Tire Smoke Particle Systems
@@ -496,6 +498,43 @@ class FlightSimulator {
     if (this.engines?.loadConfig) this.engines.loadConfig(config);
     if (this.gear?.loadConfig) this.gear.loadConfig(config);
     if (this.cameraSystem?.loadAircraftConfig) this.cameraSystem.loadAircraftConfig(config);
+  }
+
+  setAircraft(aircraftId = 'B738') {
+    const config = AIRCRAFT_REGISTRY[aircraftId];
+    if (!config) return;
+
+    if (this.aircraft?.group) {
+      this.scene.remove(this.aircraft.group);
+    }
+
+    this.currentAircraftId = aircraftId;
+
+    if (aircraftId === 'C172') {
+      this.aircraft = new Cessna172();
+    } else {
+      this.aircraft = new Boeing737(
+        this.pfdCanvas,
+        this.ndCanvas,
+        this.eicasCanvas,
+        this.mcpCanvas,
+        this.isfdCanvas,
+        this.cduCanvas
+      );
+    }
+
+    this.scene.add(this.aircraft.group);
+    this.loadAircraftConfig(config);
+
+    if (this.cockpitOcclusion && this.aircraft.cockpit) {
+      this.cockpitOcclusion.cockpit = this.aircraft.cockpit;
+    }
+
+    if (this.cameraSystem) {
+      this.cameraSystem.snapToTarget(this.aircraft.group);
+    }
+
+    this.showToast(() => t('notice.aircraft', { name: config.name }));
   }
 
   setPreset(type, isDemoInternal = false) {
@@ -867,7 +906,8 @@ class FlightSimulator {
     // transform before physics so a rendered interpolation never feeds back.
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);
-    this.gear.bodySupportPoints = this.aircraft.useGltf ? BODY_SUPPORT_POINTS : FALLBACK_BODY_SUPPORT_POINTS;
+    this.gear.bodySupportPoints = this.currentAircraftConfig?.landingGear?.bodySupportPoints
+      ?? (this.aircraft.useGltf ? BODY_SUPPORT_POINTS : FALLBACK_BODY_SUPPORT_POINTS);
     // If crashed, damp out velocities and rest on terrain
     if (this.isCrashed) {
       this.linearVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 2.8));
@@ -1315,8 +1355,8 @@ class FlightSimulator {
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
     if (this.cockpitPhotoOverlay) {
-      this.cockpitPhotoOverlay.enabled = isPhotoCockpit;
-      if (isPhotoCockpit) {
+      this.cockpitPhotoOverlay.enabled = isPhotoCockpit && (this.currentAircraftId !== 'C172');
+      if (this.cockpitPhotoOverlay.enabled) {
         this.cockpitPhotoOverlay.update(this.telemetry);
       }
     }
@@ -1443,8 +1483,8 @@ class FlightSimulator {
     });
     this.aircraft.cockpit.syncDaylight(daylight);
     if (this.cockpitPhotoOverlay) {
-      this.cockpitPhotoOverlay.enabled = isPhotoCockpit;
-      if (isPhotoCockpit) {
+      this.cockpitPhotoOverlay.enabled = isPhotoCockpit && (this.currentAircraftId !== 'C172');
+      if (this.cockpitPhotoOverlay.enabled) {
         this.cockpitPhotoOverlay.update(this.telemetry);
       }
     }
@@ -1750,12 +1790,17 @@ class FlightSimulator {
       getAirport: () => this.lobby.airport,
       getPreset: () => this.lobby.preset,
       getTime: () => this.sky.timeOfDay,
+      getAircraft: () => this.lobby.aircraft || this.currentAircraftId || 'B738',
       onAirport: id => this.setAirport(id),
       onPreset: type => {
         this.lobby.preset = type;
         this.lobbyScreen.refresh();
       },
       onTime: hours => this.setTimeOfDay(hours),
+      onAircraft: id => {
+        this.lobby.aircraft = id;
+        this.setAircraft(id);
+      },
       onFly: () => this.fly(),
     });
     document.getElementById('btn-pause-resume')?.addEventListener('click', () => this.gameFlow.resume());
