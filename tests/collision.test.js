@@ -86,22 +86,40 @@ test('CollisionDetector (Multi-Obstacle & Crash Detection System)', async (t) =>
     assert.equal(result, null, 'Airborne flight outside runway must not trigger collision');
   });
 
-  await t.test('should detect collision when landing gear wheel runs off the runway', () => {
-    // Aircraft center at z = 30m, but right main gear wheel is at z = 42m (outside runway)
+  await t.test('should permit brief buffer when wheel clips shoulder with intact gear', () => {
+    // Aircraft center at z = 30m, right main gear wheel at z = 42m (outside runway tarmac, within safety area)
     const pos = new THREE.Vector3(-1000, 15.5, 30);
     const quat = new THREE.Quaternion();
     const vel = new THREE.Vector3(30, 0, 0);
     const groundContact = {
       onGround: true,
       contacts: [
-        { id: 'nose', isGrounded: true, worldPos: new THREE.Vector3(-1000, 12, 30) },
-        { id: 'mainLeft', isGrounded: true, worldPos: new THREE.Vector3(-1000, 12, 27) },
-        { id: 'mainRight', isGrounded: true, worldPos: new THREE.Vector3(-1000, 12, 42) } // outside runway (>40m)
+        { id: 'nose', isGrounded: true, damageState: 'normal', worldPos: new THREE.Vector3(-1000, 12, 30) },
+        { id: 'mainLeft', isGrounded: true, damageState: 'normal', worldPos: new THREE.Vector3(-1000, 12, 27) },
+        { id: 'mainRight', isGrounded: true, damageState: 'normal', worldPos: new THREE.Vector3(-1000, 12, 42) }
       ]
     };
 
     const result = detector.checkCollision(pos, quat, vel, 1.0, 0, 0, groundContact);
-    assert.ok(result !== null, 'Wheel off runway while moving must trigger collision');
+    assert.equal(result, null, 'Intact gear clipping shoulder must not immediately explode');
+  });
+
+  await t.test('should detect collision when landing gear collapses from off-runway excursion', () => {
+    // Aircraft center at z = 30m, but right main gear has collapsed from off-runway dynamic loads
+    const pos = new THREE.Vector3(-1000, 15.5, 30);
+    const quat = new THREE.Quaternion();
+    const vel = new THREE.Vector3(30, 0, 0);
+    const groundContact = {
+      onGround: true,
+      contacts: [
+        { id: 'nose', isGrounded: true, damageState: 'normal', worldPos: new THREE.Vector3(-1000, 12, 30) },
+        { id: 'mainLeft', isGrounded: true, damageState: 'normal', worldPos: new THREE.Vector3(-1000, 12, 27) },
+        { id: 'mainRight', isGrounded: true, damageState: 'collapsed', worldPos: new THREE.Vector3(-1000, 12, 42) } // outside runway (>40m)
+      ]
+    };
+
+    const result = detector.checkCollision(pos, quat, vel, 1.0, 0, 0, groundContact);
+    assert.ok(result !== null, 'Collapsed gear off runway while moving must trigger collision');
     assert.equal(result.type, 'TERRAIN');
     assert.match(result.name, /RUNWAY EXCURSION|활주로 이탈/);
   });

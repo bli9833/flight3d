@@ -623,4 +623,17 @@ export class Airport {
 
     return onRunway || onParallelTaxiway || onConnector || onApron;
   }
+
+  /**
+   * Determine if world coordinates fall within Coastal Airport's graded safety area
+   */
+  isRunwaySafetyArea(x, z) {
+    const rsaL = this.runwayLength * 0.5 + 150; // 1750m
+    const rsaW = this.runwayWidth * 0.5 + 25;   // 55m
+    const inRunwayRsa = Math.abs(x) <= rsaL && Math.abs(z) <= rsaW;
+    const inTaxiwayRsa = Math.abs(x) <= rsaL && Math.abs(z - 160) <= 30;
+    const inApronRsa = Math.abs(x) <= 760 && z >= 150 && z <= 390;
+
+    return inRunwayRsa || inTaxiwayRsa || inApronRsa;
+  }
 }

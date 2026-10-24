@@ -205,7 +205,7 @@ export class LandingGear {
    * @param {Function} [getTerrainNormal=null] (x, z) => THREE.Vector3 surface normal
    * @returns {{ forces: THREE.Vector3, moments: THREE.Vector3, onGround: boolean, touchdown: boolean }}
    */
-  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null) {
+  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null, sampleIsOnRunway = null) {
     // Animate gear transit
     if (Math.abs(this.targetGearState - this.gearState) > 0.001) {
       this.isTransit = true;
@@ -328,7 +328,8 @@ export class LandingGear {
         // Tire forces, Coulomb-limited by the strut load. These are both what
         // pushes the airframe around and what the leg structure has to react,
         // so the damage model reads the same numbers the solver delivers.
-        let muBrake = this.rollingFriction ?? 0.02; // Baseline rolling resistance
+        const onRunway = sampleIsOnRunway ? sampleIsOnRunway(c.worldPos.x, c.worldPos.z) : true;
+        let muBrake = onRunway ? (this.rollingFriction ?? 0.02) : 0.18; // Baseline rolling resistance (higher on unpaved turf/grass)
         if (this.brakes > 0.01) {
           muBrake += this.brakes * (this.maxBrakingFriction ?? 0.58); // Anti-skid brake friction
         }
@@ -339,20 +340,33 @@ export class LandingGear {
         const muLateral = this.tireLateralFriction ?? 0.75;
         const fLateralMag = -Math.sign(vLateral) * Math.min(Math.abs(vLateral) * 35000.0, normalForceMag * muLateral);
 
+        // Dynamic roughness loads when moving at speed on unpaved terrain
+        let dynamicNormalLoad = normalForceMag;
+        let dynamicLateralLoad = Math.abs(fLateralMag);
+        let dynamicLongitudinalLoad = Math.abs(fForwardMag);
         const limits = GEAR_DAMAGE_LIMITS[c.id === 'nose' ? 'nose' : 'main'];
+        if (!onRunway && Math.abs(vForward) > 10.0) {
+          const excessSpeed = Math.abs(vForward) - 10.0;
+          // Unpaved terrain dynamic shock loads scaling with speed
+          const shockRatio = excessSpeed / 20.0;
+          dynamicNormalLoad += limits.vertical * shockRatio;
+          dynamicLateralLoad += limits.lateral * 0.5 * shockRatio;
+          dynamicLongitudinalLoad += limits.longitudinal * 0.5 * shockRatio;
+        }
+
         const stateBefore = c.damageState;
         updateGearDamage(c, {
           sinkRate,
           firstContact: !wasGrounded,
-          normalLoad: normalForceMag,
-          lateralLoad: Math.abs(fLateralMag),
-          longitudinalLoad: Math.abs(fForwardMag),
+          normalLoad: dynamicNormalLoad,
+          lateralLoad: dynamicLateralLoad,
+          longitudinalLoad: dynamicLongitudinalLoad,
           overtravel: Math.max(0, normalPenetration - c.restLength),
           locked: gearDeploy >= 0.99 && this.targetGearState === 1,
         }, dt, limits);
         if (stateBefore !== c.damageState) {
           this.failure ??= { contact: c.id, sinkRate, penetration,
-            reason: sinkRate > limits.impact ? 'impact' : normalPenetration > c.restLength + 0.08 ? 'bottom-out' : gearDeploy < 0.99 || this.targetGearState !== 1 ? 'unlocked' : 'overload' };
+            reason: sinkRate > limits.impact ? 'impact' : normalPenetration > c.restLength + 0.08 ? 'bottom-out' : !onRunway ? 'excursion' : gearDeploy < 0.99 || this.targetGearState !== 1 ? 'unlocked' : 'overload' };
           damageEvents.push({ id: c.id, state: c.damageState, damage: c.damage });
         }
         if (c.damageState === 'collapsed') {

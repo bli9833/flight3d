@@ -9,12 +9,12 @@ const demand = overrides => ({ sinkRate: 0, firstContact: false, normalLoad: 600
   lateralLoad: 0, longitudinalLoad: 0, overtravel: 0, locked: true, ...overrides });
 const leg = () => ({ damage: 0, damageState: 'normal' });
 function sample(gear, { y = 3.5, velocity = [0, -1, -60], rotation = [0, 0, 0], dt = 1 / 120,
-  height = () => 0, normal = () => new THREE.Vector3(0, 1, 0), omega = [0, 0, 0] } = {}) {
+  height = () => 0, normal = () => new THREE.Vector3(0, 1, 0), omega = [0, 0, 0], onRunway = null } = {}) {
   const mesh = new THREE.Object3D();
   mesh.position.y = y;
   mesh.rotation.set(...rotation);
   mesh.updateMatrixWorld(true);
-  return gear.update(dt, mesh, new THREE.Vector3(...velocity), new THREE.Vector3(...omega), height, normal);
+  return gear.update(dt, mesh, new THREE.Vector3(...velocity), new THREE.Vector3(...omega), height, normal, onRunway);
 }
 
 describe('Independent gear damage and body support', () => {
@@ -149,6 +149,17 @@ describe('Independent gear damage and body support', () => {
     assert.equal(gear.structuralDamage, 0);
     assert.equal(gear.bodyGrounded.size, 0);
     assert.ok(sample(gear, { velocity: [0, -11, -60] }).damageEvents.length);
+  });
+  it('accumulates gear damage and collapses gear when rolling off-runway at high speed', () => {
+    const gear = new LandingGear();
+    // Low speed taxi off-runway (8 m/s): loads stay safe, 0 damage
+    for (let i = 0; i < 120; i++) sample(gear, { velocity: [0, 0, -8], onRunway: () => false });
+    assert.ok(gear.contacts.every(c => c.damage === 0));
+
+    // High speed ground roll off-runway (45 m/s): roughness dynamic loads accumulate damage
+    for (let i = 0; i < 120; i++) sample(gear, { velocity: [0, 0, -45], onRunway: () => false });
+    assert.ok(gear.contacts.some(c => c.damage > 0));
+    assert.equal(gear.failure?.reason, 'excursion');
   });
   it('permits controlled runway scraping but retains catastrophic, obstacle and off-runway crashes', () => {
     const terrain = { getHeight: () => 12 };

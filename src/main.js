@@ -935,7 +935,8 @@ class FlightSimulator {
       this.linearVelocity,
       this.angularVelocity,
       (x, z) => this.currentTerrain.getHeight(x, z),
-      (x, z) => (this.currentTerrain.getNormal ? this.currentTerrain.getNormal(x, z) : null)
+      (x, z) => (this.currentTerrain.getNormal ? this.currentTerrain.getNormal(x, z) : null),
+      (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true)
     );
 
     if (gearResult.damageEvents.length || (gearResult.bodyContacts.length && !this.bodyContactStarted)) {
