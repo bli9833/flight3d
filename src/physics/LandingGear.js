@@ -163,6 +163,7 @@ export class LandingGear {
       c.isGrounded = false;
       c.compression = 0;
       c.touchdownThisFrame = false;
+      c.turfEngagement = 0;
     }
     this.bodyGrounded = new Set();
     this.structuralDamage = 0;
@@ -205,7 +206,7 @@ export class LandingGear {
    * @param {Function} [getTerrainNormal=null] (x, z) => THREE.Vector3 surface normal
    * @returns {{ forces: THREE.Vector3, moments: THREE.Vector3, onGround: boolean, touchdown: boolean }}
    */
-  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null) {
+  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null, sampleIsOnRunway = null) {
     // Animate gear transit
     if (Math.abs(this.targetGearState - this.gearState) > 0.001) {
       this.isTransit = true;
@@ -328,7 +329,16 @@ export class LandingGear {
         // Tire forces, Coulomb-limited by the strut load. These are both what
         // pushes the airframe around and what the leg structure has to react,
         // so the damage model reads the same numbers the solver delivers.
-        let muBrake = this.rollingFriction ?? 0.02; // Baseline rolling resistance
+        // Continuous turf engagement relaxation: rate-limited physical surface transition (tau ~ 0.25s / 0.4s)
+        const onRunway = sampleIsOnRunway ? sampleIsOnRunway(c.worldPos.x, c.worldPos.z) : true;
+        const targetTurf = onRunway ? 0.0 : 1.0;
+        const tauTurf = targetTurf > (c.turfEngagement || 0) ? 0.25 : 0.40;
+        c.turfEngagement = (c.turfEngagement || 0) + (targetTurf - (c.turfEngagement || 0)) * Math.min(1.0, dt / tauTurf);
+
+        // Continuous rolling resistance derived from turf engagement state
+        const baseRolling = this.rollingFriction ?? 0.02;
+        const muRolling = THREE.MathUtils.lerp(baseRolling, 0.18, c.turfEngagement);
+        let muBrake = muRolling;
         if (this.brakes > 0.01) {
           muBrake += this.brakes * (this.maxBrakingFriction ?? 0.58); // Anti-skid brake friction
         }
@@ -339,20 +349,32 @@ export class LandingGear {
         const muLateral = this.tireLateralFriction ?? 0.75;
         const fLateralMag = -Math.sign(vLateral) * Math.min(Math.abs(vLateral) * 35000.0, normalForceMag * muLateral);
 
+        // Dynamic roughness loads continuously scaling with speed and turf engagement
+        let dynamicNormalLoad = normalForceMag;
+        let dynamicLateralLoad = Math.abs(fLateralMag);
+        let dynamicLongitudinalLoad = Math.abs(fForwardMag);
         const limits = GEAR_DAMAGE_LIMITS[c.id === 'nose' ? 'nose' : 'main'];
+        if (c.turfEngagement > 0.01 && Math.abs(vForward) > 10.0) {
+          const excessSpeed = Math.abs(vForward) - 10.0;
+          const shockRatio = (excessSpeed / 20.0) * c.turfEngagement;
+          dynamicNormalLoad += limits.vertical * shockRatio;
+          dynamicLateralLoad += limits.lateral * 0.5 * shockRatio;
+          dynamicLongitudinalLoad += limits.longitudinal * 0.5 * shockRatio;
+        }
+
         const stateBefore = c.damageState;
         updateGearDamage(c, {
           sinkRate,
           firstContact: !wasGrounded,
-          normalLoad: normalForceMag,
-          lateralLoad: Math.abs(fLateralMag),
-          longitudinalLoad: Math.abs(fForwardMag),
+          normalLoad: dynamicNormalLoad,
+          lateralLoad: dynamicLateralLoad,
+          longitudinalLoad: dynamicLongitudinalLoad,
           overtravel: Math.max(0, normalPenetration - c.restLength),
           locked: gearDeploy >= 0.99 && this.targetGearState === 1,
         }, dt, limits);
         if (stateBefore !== c.damageState) {
           this.failure ??= { contact: c.id, sinkRate, penetration,
-            reason: sinkRate > limits.impact ? 'impact' : normalPenetration > c.restLength + 0.08 ? 'bottom-out' : gearDeploy < 0.99 || this.targetGearState !== 1 ? 'unlocked' : 'overload' };
+            reason: sinkRate > limits.impact ? 'impact' : normalPenetration > c.restLength + 0.08 ? 'bottom-out' : c.turfEngagement > 0.5 ? 'excursion' : gearDeploy < 0.99 || this.targetGearState !== 1 ? 'unlocked' : 'overload' };
           damageEvents.push({ id: c.id, state: c.damageState, damage: c.damage });
         }
         if (c.damageState === 'collapsed') {

@@ -484,12 +484,28 @@ export class LuklaAirport {
     const w = x * this.cos58 + z * this.sin58;
 
     // Runway 06/24: 527m length (|s| <= 265m), 30m width (|w| <= 16m)
-    const onRunway = Math.abs(s) <= 265.0 && Math.abs(w) <= 16.0;
+    // Include Runway 24 cliff departure corridor (s < -265m) into the Dudh Kosi canyon
+    const onRunway = (s >= -265.0 && s <= 265.0 && Math.abs(w) <= 16.0) ||
+                     (s < -265.0 && s >= -400.0 && Math.abs(w) <= 30.0);
 
     // Apron tarmac and helipads: s in [15, 105], w in [12, 52]
     const onApron = (s >= 15.0 && s <= 105.0 && w >= 12.0 && w <= 52.0);
 
     return onRunway || onApron;
+  }
+
+  /**
+   * Determine if world coordinates fall within Lukla's graded runway safety area
+   */
+  isRunwaySafetyArea(x, z) {
+    const s = x * this.sin58 - z * this.cos58;
+    const w = x * this.cos58 + z * this.sin58;
+
+    const inRsa = (s >= -265.0 && s <= 275.0 && Math.abs(w) <= 24.0) ||
+                  (s < -265.0 && s >= -400.0 && Math.abs(w) <= 35.0);
+    const inApronRsa = (s >= 10.0 && s <= 110.0 && w >= 8.0 && w <= 58.0);
+
+    return inRsa || inApronRsa;
   }
 
   /**

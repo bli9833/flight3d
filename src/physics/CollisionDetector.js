@@ -486,6 +486,13 @@ export class CollisionDetector {
     return Math.abs(x) < 1650 && Math.abs(z) < 40;
   }
 
+  isPositionInSafetyArea(x, z) {
+    if (this.airport && typeof this.airport.isRunwaySafetyArea === 'function') {
+      return this.airport.isRunwaySafetyArea(x, z);
+    }
+    return Math.abs(x) < 1750 && Math.abs(z) < 60;
+  }
+
   checkTerrain(aircraftPos, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity = null, groundContact = null) {
     if (!this.terrain) return null;
 
@@ -501,16 +508,29 @@ export class CollisionDetector {
     // Evaluate off-runway ground excursion: when the aircraft moves on the ground outside the runway
     const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
     const gearHeight = gearState >= 0.5 ? 3.85 : 1.85;
-    const isGrounded = groundContact !== null
-      ? Boolean(groundContact.onGround)
+    const isWheelGrounded = groundContact !== null
+      ? Boolean(groundContact.contacts?.some(c => c.isGrounded))
       : (aircraftPos.y - groundH <= gearHeight && aircraftPos.y - groundH >= -2.0);
 
-    const isMoving = speedMs > 0.5;
+    const isMoving = speedMs > 5.0; // Low-speed taxi into grass halts safely rather than detonating
+    const inSafetyArea = this.isPositionInSafetyArea(aircraftPos.x, aircraftPos.z);
+    const gearCollapsed = groundContact?.contacts?.some(c => c.damageState === 'collapsed');
+    const catastrophicHullLoss = Boolean(groundContact?.catastrophicImpact);
     const wheelOffRunway = groundContact?.contacts?.some(c =>
       c.isGrounded && !this.isPositionOnRunway(c.worldPos.x, c.worldPos.z)
     );
 
-    if (isGrounded && isMoving && (!onRunway || wheelOffRunway)) {
+    // Fatal excursion conditions:
+    // 1. Structural gear collapse from sustained off-runway stress while moving
+    // 2. High-speed deep excursion outside paved runway and airport safety area (> 15 m/s)
+    // 3. Catastrophic hull impact while off-runway
+    const isExcursionCrash = isWheelGrounded && isMoving && (
+      (gearCollapsed && (!onRunway || wheelOffRunway)) ||
+      (!onRunway && !inSafetyArea && speedMs > 15.0) ||
+      (catastrophicHullLoss && !onRunway)
+    );
+
+    if (isExcursionCrash) {
       return {
         get name() { return t('runway.excursion'); },
         point: aircraftPos.clone(),
