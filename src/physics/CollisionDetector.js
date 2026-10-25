@@ -383,11 +383,18 @@ export class CollisionDetector {
           const maxZ = b.z + halfD;
           const minY = b.y;
           const maxY = b.y + b.height;
+          const oriented = b.localWidth !== undefined && b.localDepth !== undefined;
+          const cos = Math.cos(b.rotationY || 0), sin = Math.sin(b.rotationY || 0);
 
           // Quick bounding box check for aircraft center
           if (aircraftPos.y > maxY + 15 || aircraftPos.y < minY - 5) continue;
 
           for (const probe of worldProbes) {
+            const dx = probe.pos.x - b.x, dz = probe.pos.z - b.z;
+            // AABB indexes grid cells; local-space bounds keep rotated plinths
+            // from colliding with empty road space at the AABB corners.
+            if (oriented && (Math.abs(cos * dx - sin * dz) > b.localWidth / 2 + probe.radius ||
+                Math.abs(sin * dx + cos * dz) > b.localDepth / 2 + probe.radius)) continue;
             if (
               probe.pos.x >= minX - probe.radius && probe.pos.x <= maxX + probe.radius &&
               probe.pos.z >= minZ - probe.radius && probe.pos.z <= maxZ + probe.radius &&

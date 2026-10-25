@@ -68,7 +68,7 @@ test('rotated city footprint is included in collision broadphase and probe check
 
 test('district lots leave road clearance, exclude trees and keep collision envelopes', () => {
   const city = new FoliageAndCities({ getHeight: () => 25 }, () => .5);
-  const district = city.buildingData.filter(b => b.archetype >= 3);
+  const district = city.buildingData.filter(b => b.district === 'south');
   assert.equal(district.length, 110);
   for (const b of district) {
     assert.ok(b.width <= 44 && b.depth <= 44);
