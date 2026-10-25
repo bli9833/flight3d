@@ -1,16 +1,7 @@
 import * as THREE from 'three';
 import { createEffectAtlas, createFlipbookMaterial, updateFlipbook } from './EffectFlipbook.js';
 
-/**
- * Cinematic High-Fidelity Explosion & Crash Effects System
- * Generates multi-stage explosions featuring:
- * 1. Expanding incandescent fireball core & point light flash
- * 2. Billowing buoyant black smoke plumes rising into the sky
- * 3. High-velocity ballistic burning metal shrapnel and spark debris
- * 4. Ground/water shockwave expansion ring
- * 5. Massive water geyser & white foam plumes upon ocean impact
- * 6. Persistent fuselage fire & smoke at crash wreckage
- */
+// Bounded impact particles: ballistic spray, surface foam, dust and short-lived heat.
 export class ExplosionSystem {
   constructor(scene, terrain = null) {
     this.scene = scene;
@@ -35,6 +26,7 @@ export class ExplosionSystem {
     this.fireTexture = createEffectAtlas('fire');
     this.smokeTexture = createEffectAtlas('smoke');
     this.waterTexture = createEffectAtlas('water');
+    this.dustTexture = createEffectAtlas('tire');
     this.sparkTexture = this.createSparkTexture();
   }
 
@@ -76,63 +68,71 @@ export class ExplosionSystem {
   /**
    * Spawns an explosion at the given collision result
    */
-  spawnExplosion(crashResult) {
-    const pos = crashResult.point || new THREE.Vector3();
+  spawnExplosion(crashResult, velocity = new THREE.Vector3()) {
+    const pos = (crashResult.point || new THREE.Vector3()).clone();
     const isWater = crashResult.type === 'WATER';
-
-    // 1. Incandescent Flash Light
-    const flash = this.getAvailableLight();
-    flash.light.position.copy(pos);
-    flash.light.position.y += 3.0;
-    flash.light.color.set(isWater ? 0x99ccff : 0xffaa33);
-    flash.light.intensity = isWater ? 20.0 : 40.0;
-    flash.light.distance = 180;
-    flash.light.visible = true;
-    flash.life = 0.0;
-    flash.maxLife = 1.4;
-
-    // 2. Shockwave Ring on Ground or Water
-    this.spawnShockwave(pos, isWater);
-
-    // 3. Fireball Core
-    const fireballCount = isWater ? 25 : 60;
-    this.spawnFireballCore(pos, fireballCount, isWater);
-
-    // 4. Rising Smoke Plume
-    const smokeCount = isWater ? 40 : 85;
-    this.spawnSmokePlume(pos, smokeCount, isWater);
-
-    // 5. High-Velocity Sparks & Shrapnel
-    this.spawnShrapnel(pos, isWater ? 30 : 70, isWater);
-
-    // 6. Water Plumes (If crashing into ocean)
+    const speed = Math.max(velocity.length(), (crashResult.speedKnots || 0) / 1.94384);
+    const energy = THREE.MathUtils.clamp(speed * speed / (90 * 90), 0.04, 1.5);
+    const spread = Math.sqrt(energy);
     if (isWater) {
-      this.spawnWaterGeyser(pos, 90);
+      pos.y = 0.08; // Collision probes can already be below the sea surface.
+      this.spawnShockwave(pos, true, spread);
+      this.spawnWaterGeyser(pos, Math.ceil(35 + 35 * spread), velocity, spread);
+      return; // No combustion, glowing sparks or persistent smoke on water.
     }
 
-    // 7. Attach persistent wreckage fire to impact site
-    this.persistentWreckage = {
-      pos: pos.clone(),
-      isWater,
-      timer: 0,
-      smokeInterval: 0.12,
-      duration: 25.0 // lasts 25 seconds
-    };
+    const fireStart = this.fireballs.length;
+    const smokeStart = this.smokePuffs.length;
+    const debrisStart = this.debrisParticles.length;
+    const heat = THREE.MathUtils.smoothstep(speed, 55, 120);
+    if (heat > 0) {
+      const flash = this.getAvailableLight();
+      flash.light.position.copy(pos);
+      flash.light.color.set(0xffaa66);
+      flash.light.intensity = 12 * heat;
+      flash.light.distance = 60;
+      flash.light.visible = true;
+      flash.life = 0;
+      flash.maxLife = 0.25;
+      this.spawnFireballCore(pos, Math.ceil(12 * heat), false);
+      for (const f of this.fireballs.slice(fireStart)) {
+        f.vel.multiplyScalar(0.3);
+        f.scale *= 0.45;
+        f.sprite.scale.set(f.scale, f.scale, 1);
+        f.growth *= 0.3;
+        f.maxLife = Math.min(f.maxLife, 0.65);
+      }
+    }
+    this.spawnSmokePlume(pos, Math.ceil(20 + 30 * spread), crashResult.type);
+    this.spawnShrapnel(pos, Math.ceil(15 + 25 * spread), false);
+    // Material ejection inherits momentum instead of a symmetric explosion.
+    for (const p of [...this.smokePuffs.slice(smokeStart), ...this.debrisParticles.slice(debrisStart)]) {
+      p.vel.multiplyScalar(spread * 0.45).addScaledVector(velocity, 0.12);
+      p.vel.y = Math.max(1, p.vel.y);
+    }
   }
 
-  spawnShockwave(pos, isWater) {
+  spawnShockwave(pos, isWater, spread = 1) {
     if (this.shockwaves.length >= 4) return;
-    const geo = new THREE.RingGeometry(1.0, 2.5, 32);
+    const geo = new THREE.RingGeometry(0.82, 1.0, 64);
     geo.rotateX(-Math.PI * 0.5);
 
     const mat = new THREE.MeshBasicMaterial({
       color: isWater ? 0xd0f0fd : 0xffddaa,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.3,
       side: THREE.DoubleSide,
       depthWrite: false
     });
 
+    mat.defines = { USE_UV: '' };
+    mat.onBeforeCompile = shader => {
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
+        #include <color_fragment>
+        float radius = length(vUv - 0.5) * 2.0;
+        diffuseColor.a *= smoothstep(0.82, 0.9, radius) * (1.0 - smoothstep(0.92, 1.0, radius));
+      `);
+    };
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(pos);
     mesh.position.y += 0.25;
@@ -141,10 +141,10 @@ export class ExplosionSystem {
     this.shockwaves.push({
       mesh,
       scale: 1.0,
-      maxScale: isWater ? 75.0 : 55.0,
-      opacity: 0.85,
+      maxScale: 12 + 18 * spread,
+      opacity: 0.3,
       life: 0.0,
-      maxLife: 1.0
+      maxLife: 4.0
     });
   }
 
@@ -187,11 +187,12 @@ export class ExplosionSystem {
     }
   }
 
-  spawnSmokePlume(pos, count, isWater) {
+  spawnSmokePlume(pos, count, type) {
     for (let i = 0; i < count && this.smokePuffs.length < 120; i++) {
-      const spriteMat = createFlipbookMaterial(this.smokeTexture, {
+      const spriteMat = createFlipbookMaterial(this.dustTexture, {
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.65,
+        color: type === 'TERRAIN' ? 0xa28b6c : 0xa3a5a7,
         depthWrite: false
       });
 
@@ -217,9 +218,10 @@ export class ExplosionSystem {
         sprite,
         vel,
         scale: baseScale,
-        growth: 4.5 + Math.random() * 6.0,
+        growth: 2.5 + Math.random() * 3.0,
+        isDust: true,
         life: 0.0,
-        maxLife: 5.5 + Math.random() * 4.5
+        maxLife: 3.0 + Math.random() * 2.0
       });
     }
   }
@@ -228,9 +230,10 @@ export class ExplosionSystem {
     for (let i = 0; i < count && this.debrisParticles.length < 70; i++) {
       const spriteMat = new THREE.SpriteMaterial({
         map: this.sparkTexture,
+        color: 0x77716a,
         transparent: true,
         opacity: 1.0,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
         depthWrite: false
       });
 
@@ -248,7 +251,7 @@ export class ExplosionSystem {
         Math.sin(theta) * Math.sin(phi) * speed
       );
 
-      const baseScale = 0.8 + Math.random() * 1.4;
+      const baseScale = 0.15 + Math.random() * 0.55;
       sprite.scale.set(baseScale, baseScale, 1.0);
 
       this.group.add(sprite);
@@ -262,7 +265,7 @@ export class ExplosionSystem {
     }
   }
 
-  spawnWaterGeyser(pos, count) {
+  spawnWaterGeyser(pos, count, velocity = new THREE.Vector3(), spread = 1) {
     for (let i = 0; i < count && this.waterPlumes.length < 90; i++) {
       const spriteMat = createFlipbookMaterial(this.waterTexture, {
         transparent: true,
@@ -278,18 +281,20 @@ export class ExplosionSystem {
         (Math.random() - 0.5) * 12.0
       ));
 
-      // Upward geyser fountain
+      spriteMat.rotation = (Math.random() - 0.5) * 0.35;
+
+      // Ballistic sheets stretch upward, then break into falling foam.
       const angle = Math.random() * Math.PI * 2;
-      const radialSpeed = 2.0 + Math.random() * 12.0;
-      const upSpeed = 20.0 + Math.random() * 40.0;
+      const radialSpeed = (4.0 + Math.random() * 15.0) * spread;
+      const upSpeed = (3 + Math.random() * 12) * spread + Math.min(18, Math.abs(velocity.y) * 0.35);
 
       const vel = new THREE.Vector3(
-        Math.cos(angle) * radialSpeed,
+        Math.cos(angle) * radialSpeed + velocity.x * 0.22,
         upSpeed,
-        Math.sin(angle) * radialSpeed
+        Math.sin(angle) * radialSpeed + velocity.z * 0.22
       );
 
-      const baseScale = 3.5 + Math.random() * 6.0;
+      const baseScale = 1.0 + Math.random() * 2.5;
       sprite.scale.set(baseScale, baseScale, 1.0);
 
       this.group.add(sprite);
@@ -297,9 +302,10 @@ export class ExplosionSystem {
         sprite,
         vel,
         scale: baseScale,
-        growth: 6.0 + Math.random() * 8.0,
+        growth: 1.0 + Math.random() * 2.0,
+        surfaceY: pos.y,
         life: 0.0,
-        maxLife: 2.2 + Math.random() * 1.5
+        maxLife: 3.0 + Math.random() * 1.5
       });
     }
   }
@@ -368,7 +374,12 @@ export class ExplosionSystem {
       } else {
         s.sprite.position.addScaledVector(s.vel, dt);
         s.vel.x += dt * 0.8; // Atmospheric wind drift
-        s.vel.y = Math.max(1.5, s.vel.y - dt * 0.5); // Rising buoyancy
+        if (s.isDust) {
+          s.vel.multiplyScalar(Math.exp(-dt * 0.7));
+          s.vel.y -= dt * 0.8; // Suspended dust slows and settles rather than rising like hot smoke.
+        } else {
+          s.vel.y = Math.max(1.5, s.vel.y - dt * 0.5);
+        }
         s.scale += s.growth * dt;
         s.sprite.scale.set(s.scale, s.scale, 1.0);
         s.sprite.material.opacity = Math.max(0.0, (1.0 - t * 0.9) * 0.75);
@@ -413,10 +424,15 @@ export class ExplosionSystem {
         w.sprite.material.dispose();
         this.waterPlumes.splice(i, 1);
       } else {
-        w.vel.y -= 12.0 * dt; // Gravity
+        w.vel.y -= 9.81 * dt; // Ballistic spray falls back to the surface.
         w.sprite.position.addScaledVector(w.vel, dt);
+        if (w.sprite.position.y < w.surfaceY) {
+          w.sprite.position.y = w.surfaceY;
+          w.vel.set(0, 0, 0);
+          w.life = Math.max(w.life, w.maxLife - 0.3);
+        }
         w.scale += w.growth * dt;
-        w.sprite.scale.set(w.scale, w.scale, 1.0);
+        w.sprite.scale.set(w.scale * 0.7, w.scale * (1 + Math.max(0, w.vel.y) * 0.07), 1.0);
         w.sprite.material.opacity = Math.max(0.0, (1.0 - t) * 0.9);
       }
     }
@@ -474,7 +490,7 @@ export class ExplosionSystem {
    */
   dispose() {
     this.clear();
-    for (const texture of [this.fireTexture, this.smokeTexture, this.waterTexture, this.sparkTexture]) texture.dispose();
+    for (const texture of [this.fireTexture, this.smokeTexture, this.waterTexture, this.dustTexture, this.sparkTexture]) texture.dispose();
     this.scene.remove(this.group);
   }
 

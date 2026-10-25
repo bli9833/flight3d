@@ -1266,7 +1266,7 @@ class FlightSimulator {
     this.crashResult = crashResult;
 
     // 1. Spawn Visual Explosion Particles, Fireball, Smoke & Dynamic Light Flash
-    this.explosionSystem.spawnExplosion(crashResult);
+    this.explosionSystem.spawnExplosion(crashResult, this.linearVelocity);
 
     // 2. Procedural Audio Detonation & Metal Crunch Sound
     this.audio.playExplosion(crashResult.type === 'WATER');

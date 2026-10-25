@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const PORT = Number(process.env.PORT || 5173);
-const CDP_PORT = Number(process.env.CDP_PORT || 9452);
+const CDP_PORT = Number(process.env.CHROME_DEBUG_PORT || process.env.CDP_PORT || 9452);
 const SIM_URL = `http://localhost:${PORT}/`;
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR || '/home/stlim/.gemini/antigravity-cli/brain/ad33c4b1-3b1c-4752-ad5e-b09f9794851b';
 
@@ -24,22 +24,27 @@ async function main() {
     SIM_URL
   ];
 
-  const chrome = spawn(process.env.CHROME_BIN || 'google-chrome-stable', args, { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
-  chrome.stderr.on('data', (d) => {
+  const externalBrowser = process.env.CHROME_DEBUG_PORT;
+  const chrome = externalBrowser ? null : spawn(process.env.CHROME_BIN || 'google-chrome-stable', args, { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+  chrome?.stderr.on('data', (d) => {
     const s = d.toString();
     if (s.includes('FATAL') || s.includes('ERROR:content') || s.includes('Crash')) {
       console.error('[Chrome Stderr]', s.trim());
     }
   });
 
+  let ownedTarget;
   try {
+    if (externalBrowser) {
+      ownedTarget = await (await fetch(`http://localhost:${CDP_PORT}/json/new?${encodeURIComponent(SIM_URL)}`, { method: 'PUT' })).json();
+    }
     let pageTarget = null;
     for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 300));
       try {
         const resp = await fetch(`http://localhost:${CDP_PORT}/json`);
         const targets = await resp.json();
-        pageTarget = targets.find(t => t.url.includes(String(PORT)) && t.type === 'page');
+        pageTarget = targets.find(t => ownedTarget ? t.id === ownedTarget.id : t.url.includes(String(PORT)) && t.type === 'page');
         if (pageTarget) break;
       } catch (e) {}
     }
@@ -87,6 +92,7 @@ async function main() {
     };
 
     const takeScreenshot = async (filename) => {
+      if (filename.startsWith('crash_') && process.env.CRASH_SCREENSHOTS === '0') return;
       const shot = await send('Page.captureScreenshot', { format: 'png' });
       const buf = Buffer.from(shot.data, 'base64');
       fs.writeFileSync(path.resolve(process.cwd(), filename), buf);
@@ -96,17 +102,36 @@ async function main() {
       console.log(`📸 Saved: ${filename} (${(buf.length / 1024).toFixed(1)} KB)`);
     };
 
+    const browserErrors = [];
+    ws.addEventListener('message', event => {
+      const message = JSON.parse(event.data);
+      if (message.method === 'Runtime.exceptionThrown' ||
+          (message.method === 'Log.entryAdded' && message.params.entry.level === 'error' && !message.params.entry.url?.endsWith('/favicon.ico'))) {
+        browserErrors.push(message.params);
+      }
+    });
+    await send('Log.enable');
     await send('Page.enable');
     await send('Runtime.enable');
+    await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
 
     console.log('⏳ Waiting for simulator to initialize in browser DOM...');
-    for (let i = 0; i < 40; i++) {
+    let simulatorReady = false;
+    for (let i = 0; i < 120; i++) {
       try {
         const ready = await evalJs('typeof window.simulator !== "undefined" && window.simulator.aircraft !== undefined');
-        if (ready) break;
+        if (ready) { simulatorReady = true; break; }
       } catch (e) {}
       await new Promise(r => setTimeout(r, 250));
     }
+
+    if (!simulatorReady) throw new Error('Simulator failed to initialize: ' + JSON.stringify(browserErrors));
+
+    console.log('WebGL renderer:', await evalJs(`(() => {
+      const gl = window.simulator.renderer.getContext();
+      const debug = gl.getExtension('WEBGL_debug_renderer_info');
+      return gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
+    })()`));
 
     // Stop demo flight director and select coastal airport for coastal collision scenarios
     await evalJs(`
@@ -328,10 +353,52 @@ async function main() {
     if (![towerCrashed, waterCrashed, terrainCrashed, bldgCrashed, treeCrashed, excursionCrashed, restartOk].every(Boolean)) {
       throw new Error('One or more collision/restart checks failed');
     }
+    // Fixed camera and time samples expose effects without aircraft/HUD occlusion.
+    await evalJs(`(async () => {
+      const THREE = window.THREE;
+      const { ExplosionSystem } = await import('/src/effects/ExplosionSystem.js');
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x52677a);
+      const camera = new THREE.PerspectiveCamera(50, 1280 / 720, 0.1, 500);
+      camera.position.set(-40, 26, 50);
+      camera.lookAt(5, 5, 0);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setSize(1280, 720);
+      Object.assign(renderer.domElement.style, { position: 'fixed', inset: '0', zIndex: '99999', width: '100%', height: '100%' });
+      document.body.appendChild(renderer.domElement);
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.MeshBasicMaterial({ color: 0x28485b }));
+      ground.rotation.x = -Math.PI / 2;
+      scene.add(ground);
+      window.effectReview = { scene, camera, renderer, ground, effects: new ExplosionSystem(scene) };
+    })()`);
+    for (const type of ['WATER', 'TERRAIN', 'BUILDING']) {
+      await evalJs(`(() => {
+        const { effects, ground } = window.effectReview;
+        effects.clear();
+        ground.material.color.set('${type}' === 'WATER' ? 0x28485b : 0x655e4d);
+        effects.spawnExplosion({ type: '${type}', point: new window.THREE.Vector3() }, new window.THREE.Vector3(75, -20, 0));
+      })()`);
+      for (const [label, steps] of [['early', 24], ['late', 120]]) {
+        await evalJs(`(() => {
+          const { effects, renderer, scene, camera } = window.effectReview;
+          for (let i = 0; i < ${steps}; i++) effects.update(1 / 60);
+          renderer.render(scene, camera);
+          if (renderer.info.programs.some(p => p.diagnostics && !p.diagnostics.runnable)) throw new Error('Effect shader failed');
+        })()`);
+        await takeScreenshot('impact_' + type.toLowerCase() + '_' + label + '.png');
+      }
+    }
+    await evalJs(`(() => {
+      const { effects, renderer, ground } = window.effectReview;
+      effects.dispose(); ground.geometry.dispose(); ground.material.dispose();
+      renderer.dispose(); renderer.domElement.remove(); delete window.effectReview;
+    })()`);
+    if (browserErrors.length) throw new Error(JSON.stringify(browserErrors));
     console.log('\n🎉 ALL COLLISION & EXPLOSION TESTS COMPLETED SUCCESSFULLY!');
     ws.close();
   } finally {
-    chrome.kill('SIGTERM');
+    if (ownedTarget) await fetch(`http://localhost:${CDP_PORT}/json/close/${ownedTarget.id}`);
+    chrome?.kill('SIGTERM');
   }
 }
 

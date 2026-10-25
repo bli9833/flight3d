@@ -20,7 +20,7 @@ context, while the current implementation defines actual behavior.
 | Ship exteriors, buoyancy and wakes | src/environment/Ships.js; ShipAssets.js; [ship assets](ships.md) | tests/ships.test.js; tests/collision.test.js; node scripts/verify-ships.mjs |
 | City buildings and foliage | src/environment/FoliageAndCities.js; CityBuildingAssets.js; [city evidence](city-buildings.md) | tests/cityBuildings.test.js; tests/collision.test.js; browser city review |
 | Sound | src/audio/FlightAudio.js | browser interaction and listening |
-| Crash and tire effects | src/effects/ | npm run test:crash; screenshots |
+| Crash and tire effects | src/effects/; [impact effects](impact-effects.md) | npm run test:crash; screenshots |
 | Events and diagnostics | src/core/EventBus.js; src/ui/DiagnosticsInspector.js | relevant Node tests and browser inspection |
 | CI and agent guidance | package.json; .github/workflows/ci.yml; scripts/check-*.mjs; AGENTS.md | npm run check; npm test; npm run build |
 | PR self-feedback | .agents/skills/flight3d-pr-feedback/SKILL.md; .github/workflows/pr-feedback.yml; scripts/pr-feedback.mjs; [setup and usage](pr-feedback.md) | tests/prFeedback.test.js; npm run check; npm test; npm run build; configured PR smoke test |
