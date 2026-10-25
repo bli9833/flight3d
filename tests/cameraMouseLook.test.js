@@ -498,6 +498,37 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       assert.strictEqual(camSys.isDragging, false);
     });
 
+    it('should turn the head faster on touch drag than mouse drag to compensate for mobile swipe travel', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+
+      // Mouse drag of 120px uses desktop pixels-per-radian gain (0.0011 rad/px)
+      camSys.applyDragDelta(120, 0, false);
+      const mouseYaw = Math.abs(camSys.lookYaw);
+      assert.ok(Math.abs(mouseYaw - 120 * 0.0011) < 1e-6, `mouseYaw (${mouseYaw}) matches 0.0011 rad/px`);
+      const mouseDeg = mouseYaw * 180 / Math.PI;
+      assert.ok(mouseDeg < 10, `mouse drag sweeps under 10° (${mouseDeg.toFixed(1)}°) for 120px`);
+
+      camSys.resetLook();
+
+      // Touch drag of 120px via touch event uses touchGazeSensitivity (0.0035 rad/px)
+      const canvasTarget = { closest: () => null };
+      camSys.handleTouchStart({
+        touches: [{ identifier: 77, clientX: 200, clientY: 200, target: canvasTarget }]
+      });
+      camSys.handleTouchMove({
+        touches: [{ identifier: 77, clientX: 320, clientY: 200, target: canvasTarget }]
+      });
+      camSys.handleTouchEnd({ touches: [] });
+
+      const touchYaw = Math.abs(camSys.lookYaw);
+      assert.ok(Math.abs(touchYaw - 120 * 0.0035) < 1e-6, `touchYaw (${touchYaw}) matches 0.0035 rad/px`);
+      const touchDeg = touchYaw * 180 / Math.PI;
+      assert.ok(touchDeg > 20, `touch swipe sweeps ~24° (${touchDeg.toFixed(1)}°) for 120px`);
+      assert.ok(touchYaw > mouseYaw * 3.0, 'touch look gain is >3x desktop mouse gain');
+    });
+
     it('should rotate cockpit gaze (yaw and pitch) on single-finger touch drag', () => {
       const camera = new THREE.PerspectiveCamera();
       const camSys = new CameraSystem(camera, mockDom);
