@@ -80,7 +80,7 @@ export class CameraSystem {
     // Tower Camera Location (Inside Control Tower Cab at 66m height)
     this.towerPos = new THREE.Vector3(120, 78, 280);
 
-    // Optical Zoom (magnification) for fixed eye-point views: cockpit and tower
+    // Zoom magnification for cockpit (with a bounded head lean) and tower.
     this.opticalZoom = 1.0;
     this.opticalZoomMin = 1.0;
     this.opticalZoomMax = 4.0;
@@ -88,11 +88,11 @@ export class CameraSystem {
     // clip against, so it magnifies further than the cockpit, whose cone is
     // already crowded by the windscreen and the panels.
     this.towerZoomMax = 8.0;
-    // The cockpit eye point never moves: the windscreen glass starts 0.41 m ahead
-    // and the roof fairing 0.32 m above, so any lean long enough to matter drives
-    // the camera through the interior. The magnified cone rotates up instead, off
-    // the glareshield whose top edge sits 2.5 cm below the seated eye.
-    this.cockpitZoomGazeLift = 0.12; // radians of head-up rotation per unit above 1x
+    // Aircraft-local metres: lean forward (-Z) and slightly above the panel.
+    // Keep room for the 0.08 m near plane, head dynamics and portrait eye lift
+    // inside the windscreen (0.41 m ahead) and roof (0.32 m above).
+    this.cockpitZoomLean = new THREE.Vector3(0, 0.02, -0.12);
+    this.cockpitZoomGazeLift = 0.08; // radians of head-up rotation per unit above 1x
 
     // Flyby Camera State
     this.flybyPos = new THREE.Vector3();
@@ -994,6 +994,13 @@ export class CameraSystem {
         }
         if (this.photoCockpit && this.supportsPhotoCockpit) {
           eyeLocal.set(-0.48, 0.88, -12.02);
+        }
+        // Saturate the lean early so the first wheel/pinch movement feels like
+        // leaning out to see; further zoom retains optical magnification. The
+        // offset stays in aircraft space even while looking sideways or down.
+        if (!(this.photoCockpit && this.supportsPhotoCockpit)) {
+          const lean = (1 - 1 / this.opticalZoom) / (1 - 1 / this.opticalZoomMax);
+          eyeLocal.addScaledVector(this.cockpitZoomLean, lean);
         }
         eyeLocal.y += this.headGForceOffset.y + buffetY + this.touchJoltOffset;
         eyeLocal.x += buffetX;
