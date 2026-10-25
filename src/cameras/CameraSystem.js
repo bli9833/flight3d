@@ -602,11 +602,11 @@ export class CameraSystem {
   resetLook() {
     this.userLookOverridden = false;
     this.lookYaw = 0;
-    this.lookPitch = -0.25;
+    this.lookPitch = this.aircraftLookPitch ?? -0.25;
     this.chaseYaw = 0;
     this.chasePitch = 0;
-    this.chaseDistance = 55.0;
-    this.chaseHeight = 10.5;
+    this.chaseDistance = this.aircraftChaseDistance ?? 55.0;
+    this.chaseHeight = this.aircraftChaseHeight ?? 10.5;
     this.wingLookYaw = 0;
     this.wingLookPitch = 0;
     this.gearLookYaw = 0;
@@ -629,7 +629,7 @@ export class CameraSystem {
 
   isLookingAwayFromCenter() {
     if (this.mode !== CameraSystem.MODES.COCKPIT) return false;
-    return Math.abs(this.lookYaw) > 0.38 || Math.abs(this.lookPitch - (-0.25)) > 0.42;
+    return Math.abs(this.lookYaw) > 0.38 || Math.abs(this.lookPitch - (this.aircraftLookPitch ?? -0.25)) > 0.42;
   }
 
   /**
@@ -640,7 +640,7 @@ export class CameraSystem {
    */
   zoomGazeBlend() {
     const yawAway = Math.abs(this.lookYaw) / 0.38;
-    const pitchAway = Math.abs(this.lookPitch + 0.25) / 0.42;
+    const pitchAway = Math.abs(this.lookPitch - (this.aircraftLookPitch ?? -0.25)) / 0.42;
     return Math.max(0, 1 - Math.max(yawAway, pitchAway));
   }
 
@@ -668,6 +668,7 @@ export class CameraSystem {
       const p = cockpit.captainEyePos;
       this.cockpitHeadOffset.set(p.x, p.y, p.z);
     }
+    this.aircraftLookPitch = cockpit.defaultLookPitchRad ?? -0.25;
     if (cockpit.defaultLookPitchRad !== undefined) {
       this.lookPitch = cockpit.defaultLookPitchRad;
     }
@@ -681,6 +682,8 @@ export class CameraSystem {
     } else if (span) {
       this.chaseHeight = Math.max(3.0, this.chaseDistance * 0.19);
     }
+    this.aircraftChaseDistance = this.chaseDistance;
+    this.aircraftChaseHeight = this.chaseHeight;
     if (cockpit.droneDistance !== undefined) {
       this.droneDistance = cockpit.droneDistance;
     } else if (span) {
