@@ -19,7 +19,7 @@ context, while the current implementation defines actual behavior.
 | Terrain, airport, ocean, sky, vegetation | src/environment/; [Lukla data provenance](lukla-terrain.md); [airport exterior assets](airport-buildings.md); [pavement](pavement.md); [vegetation](foliage.md) | npm run build; relevant scene screenshots; node scripts/verify-foliage.mjs |
 | Ship exteriors, buoyancy and wakes | src/environment/Ships.js; ShipAssets.js; [ship assets](ships.md) | tests/ships.test.js; tests/collision.test.js; node scripts/verify-ships.mjs |
 | City buildings and foliage | src/environment/FoliageAndCities.js; CityBuildingAssets.js; [city evidence](city-buildings.md) | tests/cityBuildings.test.js; tests/collision.test.js; browser city review |
-| Sound | src/audio/FlightAudio.js | browser interaction and listening |
+| Sound | src/audio/FlightAudio.js; src/audio/pistonSoundState.js | tests/flightAudio.test.js; scripts/verify-aircraft-audio.mjs; browser interaction and listening |
 | Crash and tire effects | src/effects/; [impact effects](impact-effects.md) | npm run test:crash; screenshots |
 | Events and diagnostics | src/core/EventBus.js; src/ui/DiagnosticsInspector.js | relevant Node tests and browser inspection |
 | Developer mode, scenarios, build identity | src/dev/; src/ui/DeveloperPanel.js; [developer mode](developer-mode.md) | tests/developerMode.test.js; node scripts/verify-developer-mode.mjs |
