@@ -18,7 +18,7 @@ It also used native mute/unmute clicks in the actual simulator, switched C172 â†
 B738 repeatedly with the same AudioContext and verified stationary failed-engine
 silence. No browser exceptions were observed.
 
-`npm run check`, all 541 Node tests, and `npm run build` passed. Node tests cover
+`npm run check`, all 542 Node tests, and `npm run build` passed. Node tests cover
 profile switching, idle/power/release, failure/restart, mute/unmute, stall warning,
 callout reset and crash/reset sequences.
 

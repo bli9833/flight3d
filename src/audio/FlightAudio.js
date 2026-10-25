@@ -132,7 +132,7 @@ export class FlightAudio {
       for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain']) {
         this[name].gain.setValueAtTime(0, this.ctx.currentTime);
       }
-      this.packGain.gain.setValueAtTime(this.isPiston ? 0 : 0.16, this.ctx.currentTime);
+      this.packGain.gain.setValueAtTime(this.isPiston || this.crashed ? 0 : 0.16, this.ctx.currentTime);
     } catch (e) {
       console.warn('Web Audio initialization error:', e);
     }

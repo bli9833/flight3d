@@ -365,3 +365,19 @@ describe('C172 piston sound and lifecycle', () => {
     assert.ok(audio.pistonGain.gain.value > 0);
   }));
 });
+
+
+it('keeps continuous buses silent when audio is first enabled after a crash', () => {
+  const previous = globalThis.window;
+  globalThis.window = { AudioContext: createMockAudioContext() };
+  try {
+    const audio = new FlightAudio();
+    audio.playExplosion(); audio.init(); audio.update(0.1, pistonState(100), false);
+    for (const name of ['engineGain', 'turbineGain', 'packGain', 'pistonGain']) assert.equal(audio[name].gain.value, 0);
+    audio.reset(); audio.update(0.1, pistonState(25), false);
+    assert.ok(audio.engineGain.gain.value > 0);
+    assert.equal(audio.packGain.gain.value, 0.16);
+  } finally {
+    if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+  }
+});
