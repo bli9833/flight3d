@@ -151,11 +151,12 @@ export class Cessna172 {
     this.buildPropeller(whiteMat, darkMat, chromeMat);
     this.buildLights();
 
-    // Enable shadows across all procedural meshes
+    // Enable shadows across all procedural meshes except transparent glass and blur disk
     this.proceduralGroup.traverse(child => {
       if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
+        const isTransparent = child.material === glassMat || child === this.propBlurDisk || child.material?.transparent;
+        child.castShadow = !isTransparent;
+        child.receiveShadow = !isTransparent;
       }
     });
   }
@@ -485,11 +486,16 @@ export class Cessna172 {
 
           this.gltfModel.traverse(node => {
             if (node.isMesh) {
-              node.castShadow = true;
-              node.receiveShadow = true;
-
               const mat = node.material;
               const matName = Array.isArray(mat) ? mat.map(m => m.name).join(' ') : (mat?.name || '');
+              const isWindow = matName.includes('Window') ||
+                node.name.toLowerCase().includes('window') ||
+                (mat && (mat.transparent || mat.opacity < 0.95));
+
+              // Transparent cockpit and cabin windows must not cast shadows into the cockpit,
+              // or they block sunlight from illuminating the instrument panel and deck through the glass.
+              node.castShadow = !isWindow;
+              node.receiveShadow = !isWindow;
 
               // Occlude static ground parking / mooring artifacts
               if (matName.includes('Concrete') || matName.includes('remove_before_flight')) {
@@ -661,7 +667,9 @@ export class Cessna172 {
       if (this.fuselageGroup) this.fuselageGroup.visible = !isCockpit;
     }
     if (this.cockpit && this.cockpit.group) {
-      this.cockpit.group.visible = isCockpit && showInterior;
+      // C172 has a dedicated 3D cockpit only (no 2D photo overlay), so keep cockpit group
+      // and live instrument displays visible in cockpit mode.
+      this.cockpit.group.visible = isCockpit;
     }
   }
 

@@ -1366,10 +1366,10 @@ class FlightSimulator {
     this.updateFlightDisplays(true);
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
-    const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
+    const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && this.cameraSystem.supportsPhotoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
     if (this.cockpitPhotoOverlay) {
-      this.cockpitPhotoOverlay.enabled = isPhotoCockpit && (this.currentAircraftId !== 'C172');
+      this.cockpitPhotoOverlay.enabled = isPhotoCockpit && this.cameraSystem.supportsPhotoCockpit;
       if (this.cockpitPhotoOverlay.enabled) {
         this.cockpitPhotoOverlay.update(this.telemetry);
       }
@@ -1486,7 +1486,7 @@ class FlightSimulator {
       }
     }
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
-    const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
+    const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && this.cameraSystem.supportsPhotoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
     const daylight = this.sky.updateCockpitSun({
       position: this.aircraft.group.position,
@@ -1497,7 +1497,7 @@ class FlightSimulator {
     });
     this.aircraft.cockpit.syncDaylight(daylight);
     if (this.cockpitPhotoOverlay) {
-      this.cockpitPhotoOverlay.enabled = isPhotoCockpit && (this.currentAircraftId !== 'C172');
+      this.cockpitPhotoOverlay.enabled = isPhotoCockpit && this.cameraSystem.supportsPhotoCockpit;
       if (this.cockpitPhotoOverlay.enabled) {
         this.cockpitPhotoOverlay.update(this.telemetry);
       }
@@ -1887,6 +1887,10 @@ class FlightSimulator {
     // Toggle Cockpit Photo Mode by clicking HUD Camera item
     document.getElementById('hud-cam')?.addEventListener('click', () => {
       if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {
+        if (!this.cameraSystem.supportsPhotoCockpit) {
+          this.showToast(() => t('3d.virtual.cockpit'));
+          return;
+        }
         const isPhoto = this.cameraSystem.toggleCockpitPhoto();
         this.showToast(() => isPhoto ? t('photo.cockpit.panel') : t('3d.virtual.cockpit'));
       }
@@ -1900,6 +1904,10 @@ class FlightSimulator {
       }
       if (e.code === 'F2') {
         if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {
+          if (!this.cameraSystem.supportsPhotoCockpit) {
+            this.showToast(() => t('3d.virtual.cockpit'));
+            return;
+          }
           const isPhoto = this.cameraSystem.toggleCockpitPhoto();
           this.showToast(() => isPhoto ? t('photo.cockpit.panel') : t('3d.virtual.cockpit'));
         }

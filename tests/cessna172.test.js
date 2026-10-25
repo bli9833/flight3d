@@ -257,4 +257,31 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
     assert.strictEqual(c172.pfdCanvas, fakePfd);
     assert.strictEqual(c172.ndCanvas, fakeNd);
   });
+
+  it('should exclude transparent windshield and window panes from casting shadows', () => {
+    const c172 = new Cessna172();
+    let transparentGlassCount = 0;
+    c172.proceduralGroup.traverse(child => {
+      if (child.isMesh && (child.material.transparent || child.material.opacity < 0.95)) {
+        transparentGlassCount++;
+        assert.strictEqual(child.castShadow, false, 'Transparent glass must not cast shadow');
+        assert.strictEqual(child.receiveShadow, false, 'Transparent glass must not receive shadow');
+      }
+    });
+    assert.ok(transparentGlassCount > 0, 'Found procedural window glass meshes');
+  });
+
+  it('should keep cockpit group visible in cockpit mode even if showInterior is false', () => {
+    const c172 = new Cessna172();
+    c172.setCockpitMode(true, false);
+    assert.strictEqual(c172.cockpit.group.visible, true, '3D instruments must stay visible');
+
+    c172.setCockpitMode(false, false);
+    assert.strictEqual(c172.cockpit.group.visible, false, 'Cockpit group hidden in exterior view');
+  });
+
+  it('should specify hasPhotoCockpit: false in CESSNA_172 configuration', () => {
+    assert.strictEqual(CESSNA_172.cockpit.hasPhotoCockpit, false);
+    assert.strictEqual(BOEING_737_800.cockpit.hasPhotoCockpit, true);
+  });
 });

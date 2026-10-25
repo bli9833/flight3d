@@ -133,6 +133,7 @@ export const BOEING_737_800 = {
 
   // 5. Cockpit Camera & Instrument Layout
   cockpit: {
+    hasPhotoCockpit: true,
     captainEyePos: { x: -0.39, y: 0.85, z: -12.35 },
     defaultLookPitchRad: -0.25,
     defaultFov: 68.0,
@@ -256,6 +257,7 @@ export const F16_FALCON = {
 
   // 5. Cockpit Camera & Instrument Layout
   cockpit: {
+    hasPhotoCockpit: false,
     captainEyePos: { x: 0.0, y: 0.85, z: -2.8 },
     defaultLookPitchRad: -0.10,
     defaultFov: 75.0,
@@ -380,6 +382,7 @@ export const CESSNA_172 = {
 
   // 5. Cockpit Camera & Instrument Layout
   cockpit: {
+    hasPhotoCockpit: false,
     captainEyePos: { x: -0.22, y: 0.42, z: -1.18 },
     defaultLookPitchRad: -0.05,
     defaultFov: 68.0,
