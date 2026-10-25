@@ -1,6 +1,8 @@
 import { t, bindText } from '../i18n/index.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { LuklaCircuitScenario } from './scenarios/LuklaCircuitScenario.js';
+import { CessnaDemoScenario } from './scenarios/CessnaDemoScenario.js';
+import { resolveDemoProfile } from './demoProfiles.js';
 import { CoastalDemoScenario } from './scenarios/CoastalDemoScenario.js';
 
 /**
@@ -44,6 +46,9 @@ export class DemoFlightDirector {
     // Scenarios
     this.luklaScenario = new LuklaCircuitScenario(this, simulator);
     this.coastalScenario = new CoastalDemoScenario(this, simulator);
+    this.cessnaScenario = new CessnaDemoScenario(this, simulator);
+    this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
+    this.profile = 'classic';
 
     // UI element references
     this.bannerEl = null;
@@ -70,6 +75,7 @@ export class DemoFlightDirector {
   }
 
   getActiveScenario() {
+    if (this.activeDemoAircraft === 'C172') return this.cessnaScenario;
     return this.activeDemoAirport === 'lukla' ? this.luklaScenario : this.coastalScenario;
   }
 
@@ -155,10 +161,9 @@ export class DemoFlightDirector {
     }
   }
 
-  start(targetAirport = null) {
-    if (this.sim?.setAircraft && this.sim.currentAircraftId !== 'B738') {
-      this.sim.setAircraft('B738');
-    }
+  start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
+    if (this.isActive) this.stop();
+    this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
 
     const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaAirport ? 'lukla' : 'coastal');
     if (this.sim.setAirport && this.sim.activeAirport !== airport) {
@@ -166,6 +171,7 @@ export class DemoFlightDirector {
     }
 
     this.activeDemoAirport = airport;
+    this.profile = resolveDemoProfile(this.activeDemoAircraft, airport, requestedProfile).id;
     this.isActive = true;
     if (this.sim?.controls) {
       if (typeof this.sim.controls.setAircraftControlsDisabled === 'function') {
@@ -203,7 +209,7 @@ export class DemoFlightDirector {
     this.waitingForTerrain = airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false;
     if (this.waitingForTerrain) {
       this.currentStage = DemoFlightDirector.STAGES.IDLE;
-      this.luklaScenario.result = { status: 'pending', airborne: false };
+      this.getActiveScenario().result = { status: 'pending', airborne: false };
       this.updateBanner(() => t('loading.lukla.terrain'), () => t('the.demo.will.start.when.terrain.data'));
       this.sim.controls?.setParkingBrake?.(true);
       this.sim.gear?.setBrakes(1);
@@ -218,7 +224,9 @@ export class DemoFlightDirector {
       this.audioInitiated = true;
     }
 
-    if (this.activeDemoAirport === 'lukla') {
+    if (this.activeDemoAircraft === 'C172') {
+      this.setStage(CessnaDemoScenario.STAGES.ESTABLISH);
+    } else if (this.activeDemoAirport === 'lukla') {
       this.setStage(DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
     } else {
       this.setStage(DemoFlightDirector.COASTAL_STAGES.PREFLIGHT_ORBIT);
@@ -239,7 +247,7 @@ export class DemoFlightDirector {
   stop(message = null, keepParkingBrake = false, { preserveThrottle = false } = {}) {
     if (!this.isActive) return;
     this.getActiveScenario().stop?.();
-    if (this.activeDemoAirport === 'lukla' &&
+    if (this.activeDemoAircraft === 'B738' && this.activeDemoAirport === 'lukla' &&
         ['pending', 'running'].includes(this.luklaScenario.result.status)) {
       this.luklaScenario.result.status = 'cancelled';
     }
@@ -345,11 +353,11 @@ export class DemoFlightDirector {
     if (!this.isActive) return;
     if (this.waitingForTerrain) {
       if (this.sim.currentTerrain?.loadError) {
-        this.luklaScenario.recordFailure({ description: this.sim.currentTerrain.loadError });
+        this.getActiveScenario().recordFailure({ description: this.sim.currentTerrain.loadError });
         this.stop(() => t('could.not.load.lukla.terrain.refresh.and'));
         return;
       }
-      if (this.sim.currentTerrain?.isLoaded === true) this.start(this.activeDemoAirport);
+      if (this.sim.currentTerrain?.isLoaded === true) this.start(this.activeDemoAirport, this.profile);
       return;
     }
 

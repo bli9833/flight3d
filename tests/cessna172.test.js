@@ -154,7 +154,7 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
     assert.strictEqual(yawMoment, 0.0, 'Centerline engine produces no asymmetric yaw moment');
   });
 
-  it('should switch aircraft to B738 when DemoFlightDirector starts', () => {
+  it('should retain C172 and choose its scenario when DemoFlightDirector starts', () => {
     let switchedAircraft = null;
     const fakeSim = {
       currentAircraftId: 'C172',
@@ -169,8 +169,12 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
       gear: { setBrakes: () => {} }
     };
     const director = new DemoFlightDirector(fakeSim);
+    let entered = false;
+    director.cessnaScenario.enterStage = () => { entered = true; };
     director.start('lukla');
-    assert.strictEqual(switchedAircraft, 'B738', 'Demo flight director forces B738 airframe and aero');
+    assert.strictEqual(switchedAircraft, null, 'Selected aircraft is preserved');
+    assert.strictEqual(director.getActiveScenario(), director.cessnaScenario);
+    assert.strictEqual(entered, true);
   });
 
   it('should scale fuel flow and capacity correctly for Cessna 172 propulsion', () => {
@@ -247,7 +251,7 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
 
   it('should configure authentic cockpit eye view behind left pilot yoke', () => {
     assert.strictEqual(CESSNA_172.cockpit.captainEyePos.x, -0.22, 'Captain eye inline with left seat center');
-    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.y, 0.42, 'Captain eye at natural seating height');
+    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.y, 0.72, 'Captain eye above the panel for a forward view');
     assert.strictEqual(CESSNA_172.cockpit.captainEyePos.z, -1.18, 'Captain eye seated in chair');
     assert.ok(CESSNA_172.cockpit.defaultLookPitchRad <= 0, 'Slight downward pitch to frame flight instruments');
   });

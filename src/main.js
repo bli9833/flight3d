@@ -505,7 +505,7 @@ class FlightSimulator {
     const config = AIRCRAFT_REGISTRY[aircraftId];
     if (!config) return;
 
-    if (this.demoDirector && this.demoDirector.isActive && aircraftId !== 'B738') {
+    if (this.demoDirector && this.demoDirector.isActive && aircraftId !== this.currentAircraftId) {
       this.demoDirector.stop(() => t('manual.control.engaged'));
     }
 
@@ -1805,6 +1805,8 @@ class FlightSimulator {
       getPreset: () => this.lobby.preset,
       getTime: () => this.sky.timeOfDay,
       getAircraft: () => this.lobby.aircraft || this.currentAircraftId || 'B738',
+      getDemoProfile: () => this.lobby.demoProfile,
+      onDemoProfile: id => { this.lobby.demoProfile = id; },
       onAirport: id => this.setAirport(id),
       onPreset: type => {
         this.lobby.preset = type;

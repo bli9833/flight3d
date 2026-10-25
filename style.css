@@ -2319,3 +2319,7 @@ body[data-flow="lobby"] .menu-toggle {
 .shadow-demo-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .shadow-demo-actions .btn { min-height: 38px; padding: 6px 9px; }
 @media (max-width: 600px) { .shadow-demo { top: 146px; font-size: 11px; } }
+
+#lobby-demo-options[hidden] { display: none; }
+#lobby-demo-select { width: 100%; min-height: 44px; white-space: normal; }
+.demo-route-briefing { margin: 8px 0 0; line-height: 1.55; font-size: 13px; color: #cbd5e1; }

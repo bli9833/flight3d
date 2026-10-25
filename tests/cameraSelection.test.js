@@ -110,3 +110,20 @@ test('opens on an exterior view because the cockpit interior streams in separate
   assert.equal(system.mode, CameraSystem.MODES.CHASE);
   assert.equal(camera.near, 0.25, 'Exterior near plane must be used before any cockpit entry');
 });
+
+test('camera cuts and recentering retain the active aircraft chase framing', () => {
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  system.loadAircraftConfig({ id: 'C172', cockpit: { chaseDistance: 14, chaseHeight: 3.2, defaultLookPitchRad: -0.05 } });
+  system.setMode(CameraSystem.MODES.FLYBY);
+  system.setMode(CameraSystem.MODES.CHASE);
+  assert.equal(system.chaseDistance, 14);
+  assert.equal(system.chaseHeight, 3.2);
+  assert.equal(system.lookPitch, -0.05);
+  system.chaseDistance = 80;
+  system.resetLook();
+  assert.equal(system.chaseDistance, 14);
+  system.loadAircraftConfig({ id: 'B738', cockpit: { chaseDistance: 55, chaseHeight: 10.5 } });
+  system.setMode(CameraSystem.MODES.CHASE);
+  assert.equal(system.chaseDistance, 55);
+  assert.equal(system.chaseHeight, 10.5);
+});

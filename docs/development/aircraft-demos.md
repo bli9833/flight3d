@@ -1,0 +1,52 @@
+# Aircraft demos
+
+Select an aircraft, **Demo flight**, then a **Demo route** in the main menu.
+The launch button changes to **Watch demo flight**. P restarts the selected
+route; Esc releases the demo controls. A selected camera or mouse-look keeps
+priority over automatic camera cuts.
+
+- Boeing 737: existing airport cinematic demos, including takeoff and landing.
+- Cessna 172, coastal: airborne city corridor pass followed by climb-out.
+- Cessna 172, Lukla: airborne valley pass followed by a climbing turnaround.
+- Cessna 172, either airport: extra-altitude left/right steep turns, a climbing
+  wingover and wings-level recovery. No loop, roll or inverted flight is offered.
+
+The Cessna scenarios use one initial airborne spawn. Subsequent movement uses
+virtual elevator/aileron/rudder/throttle inputs through the normal 120 Hz physics
+and collision pipeline. Mass, fuel, engine count and fixed gear remain C172
+configuration. Completion retains power for manual flight; cancellation clears
+virtual inputs. These tours do not include takeoff or landing.
+
+City corridors are selected against the current generated building footprints,
+including buildings tall enough to intersect the flight altitude. Terrain is
+sampled across the entire corridor. Building placement is randomized, so the
+chosen corridor and flight altitude can differ across page loads. Climb guidance
+also scans terrain ahead. The canyon flight waits for loaded DEM data.
+
+`CessnaDemoScenario` controls measured angle of attack to supply the required
+lift in a bank. The coordinated-turn pitch-rate term keeps a sustained steep
+turn from lowering the nose. It does not change aerodynamic forces, inertia or
+collision policy. Camera cuts use the existing cockpit, chase, flyby and drone
+views; resetting a view now retains the active aircraft's chase distance/height and
+default cockpit look angle. The C172 eye is above the instrument panel at 0.72 m
+so the forward scene remains visible.
+
+## Browser verification
+
+Start Vite on port 5186 (or set APP_URL) and reuse the project Chrome daemon:
+
+```sh
+npm run dev -- --host 127.0.0.1 --port 5186
+chrome-headless --project flight3d start
+chrome-session --project flight3d node scripts/verify-cessna-demos.mjs
+```
+
+The harness owns one tab, freezes wall-clock physics, and steps real physics for
+all four airport/route combinations. It checks completion, aircraft identity,
+finite positions, no sampled stalls/crashes, terrain clearance, multiple camera
+views, demonstrated bank angles and powered handoff. It captures menu layouts at
+1440×900 and 390×844 plus flight frames and writes samples to
+`.cache/cessna-demos` (`ARTIFACT_DIR` overrides). Inspect screenshots in addition
+to the assertions. ONLY=coastal-scenic (or the other airport/profile pair) runs
+one route for diagnosis. This harness does not verify audio or a complete
+manual-input flight after handoff.

@@ -1,3 +1,4 @@
+import { demoProfiles, resolveDemoProfile } from '../director/demoProfiles.js';
 import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../config/scenarioRegistry.js';
@@ -11,9 +12,13 @@ const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly, getDemoProfile, onDemoProfile }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
+  const demoGroup = document.getElementById('lobby-demo-options');
+  const demoSelect = document.getElementById('lobby-demo-select');
+  const demoBriefing = document.getElementById('lobby-demo-briefing');
+  demoSelect?.addEventListener('change', () => { onDemoProfile?.(demoSelect.value); refresh(); });
   const timeSelect = document.getElementById('lobby-time-select');
 
   const tabs = [...document.querySelectorAll('.lobby-tab')];
@@ -51,7 +56,10 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     document.getElementById(id)?.addEventListener('click', handler);
   }
   for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
-    document.getElementById(scenario.lobbyButtonId)?.addEventListener('click', () => onPreset(type));
+    document.getElementById(scenario.lobbyButtonId)?.addEventListener('click', () => {
+      onPreset(type);
+      if (type === 'demo') demoGroup?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    });
   }
   for (const [code, id] of Object.entries(LANGUAGE_BUTTONS)) {
     document.getElementById(id)?.addEventListener('click', () => {
@@ -82,6 +90,22 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
       }
     }
     const preset = getPreset();
+    if (demoGroup) demoGroup.hidden = preset !== 'demo';
+    if (demoSelect) {
+      const choices = demoProfiles(aircraft, airport);
+      const selected = resolveDemoProfile(aircraft, airport, getDemoProfile?.());
+      onDemoProfile?.(selected.id);
+      demoSelect.replaceChildren(...choices.map(choice => {
+        const option = document.createElement('option');
+        option.value = choice.id;
+        option.textContent = t(choice.labelKey);
+        return option;
+      }));
+      demoSelect.value = selected.id;
+      if (demoBriefing) bindText(demoBriefing, () => t(resolveDemoProfile(getAircraft?.(), getAirport(), getDemoProfile?.()).briefingKey));
+    }
+    const flyLabel = document.getElementById('btn-fly')?.querySelector('span');
+    if (flyLabel) bindText(flyLabel, () => t(getPreset() === 'demo' ? 'demo.watch' : 'lobby.fly'));
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
       const button = document.getElementById(scenario.lobbyButtonId);
       if (!button) continue;

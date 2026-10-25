@@ -210,3 +210,9 @@ allocation, body/wing/tail/gear self-shadows and exterior/cockpit ground shadows
 
 See [effect flipbooks](effect-flipbooks.md) for atlas provenance, resource budgets,
 Node lifecycle tests and the Windows/Linux browser comparison harness.
+
+### Aircraft-specific cinematic demos
+
+See [aircraft demos](aircraft-demos.md) for the C172 city/canyon and steep-turn /
+wingover routes, menu behavior, physical control laws, and the reusable-browser
+acceptance command (`scripts/verify-cessna-demos.mjs`).
