@@ -73,3 +73,33 @@ The browser results include the individual median and p95 samples for all poses.
 The existing browser crash suite reached and passed its city skyscraper impact
 scenario with the new buildings. The suite's subsequent quick-restart check
 stalled in headless Chrome and was stopped; no full-suite pass is claimed.
+
+## Low-pass detail update
+
+The near archetypes now include podiums, stepped upper volumes, corner fins or
+end piers, roof parapets and rooftop plant. All parts remain within the original
+normalized footprint and height, preserving placement and collision envelopes.
+The far box geometry and 1,800 m LOD policy are unchanged.
+
+The near material derives facade UVs from each instance's physical dimensions.
+The existing atlas repeats at approximately 3.75 m per bay and 3 m per floor,
+so tall buildings gain floors instead of stretching five windows over their
+whole height. Daytime color and nighttime emission use the same mapping;
+horizontal roof faces keep their original atlas UVs. One material and the same
+instanced batches are retained.
+
+GLB was not required for this update: changing the container would not correct
+stretched facades, and the existing modular geometry already supports shared
+materials, instancing and LOD. A unique landmark needing a hand-authored
+silhouette/interior would be a separate reason to introduce a GLB asset.
+
+For a current-main comparison, run Vite on 5187 and reuse project Chrome:
+
+```sh
+chrome-session --project flight3d node scripts/verify-city-lowpass.mjs
+```
+
+`APP_URL`, `BASELINE_REF` and `ARTIFACT_DIR` override the server, baseline and
+output directory. The harness owns one tab and compares seeded city placement,
+shader compilation, draw calls and far-LOD triangles across five paired views.
+See [low-pass evidence](../../review-artifacts/city-lowpass/README.md).
