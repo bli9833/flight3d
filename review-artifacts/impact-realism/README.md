@@ -23,3 +23,15 @@ aircraft deformation and fluid simulation are outside this change.
 | Building | ![Early concrete dust](impact_building_early.png) | ![Settling concrete dust](impact_building_late.png) |
 
 Reproduction: [impact effects](../../docs/development/impact-effects.md).
+
+## Pre-contact velocity regression follow-up
+
+The review identified that contact resolution could change live velocity before
+effect emission. `triggerCrash` now forwards the same preserved velocity used by
+collision detection. The browser regression failed on the original PR head, then
+passed all six crashes after the fix, including one contact response that changed
+velocity. Related Node tests: 33 passed. The original full gate remains above;
+remote CI verifies the updated head.
+
+See [follow-up browser log](velocity-regression.txt). The controlled effect
+captures above remain applicable because particle rendering is unchanged.

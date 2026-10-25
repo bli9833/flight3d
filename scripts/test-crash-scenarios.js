@@ -146,6 +146,38 @@ async function main() {
       }
     `);
 
+    // Detection and effects must share the velocity preserved before contact impulses.
+    await evalJs(`(() => {
+      const sim = window.simulator;
+      const detect = sim.collisionDetector.checkCollision.bind(sim.collisionDetector);
+      const trigger = sim.triggerCrash.bind(sim);
+      sim.impactVelocityChecks = { crashes: 0, contactResponses: 0 };
+      let incoming;
+      sim.collisionDetector.checkCollision = (...args) => {
+        const result = detect(...args);
+        if (result) incoming = args[2].clone();
+        return result;
+      };
+      sim.triggerCrash = (result, velocity) => {
+        if (!velocity || !incoming || velocity.distanceTo(incoming) > 1e-8) {
+          throw new Error('Impact effects did not receive the pre-contact velocity');
+        }
+        sim.impactVelocityChecks.crashes++;
+        if (velocity.distanceTo(sim.linearVelocity) > 1e-6) sim.impactVelocityChecks.contactResponses++;
+        let emittedVelocity;
+        const spawn = sim.explosionSystem.spawnExplosion;
+        sim.explosionSystem.spawnExplosion = function(crash, v) {
+          emittedVelocity = v?.clone();
+          return spawn.call(this, crash, v);
+        };
+        try { trigger(result, velocity); }
+        finally { sim.explosionSystem.spawnExplosion = spawn; }
+        if (!emittedVelocity || emittedVelocity.distanceTo(incoming) > 1e-8) {
+          throw new Error('Impact effects used a velocity changed by the contact response');
+        }
+      };
+    })()`);
+
     // =========================================================================
     // TEST 1: Airport Control Tower Collision
     // =========================================================================
@@ -353,6 +385,12 @@ async function main() {
     if (![towerCrashed, waterCrashed, terrainCrashed, bldgCrashed, treeCrashed, excursionCrashed, restartOk].every(Boolean)) {
       throw new Error('One or more collision/restart checks failed');
     }
+    const velocityChecks = await evalJs('window.simulator.impactVelocityChecks');
+    if (velocityChecks.crashes < 6 || velocityChecks.contactResponses < 1) {
+      throw new Error('Missing crash/contact-response coverage: ' + JSON.stringify(velocityChecks));
+    }
+    console.log('Pre-contact impact velocity:', JSON.stringify(velocityChecks));
+
     // Fixed camera and time samples expose effects without aircraft/HUD occlusion.
     await evalJs(`(async () => {
       const THREE = window.THREE;

@@ -1248,7 +1248,7 @@ class FlightSimulator {
       );
 
       if (crash) {
-        this.triggerCrash(crash);
+        this.triggerCrash(crash, collisionVelocity);
       }
     }
   }
@@ -1260,13 +1260,13 @@ class FlightSimulator {
       (x, z) => this.currentTerrain.getNormal?.(x, z), this.gear.bodySupportPoints);
   }
 
-  triggerCrash(crashResult) {
+  triggerCrash(crashResult, impactVelocity = this.linearVelocity) {
     if (this.isCrashed) return;
     this.isCrashed = true;
     this.crashResult = crashResult;
 
     // 1. Spawn Visual Explosion Particles, Fireball, Smoke & Dynamic Light Flash
-    this.explosionSystem.spawnExplosion(crashResult, this.linearVelocity);
+    this.explosionSystem.spawnExplosion(crashResult, impactVelocity);
 
     // 2. Procedural Audio Detonation & Metal Crunch Sound
     this.audio.playExplosion(crashResult.type === 'WATER');

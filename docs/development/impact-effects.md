@@ -29,7 +29,9 @@ PORT=5188 CRASH_SCREENSHOTS=0 ARTIFACT_DIR=review-artifacts/impact-realism \
 ```
 
 The script checks tower, water, terrain, building, tree, runway excursion and
-restart. It then renders controlled effect scenes at 0.4 and 2.4 seconds, checks
+restart. It also asserts that collision detection and effect emission receive the
+same preserved pre-contact velocity, including a body-contact case where the
+contact impulse changes the live velocity. It then renders controlled effect scenes at 0.4 and 2.4 seconds, checks
 shader diagnostics and captures all three materials. Controlled captures show
 particle appearance without the aircraft/HUD occluding them; they do not replace
 collision assertions or establish whole-scene camera acceptance. Omit
