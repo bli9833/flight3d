@@ -161,4 +161,29 @@ describe('CockpitPhotoOverlay & Photorealistic 2D Cockpit System', () => {
     assert.ok(camera.position.x < -0.3, 'Eye position should be Captain seat (negative X)');
     assert.ok(camera.position.y > 0.8, 'Eye height should be Captain eye level');
   });
+
+  it('should ignore photo mode when loaded aircraft config does not support photo cockpit', () => {
+    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const camSys = new CameraSystem(camera, null);
+    camSys.loadAircraftConfig({
+      id: 'C172',
+      cockpit: {
+        hasPhotoCockpit: false,
+        captainEyePos: { x: -0.22, y: 0.42, z: -1.18 }
+      }
+    });
+    camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+
+    assert.strictEqual(camSys.supportsPhotoCockpit, false);
+    assert.strictEqual(camSys.toggleCockpitPhoto(), false);
+    assert.strictEqual(camSys.photoCockpit, false);
+    assert.strictEqual(camSys.getCockpitSubmodeName(), '3D VIRTUAL');
+
+    // Camera update retains C172 eye coordinates instead of jumping to Boeing (-0.48, 0.88, -12.02)
+    const aircraftMesh = new THREE.Mesh();
+    camSys.update(0.016, aircraftMesh, { onGround: true, pitchDeg: 0, rollDeg: 0 });
+    assert.ok(Math.abs(camera.position.x - (-0.22)) < 0.05);
+    assert.ok(Math.abs(camera.position.y - 0.42) < 0.05);
+    assert.ok(Math.abs(camera.position.z - (-1.18)) < 0.05);
+  });
 });

@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import * as THREE from 'three';
 import { Cessna172 } from '../src/aircraft/Cessna172.js';
 import { CESSNA_172, BOEING_737_800 } from '../src/config/aircraftConfigs.js';
@@ -21,6 +22,7 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
     assert.ok(c172.gearGroup, 'Landing gear group must exist');
     assert.ok(c172.propellerGroup, 'Propeller group must exist');
     assert.ok(c172.lightsGroup, 'Lights group must exist');
+    assert.strictEqual(c172.lightsGroup.parent, c172.group, 'Lights group must be child of root group to persist across model changes');
     assert.ok(c172.cockpit, 'Cockpit interface must exist for engine compatibility');
   });
 
@@ -205,5 +207,81 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
   it('should provide calibrated resting CG height for gentle runway contact', () => {
     const gear = new LandingGear(CESSNA_172);
     assert.strictEqual(gear.cgGroundHeightM, 1.35, 'C172 resting CG ground height is 1.35m');
+  });
+
+  it('should have optimized c172.glb model with valid license attribution', () => {
+    const glbPath = 'public/models/c172.glb';
+    assert.ok(fs.existsSync(glbPath), 'public/models/c172.glb must exist');
+    const stat = fs.statSync(glbPath);
+    assert.ok(stat.size > 5 * 1024 * 1024 && stat.size < 15 * 1024 * 1024, `c172.glb size ${stat.size} should be ~8.3MB Draco compressed`);
+
+    const licPath = 'public/models/c172.LICENSE.txt';
+    assert.ok(fs.existsSync(licPath), 'public/models/c172.LICENSE.txt must exist');
+    const licContent = fs.readFileSync(licPath, 'utf8');
+    assert.ok(licContent.includes('NLM'), 'License must cite author NLM');
+    assert.ok(licContent.includes('CC BY 4.0'), 'License must cite CC BY 4.0');
+  });
+
+  it('should toggle pilot yokes visibility via cockpit interface', () => {
+    const c172 = new Cessna172();
+    assert.strictEqual(c172.cockpit.yokesVisible, true);
+
+    const yoke1 = new THREE.Object3D();
+    const yoke2 = new THREE.Object3D();
+    c172.cockpit.gltfYokes = [yoke1, yoke2];
+
+    const state1 = c172.cockpit.toggleYokes();
+    assert.strictEqual(state1, false);
+    assert.strictEqual(c172.cockpit.yokesVisible, false);
+    assert.strictEqual(yoke1.visible, false);
+    assert.strictEqual(yoke2.visible, false);
+
+    const state2 = c172.cockpit.toggleYokes();
+    assert.strictEqual(state2, true);
+    assert.strictEqual(c172.cockpit.yokesVisible, true);
+    assert.strictEqual(yoke1.visible, true);
+    assert.strictEqual(yoke2.visible, true);
+  });
+
+  it('should configure authentic cockpit eye view behind left pilot yoke', () => {
+    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.x, -0.22, 'Captain eye inline with left seat center');
+    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.y, 0.42, 'Captain eye at natural seating height');
+    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.z, -1.18, 'Captain eye seated in chair');
+    assert.ok(CESSNA_172.cockpit.defaultLookPitchRad <= 0, 'Slight downward pitch to frame flight instruments');
+  });
+
+  it('should accept PFD and ND canvases and store them for live glass-cockpit display', () => {
+    const fakePfd = { texture: new THREE.Texture() };
+    const fakeNd = { texture: new THREE.Texture() };
+    const c172 = new Cessna172(fakePfd, fakeNd);
+    assert.strictEqual(c172.pfdCanvas, fakePfd);
+    assert.strictEqual(c172.ndCanvas, fakeNd);
+  });
+
+  it('should exclude transparent windshield and window panes from casting shadows', () => {
+    const c172 = new Cessna172();
+    let transparentGlassCount = 0;
+    c172.proceduralGroup.traverse(child => {
+      if (child.isMesh && (child.material.transparent || child.material.opacity < 0.95)) {
+        transparentGlassCount++;
+        assert.strictEqual(child.castShadow, false, 'Transparent glass must not cast shadow');
+        assert.strictEqual(child.receiveShadow, false, 'Transparent glass must not receive shadow');
+      }
+    });
+    assert.ok(transparentGlassCount > 0, 'Found procedural window glass meshes');
+  });
+
+  it('should keep cockpit group visible in cockpit mode even if showInterior is false', () => {
+    const c172 = new Cessna172();
+    c172.setCockpitMode(true, false);
+    assert.strictEqual(c172.cockpit.group.visible, true, '3D instruments must stay visible');
+
+    c172.setCockpitMode(false, false);
+    assert.strictEqual(c172.cockpit.group.visible, false, 'Cockpit group hidden in exterior view');
+  });
+
+  it('should specify hasPhotoCockpit: false in CESSNA_172 configuration', () => {
+    assert.strictEqual(CESSNA_172.cockpit.hasPhotoCockpit, false);
+    assert.strictEqual(BOEING_737_800.cockpit.hasPhotoCockpit, true);
   });
 });

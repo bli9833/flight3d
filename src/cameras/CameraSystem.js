@@ -35,6 +35,7 @@ export class CameraSystem {
 
     // Cockpit Head Dynamics & Look-Around
     this.photoCockpit = false; // Default to high-fidelity 3D Virtual Cockpit with GLTF asset
+    this.supportsPhotoCockpit = true; // Enabled for Boeing 737; disabled for 3D-only cockpits (e.g. C172)
     this.cockpitHeadOffset = new THREE.Vector3(-0.39, 0.85, -12.35); // Captain eye
     this.headGForceOffset = new THREE.Vector3();
     this.touchJoltOffset = 0;
@@ -658,6 +659,11 @@ export class CameraSystem {
     const aero = config.aerodynamics || {};
     const span = aero.wingspanM ?? 35.8;
 
+    this.supportsPhotoCockpit = cockpit.hasPhotoCockpit ?? (config.id ? config.id === 'B738' : true);
+    if (!this.supportsPhotoCockpit) {
+      this.photoCockpit = false;
+    }
+
     if (cockpit.captainEyePos) {
       const p = cockpit.captainEyePos;
       this.cockpitHeadOffset.set(p.x, p.y, p.z);
@@ -849,16 +855,24 @@ export class CameraSystem {
   }
 
   toggleCockpitPhoto() {
+    if (!this.supportsPhotoCockpit) {
+      this.photoCockpit = false;
+      return false;
+    }
     this.photoCockpit = !this.photoCockpit;
     return this.photoCockpit;
   }
 
   setCockpitPhoto(enabled) {
+    if (!this.supportsPhotoCockpit) {
+      this.photoCockpit = false;
+      return;
+    }
     this.photoCockpit = !!enabled;
   }
 
   getCockpitSubmodeName() {
-    return this.photoCockpit ? 'PHOTO 2D' : '3D VIRTUAL';
+    return (this.photoCockpit && this.supportsPhotoCockpit) ? 'PHOTO 2D' : '3D VIRTUAL';
   }
 
   getModeName() {
@@ -975,7 +989,7 @@ export class CameraSystem {
           eyeLocal.x = -0.34;
           eyeLocal.y += 0.03;
         }
-        if (this.photoCockpit) {
+        if (this.photoCockpit && this.supportsPhotoCockpit) {
           eyeLocal.set(-0.48, 0.88, -12.02);
         }
         eyeLocal.y += this.headGForceOffset.y + buffetY + this.touchJoltOffset;
@@ -994,9 +1008,10 @@ export class CameraSystem {
         const cursorPitch = this.enableCursorTrack ? (-this.cursorNormY * 0.12) : 0;
 
         const effectiveYaw = this.lookYaw + cursorYaw;
-        const basePitch = (this.photoCockpit && !this.isLookingAwayFromCenter()) ? (this.lookPitch * 0.2 - 0.04) : this.lookPitch;
+        const isPhoto = this.photoCockpit && this.supportsPhotoCockpit;
+        const basePitch = (isPhoto && !this.isLookingAwayFromCenter()) ? (this.lookPitch * 0.2 - 0.04) : this.lookPitch;
         // A manual aim fades the lift out across the look-away window.
-        const zoomGazeLift = this.photoCockpit ? 0
+        const zoomGazeLift = isPhoto ? 0
           : (this.opticalZoom - 1) * this.cockpitZoomGazeLift * this.zoomGazeBlend();
         const effectivePitch = basePitch + zoomGazeLift + cursorPitch;
 
