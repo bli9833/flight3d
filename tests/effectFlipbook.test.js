@@ -52,35 +52,57 @@ test('touchdown / update / clear preserves dynamics, shares maps, and stays boun
   assert.equal(system.scene.children.length, 0);
 });
 
-test('land / water crashes retain flash, shockwave, wind, gravity, reset and budgets', () => {
-  // The unchanged spark canvas is unrelated to atlas generation or particle dynamics.
+test('impacts separate water from solid materials, settle, expire and reset within budgets', () => {
   const original = ExplosionSystem.prototype.createSparkTexture;
   ExplosionSystem.prototype.createSparkTexture = () => new THREE.Texture();
   let system;
   try { system = new ExplosionSystem(new THREE.Scene()); }
   finally { ExplosionSystem.prototype.createSparkTexture = original; }
-  for (const type of ['GROUND', 'WATER', 'GROUND']) {
-    for (let i = 0; i < 8; i++) system.spawnExplosion({ type, point: new THREE.Vector3() });
-    assert.equal(system.fireballs.length, 60);
-    assert.equal(system.smokePuffs.length, 120);
-    assert.equal(system.debrisParticles.length, 70);
-    assert.equal(system.shockwaves.length, 4);
-    assert.ok(system.lightPool.some(item => item.light.visible));
+  for (const type of ['TERRAIN', 'WATER', 'BUILDING']) {
+    for (let i = 0; i < 8; i++) system.spawnExplosion(
+      { type, point: new THREE.Vector3(0, -1, 0) }, new THREE.Vector3(75, -20, 0));
     if (type === 'WATER') {
+      assert.equal(system.fireballs.length, 0);
+      assert.equal(system.smokePuffs.length, 0);
+      assert.equal(system.debrisParticles.length, 0);
+      assert.equal(system.shockwaves.length, 4);
+      assert.ok(system.lightPool.every(item => !item.light.visible));
       assert.equal(system.waterPlumes.length, 90);
-      assert.equal(system.waterPlumes[0].sprite.material.blending, THREE.NormalBlending);
+      assert.equal(system.persistentWreckage, null);
+      assert.ok(system.waterPlumes.every(p => p.sprite.position.y > 0));
+      const spray = system.waterPlumes[0], vy = spray.vel.y;
+      system.update(0.1);
+      assert.ok(spray.vel.y < vy);
+      for (let i = 0; i < 35; i++) {
+        system.update(0.1);
+        assert.ok(system.waterPlumes.every(p => p.sprite.position.y >= p.surfaceY));
+      }
+    } else {
+      assert.ok(system.fireballs.length <= 60);
+      assert.equal(system.smokePuffs.length, 120);
+      assert.equal(system.debrisParticles.length, 70);
+      assert.equal(system.shockwaves.length, 0); // No floating ring at building impact height.
+      assert.ok(system.smokePuffs.every(p => p.sprite.material.map === system.dustTexture));
     }
-    const smoke = system.smokePuffs[0], wind = smoke.vel.x;
-    system.update(0.8);
-    assert.ok(smoke.vel.x > wind);
-    assert.ok(smoke.sprite.material.userData.flipbook.frame.value > 0);
     for (let i = 0; i < 360; i++) system.update(0.1);
-    assert.equal(system.smokePuffs.length, 0);
+    for (const particles of [system.smokePuffs, system.waterPlumes, system.fireballs, system.debrisParticles, system.shockwaves]) {
+      assert.equal(particles.length, 0);
+    }
     system.clear();
     assert.equal(system.group.children.length, 4);
     assert.ok(system.lightPool.every(item => !item.light.visible));
-    assert.equal(system.persistentWreckage, null);
   }
+  system.spawnExplosion({ type: 'TERRAIN', speedKnots: 20 });
+  const slowCount = system.smokePuffs.length;
+  assert.equal(system.fireballs.length, 0);
+  assert.ok(system.lightPool.every(item => !item.light.visible));
+  system.clear();
+  const point = new THREE.Vector3(5, -2, 8), velocity = new THREE.Vector3(100, -20, 0);
+  system.spawnExplosion({ type: 'BUILDING', point }, velocity);
+  assert.ok(system.smokePuffs.length > slowCount);
+  assert.ok(system.fireballs.length > 0);
+  assert.deepEqual(point.toArray(), [5, -2, 8]);
+  assert.deepEqual(velocity.toArray(), [100, -20, 0]);
   system.dispose();
   assert.equal(system.scene.children.length, 0);
 });
