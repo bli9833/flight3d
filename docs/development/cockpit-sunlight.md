@@ -209,7 +209,8 @@ actual model and its cast shadows without adding substitute shadow geometry.
 
 ## Interactive shadow scenario
 
-Main menu → Scenarios → **Cockpit shadow demo** → **Fly**. Available at both
+Main menu → Settings → **Developer mode** → Developer → **Cockpit shadow demo**
+→ **Run**. Developer mode is session-only and defaults off. Available at both
 airports. `CockpitShadowDemo` holds the runway aircraft still in the 3D cockpit;
 mouse/touch looking remains available. The sun visits six aircraft-relative
 bearings/elevations: front-left, ahead, front-right, right, high and low. Each

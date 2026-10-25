@@ -40,9 +40,9 @@ try {
     await new Promise(r => setTimeout(r, 500));
   }
   assert.ok(await evaluate('Boolean(window.simulator?.aircraft?.cockpit?.gltfCockpitLoaded)'), 'Cockpit must load');
-  await evaluate(`(()=>{const s=window.simulator;s.sky.setCloudCover(.6);s.setTimeOfDay(17);document.getElementById('menu-toggle').click();document.getElementById('lobby-preset-shadow').click();})()`);
+  await evaluate(`(()=>{const s=window.simulator;s.sky.setCloudCover(.6);s.setTimeOfDay(17);document.getElementById('menu-toggle').click();document.getElementById('lobby-tab-settings').click();document.getElementById('dev-enabled').click();document.getElementById('lobby-tab-dev').click();document.getElementById('dev-scenario').value='shadow';})()`);
   await shot('scenario-menu');
-  await evaluate(`document.getElementById('btn-fly').click()`);
+  await evaluate(`document.getElementById('dev-run').click();window.simulator.devRunner.updatePreparation(0)`);
   await evaluate(`window.simulator.animate = () => {}`);
   await new Promise(r => setTimeout(r, 200));
   const facts = await evaluate(`(()=>{const s=window.simulator;return {active:s.shadowDemo.active,mode:s.cameraSystem.mode,photo:s.cameraSystem.photoCockpit,cloud:s.sky.cloudCover,blocked:s.controls.inputBlocked,visible:!document.getElementById('shadow-demo').hidden,position:s.position.toArray()};})()`);

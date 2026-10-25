@@ -23,6 +23,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
 
   const tabs = [...document.querySelectorAll('.lobby-tab')];
   function selectTab(selected, focus = false) {
+    document.getElementById('btn-fly').hidden = selected.id === 'lobby-tab-dev';
     for (const tab of tabs) {
       const active = tab === selected;
       tab.setAttribute('aria-selected', String(active));
@@ -32,17 +33,19 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     document.querySelector('.lobby-panels').scrollTop = 0;
     if (focus) selected.focus();
   }
-  for (const [index, tab] of tabs.entries()) {
+  for (const tab of tabs) {
     tab.addEventListener('click', () => selectTab(tab));
     tab.addEventListener('keydown', event => {
       let next;
-      if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
-      if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+      const visibleTabs = tabs.filter(item => !item.hidden);
+      const index = visibleTabs.indexOf(tab);
+      if (event.key === 'ArrowRight') next = (index + 1) % visibleTabs.length;
+      if (event.key === 'ArrowLeft') next = (index + visibleTabs.length - 1) % visibleTabs.length;
       if (event.key === 'Home') next = 0;
-      if (event.key === 'End') next = tabs.length - 1;
+      if (event.key === 'End') next = visibleTabs.length - 1;
       if (next === undefined) return;
       event.preventDefault();
-      selectTab(tabs[next], true);
+      selectTab(visibleTabs[next], true);
     });
   }
 

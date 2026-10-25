@@ -60,6 +60,9 @@ acceptance. Node tests and a successful build do not verify WebGL rendering.
 
 ## Landing damage acceptance
 
+Developer-mode UI and runtime scenarios have separate [acceptance instructions](developer-mode.md).
+Start Vite separately and run `node scripts/verify-developer-mode.mjs`.
+
 `npm run test:landing` checks normal landings, independent leg failures, partial
 extension, controlled runway scraping through rest, catastrophic body impact and
 repair. See [landing damage](landing-damage.md) for conditions, limitations and

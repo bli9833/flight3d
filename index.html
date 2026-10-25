@@ -171,6 +171,7 @@
         <span id="lobby-tabs-title" hidden data-i18n="lobby.title">메인 메뉴</span>
         <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario" data-i18n="lobby.spawn">시나리오</button>
         <button id="lobby-tab-settings" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-settings" tabindex="-1" data-i18n="ui.settings.short">설정</button>
+        <button id="lobby-tab-dev" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-dev" tabindex="-1" data-i18n="dev.title" hidden>개발자</button>
       </div>
       <div class="lobby-panels">
         <section id="lobby-panel-scenario" class="lobby-tab-panel" role="tabpanel" aria-labelledby="lobby-tab-scenario" tabindex="0">
@@ -195,7 +196,6 @@
               <button id="lobby-preset-app" class="btn btn-preset"><span>🛬 착륙 접근 (3 NM)</span></button>
               <button id="lobby-preset-cru" class="btn btn-preset"><span>✈️ 순항 비행 (6,000 FT)</span></button>
               <button id="lobby-preset-cliff" class="btn btn-preset btn-cliff"><span>⚡ 내리막 이륙 (Rwy 24)</span></button>
-              <button id="lobby-preset-shadow" class="btn btn-preset"><span data-i18n="shadow.title">☀ 콕핏 그림자 데모</span></button>
               <button id="lobby-preset-demo" class="btn btn-preset"><span>🎬 데모 비행</span></button>
             </div>
           </div>
@@ -219,7 +219,20 @@
           <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
         </section>
         <section id="lobby-panel-settings" class="lobby-tab-panel lobby-settings" role="tabpanel" aria-labelledby="lobby-tab-settings" tabindex="0" hidden>
+          <label class="dev-enable"><input id="dev-enabled" type="checkbox"><span data-i18n="dev.enable">개발자 모드 (이번 세션)</span></label>
           <div class="lobby-buttons" id="lobby-settings"></div>
+        </section>
+        <section id="lobby-panel-dev" class="lobby-tab-panel" role="tabpanel" aria-labelledby="lobby-tab-dev" tabindex="0" hidden>
+          <p id="dev-build" class="dev-build"></p>
+          <label for="dev-scenario" data-i18n="dev.choose">테스트 시나리오</label>
+          <select id="dev-scenario" class="btn"></select>
+          <p id="dev-description" class="dev-description"></p>
+          <div class="lobby-buttons">
+            <button id="dev-run" class="btn" data-i18n="dev.run">실행</button>
+            <button id="dev-restart" class="btn" data-i18n="dev.restart">재실행</button>
+            <button id="dev-stop" class="btn" data-i18n="dev.stop">종료·복구</button>
+          </div>
+          <p id="dev-result" class="dev-description" role="status"></p>
         </section>
       </div>
       <button id="btn-fly" class="btn btn-fly"><span data-i18n="lobby.fly">비행 시작</span></button>
@@ -228,6 +241,14 @@
   </div>
 
   <!-- Pause menu (ESC during flight) -->
+  <aside id="dev-live" class="dev-live" hidden aria-label="Developer scenario">
+    <p id="dev-live-result"></p>
+    <div class="lobby-buttons">
+      <button id="dev-live-pause" class="btn" data-i18n="dev.pause">일시정지 / 재개</button>
+      <button id="dev-live-restart" class="btn" data-i18n="dev.restart">재실행</button>
+      <button id="dev-live-stop" class="btn" data-i18n="dev.stop">종료·복구</button>
+    </div>
+  </aside>
   <div id="pause-menu" class="menu-backdrop flow-overlay" role="dialog" aria-modal="true" aria-labelledby="pause-title">
     <div class="pause-card">
       <h2 id="pause-title"><span data-i18n="pause.title">일시정지</span></h2>
