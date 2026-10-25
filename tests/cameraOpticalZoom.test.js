@@ -70,7 +70,7 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
     assert.equal(cockpit.cam.opticalZoom, 4, 'the cockpit still stops at 4x');
   });
 
-  it('pinch spread magnifies and pinch collapse cancels it in both fixed eye-point views', () => {
+  it('pinch spread magnifies and pinch collapse cancels it in both zoomable views', () => {
     for (const mode of [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.TOWER]) {
       const { cam } = withMode(mode);
       cam.applyPinchZoom(200);
@@ -149,7 +149,7 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
     assert.ok(Math.abs(camera.fov - 60) < 1e-6);
   });
 
-  it('keeps the pilot seated while the cockpit magnifies, swinging the cone up off the glareshield', () => {
+  it('leans the pilot forward and up while magnifying, then returns to the seat', () => {
     const { cam, camera } = withMode(CameraSystem.MODES.COCKPIT);
     const aircraft = aircraftAt(0, 0, 0);
     cam.update(0.1, aircraft, {});
@@ -159,8 +159,9 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
 
     cam.zoomOpticalBy(cam.opticalZoomMax);
     cam.update(0.1, aircraft, {});
-    assert.ok(camera.position.distanceTo(eyeAt1x) < 1e-6,
-      'zoom is optical only: the fuselage leaves the head 0.41 m forward and 0.32 m up before the glass and the roof fairing');
+    assert.ok(camera.position.z < eyeAt1x.z - 0.1, 'lean moves toward the windscreen');
+    assert.ok(camera.position.y > eyeAt1x.y, 'lean raises the eye above the panel');
+    assert.ok(camera.position.distanceTo(eyeAt1x) < 0.25, 'lean stays within the cockpit');
 
     const gazeZoomed = camera.getWorldDirection(new THREE.Vector3());
     const expectedLift = (cam.opticalZoomMax - 1) * cam.cockpitZoomGazeLift;
@@ -170,6 +171,7 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
 
     cam.resetLook();
     cam.update(0.1, aircraft, {});
+    assert.ok(camera.position.distanceTo(eyeAt1x) < 1e-6, 'reset restores the seated eye');
     assert.ok(camera.getWorldDirection(new THREE.Vector3()).angleTo(gazeAt1x) < 1e-6,
       'centering the view aims the pilot ahead again');
 
@@ -182,8 +184,8 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
     assert.ok(aimed.angleTo(camera.getWorldDirection(new THREE.Vector3())) < 1e-6,
       'looking away from the centre suppresses the zoom gaze lift');
 
-    // The lift must fade, not switch: the hard gate snapped the frame by the whole
-    // 0.36 rad lift the moment a drag crossed the look-away edge.
+    // The lift must fade, not switch: the hard gate snapped the frame by the
+    // full gaze lift the moment a drag crossed the look-away edge.
     const elevation = () => Math.asin(camera.getWorldDirection(new THREE.Vector3()).y);
     cam.lookPitch = -0.25;
     cam.lookYaw = 0.375;
@@ -206,6 +208,34 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
     tower.cam.zoomOpticalBy(3);
     tower.cam.update(0.1, aircraft, {});
     assert.ok(tower.camera.position.equals(seated), 'the tower cab never moves');
+  });
+
+  it('keeps lean aircraft-relative across hold, reverse zoom and a banked portrait view', () => {
+    const { cam, camera } = withMode(CameraSystem.MODES.COCKPIT);
+    camera.aspect = 0.6;
+    const aircraft = aircraftAt(30, 100, -70);
+    aircraft.rotation.set(0.2, 1.1, 0.5);
+    aircraft.updateMatrixWorld(true);
+    cam.update(0.1, aircraft, {});
+    const seated = camera.position.clone();
+    cam.applyPinchZoom(150);
+    cam.update(0.1, aircraft, {});
+    const leaned = camera.position.clone();
+    const localDelta = leaned.clone().sub(seated).applyQuaternion(aircraft.quaternion.clone().invert());
+    assert.ok(localDelta.z < 0 && localDelta.y > 0);
+    assert.ok(Math.abs(localDelta.x) < 1e-6, 'no sideways movement');
+    cam.lookYaw = 1;
+    for (let i = 0; i < 30; i++) cam.update(1 / 60, aircraft, {});
+    assert.ok(camera.position.distanceTo(leaned) < 1e-6, 'holding and turning the head do not drift');
+    cam.applyPinchZoom(-150);
+    cam.update(0.1, aircraft, {});
+    assert.ok(camera.position.distanceTo(seated) < 1e-6, 'reverse pinch returns to the seat');
+    cam.photoCockpit = true;
+    cam.update(0.1, aircraft, {});
+    const photoEye = camera.position.clone();
+    cam.zoomOpticalBy(4);
+    cam.update(0.1, aircraft, {});
+    assert.ok(camera.position.distanceTo(photoEye) < 1e-6, 'photo overlay retains its fixed eye');
   });
 
   it('ignores non-finite ratios and no-op ratios without touching the view', () => {
