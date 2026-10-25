@@ -103,3 +103,43 @@ chrome-session --project flight3d node scripts/verify-city-lowpass.mjs
 output directory. The harness owns one tab and compares seeded city placement,
 shader compilation, draw calls and far-LOD triangles across five paired views.
 See [low-pass evidence](../../review-artifacts/city-lowpass/README.md).
+## GLB district pilot (2026-10)
+
+The airport logistics/business cluster now uses 110 fixed lots in an 11 × 10
+street grid centered at (900, 950), with 60 m lot spacing and 12 m roads.
+The east and north clusters retain their existing procedural assets and placement.
+Trees are removed from the district after seeded placement so other clusters keep
+the same random sequence. The northern hillside extension is tracked in
+[issue #207](https://github.com/stlim0727/flight3d/issues/207).
+
+`public/models/city/district-kit.glb` is an original MIT exterior kit (149,668 bytes),
+reproducible with `node scripts/build-city-assets.mjs`. It contains three normalized
+building meshes with window panes, floor bands/balconies, roof equipment and entry
+canopies, baked offline rather than assembled at application startup. It is not a
+third-party photogrammetry asset. Vertex colors and a shared two-pixel emissive
+mask keep each near archetype to one instanced draw. A future artist-authored kit
+can replace these meshes while retaining their names and unit collision envelope.
+
+Near GLB geometry replaces only the district's fallback batches after the full
+kit loads. Failure retains the original three archetypes; time-of-day state is
+reapplied after loading. Far boxes and collision metadata exist before loading.
+Nine terrain samples per lot define the building base and foundation depth;
+near foundations and far boxes cover the same conservative collision AABB. Roads
+sample the rendered terrain triangles, not just the finer analytical height
+function, to avoid sinking into the coarse terrain mesh. They are visual overlays;
+the ground-contact surface remains `getHeight`. This pilot has no road traffic,
+sidewalk network or surveyed urban data.
+
+Verification:
+
+```sh
+node --test tests/cityBuildings.test.js tests/foliage.test.js tests/collision.test.js
+npm run dev -- --host 127.0.0.1 --port 5186
+ARTIFACT_DIR=review-artifacts/city-district chrome-session --project flight3d node scripts/verify-city-district.mjs
+```
+
+The browser comparison uses pre-pilot revision `2542473`, actual coastal terrain,
+fixed random seeds, identical low/high and day/night poses, and the shared project
+Chrome daemon. It checks GLB loading, LOD totals, render errors and blocked-asset
+fallback. Results are isolated city rendering, not full-flight FPS. See
+[city district evidence](../../review-artifacts/city-district/README.md).

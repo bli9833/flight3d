@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { FoliageAndCities } from '../src/environment/FoliageAndCities.js';
 import { createTreeGeometry, TREE_SPECIES } from '../src/environment/TreeModels.js';
+import { inDistrict } from '../src/environment/CityDistrict.js';
 import { CollisionDetector } from '../src/physics/CollisionDetector.js';
 
 function random() {
@@ -23,9 +24,10 @@ test('species have distinct silhouettes, opaque materials and cheaper far geomet
 
 test('tree placement, transformed collision envelopes and LOD hold/reverse/teleport', () => {
   const foliage = new FoliageAndCities({ getHeight: () => 12 }, random());
-  assert.equal(foliage.treeData.length, 3500);
+  assert.ok(foliage.treeData.length > 3400 && foliage.treeData.length <= 3500);
+  assert.ok(foliage.treeData.every(tree => !inDistrict(tree.x, tree.z)));
   const total = () => foliage.treeBatches.reduce((n, b) => n + b.meshes[0].count + b.meshes[1].count, 0);
-  assert.equal(total(), 3500);
+  assert.equal(total(), foliage.treeData.length);
   const point = new THREE.Vector3();
   for (let i = 0; i < foliage.treeData.length; i++) {
     const proxy = foliage.treeData[i], tree = foliage.treeInstances[i];
@@ -53,7 +55,7 @@ test('tree placement, transformed collision envelopes and LOD hold/reverse/telep
     [700, false], [660, false], [620, true], [20000, false], [0, true]]) {
     foliage.update(cameraAt(distance));
     assert.equal(tree.near, expected, `distance ${distance}`);
-    assert.equal(total(), 3500);
+    assert.equal(total(), foliage.treeData.length);
     assert.equal(JSON.stringify(foliage.treeData), collisionSnapshot);
     for (let species = 0; species < 3; species++) {
       for (let level = 0; level < 2; level++) {
