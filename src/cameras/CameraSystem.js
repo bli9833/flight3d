@@ -27,6 +27,7 @@ export class CameraSystem {
     // Explicit view choices persist across demo stages, presets and look resets.
     this.userModeSelected = false;
     this.autoSwitchTimer = 0;
+    this.customViewUpdater = null;
 
     // Temporary Cinematic View Cut State (e.g. brief gear cam preview during takeoff, landing, gear transit)
     this.temporaryViewTimer = 0;
@@ -850,11 +851,18 @@ export class CameraSystem {
     return this.getModeName();
   }
 
+  setCustomViewUpdater(fn) {
+    this.customViewUpdater = typeof fn === 'function' ? fn : null;
+  }
+
   setMode(m, isUserAction = false) {
     if ((this.userLookOverridden || this.userModeSelected) && !isUserAction) {
       return false;
     }
-    if (isUserAction) this.userModeSelected = true;
+    if (isUserAction) {
+      this.userModeSelected = true;
+      this.customViewUpdater = null;
+    }
     return this.#applyMode(m);
   }
 
@@ -1066,6 +1074,19 @@ export class CameraSystem {
 
     // Continuous Edge Pan (마우스 드래그 중 화면 끝 도달 시 적당한 속도로 시선 지속 회전)
     this.updateEdgePan(dt);
+
+    if (this.customViewUpdater && !this.userModeSelected && !this.userLookOverridden) {
+      const handled = this.customViewUpdater({
+        dt,
+        camera: this.camera,
+        planePos,
+        planeQuat,
+        aircraftMesh,
+        flightState,
+        queryGroundHeight: this.queryGroundHeight
+      });
+      if (handled) return;
+    }
 
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: {
