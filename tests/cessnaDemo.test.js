@@ -31,7 +31,8 @@ function simulator(airport = 'coastal') {
 describe('aircraft-specific demos', () => {
   it('offers only supported routes, retaining Boeing classic and resolving stale selections', () => {
     assert.deepEqual(demoProfiles('B738').map(p => p.id), ['classic']);
-    assert.deepEqual(demoProfiles('C172').map(p => p.id), ['scenic', 'maneuvers']);
+    assert.deepEqual(demoProfiles('C172').map(p => p.id), ['proximity', 'scenic', 'maneuvers']);
+    assert.deepEqual(demoProfiles('C172', 'lukla').map(p => p.id), ['scenic', 'maneuvers']);
     assert.equal(resolveDemoProfile('C172', 'lukla', 'classic').id, 'scenic');
     assert.equal(resolveDemoProfile('B738', 'coastal', 'maneuvers').id, 'classic');
     assert.equal(demoProfiles('C172', 'lukla')[0].labelKey, 'demo.c172.canyon');

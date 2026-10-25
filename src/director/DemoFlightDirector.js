@@ -2,6 +2,7 @@ import { t, bindText } from '../i18n/index.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { LuklaCircuitScenario } from './scenarios/LuklaCircuitScenario.js';
 import { CessnaDemoScenario } from './scenarios/CessnaDemoScenario.js';
+import { CessnaProximityScenario } from './scenarios/CessnaProximityScenario.js';
 import { resolveDemoProfile } from './demoProfiles.js';
 import { CoastalDemoScenario } from './scenarios/CoastalDemoScenario.js';
 
@@ -47,6 +48,7 @@ export class DemoFlightDirector {
     this.luklaScenario = new LuklaCircuitScenario(this, simulator);
     this.coastalScenario = new CoastalDemoScenario(this, simulator);
     this.cessnaScenario = new CessnaDemoScenario(this, simulator);
+    this.cessnaProximityScenario = new CessnaProximityScenario(this, simulator);
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
     this.profile = 'classic';
 
@@ -75,7 +77,9 @@ export class DemoFlightDirector {
   }
 
   getActiveScenario() {
-    if (this.activeDemoAircraft === 'C172') return this.cessnaScenario;
+    if (this.activeDemoAircraft === 'C172') {
+      return this.profile === 'proximity' ? this.cessnaProximityScenario : this.cessnaScenario;
+    }
     return this.activeDemoAirport === 'lukla' ? this.luklaScenario : this.coastalScenario;
   }
 
@@ -226,7 +230,11 @@ export class DemoFlightDirector {
     }
 
     if (this.activeDemoAircraft === 'C172') {
-      this.setStage(CessnaDemoScenario.STAGES.ESTABLISH);
+      if (this.profile === 'proximity') {
+        this.setStage(CessnaProximityScenario.STAGES.SHIP_BUZZ);
+      } else {
+        this.setStage(CessnaDemoScenario.STAGES.ESTABLISH);
+      }
     } else if (this.activeDemoAirport === 'lukla') {
       this.setStage(DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
     } else {
@@ -332,8 +340,8 @@ export class DemoFlightDirector {
 
   setTimeOfDay(hours) {
     if (!this.userTimeOfDayOverridden) {
-      this.sim.sky.setTimeOfDay(hours);
-      this.sim.foliage?.setTimeOfDay(hours);
+      this.sim.sky?.setTimeOfDay?.(hours);
+      this.sim.foliage?.setTimeOfDay?.(hours);
     }
   }
 
