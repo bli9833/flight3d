@@ -57,6 +57,13 @@ export class CameraSystem {
     this.chaseTarget = new THREE.Vector3();
     this.chaseTargetInitialized = false;
 
+    // Speed Sensation & Physical Dynamics (Continuous physics state based)
+    this.speedFov = 0; // Dynamic FOV expansion in degrees from airspeed / dynamic pressure
+    this.chaseSpeedLag = 0; // Inertial chase distance lag in meters
+    this.speedSensationTime = 0; // Deterministic simulation time accumulator for physical vibrations
+    this.vibrationOffset = new THREE.Vector3(); // High-frequency runway roll & aerodynamic jitter (head views)
+    this.chaseVibration = new THREE.Vector3(); // High-frequency subtle exterior look-target vibration
+
     // Wing View Parameters
     this.wingLookYaw = 0;
     this.wingLookPitch = 0;
@@ -487,7 +494,8 @@ export class CameraSystem {
    * doubles the apparent size of the subject.
    */
   applyBaseFov(baseFovDeg) {
-    const halfTan = Math.tan((baseFovDeg * Math.PI) / 360) / this.opticalZoom;
+    const effectiveBase = baseFovDeg + (this.speedFov || 0);
+    const halfTan = Math.tan((effectiveBase * Math.PI) / 360) / this.opticalZoom;
     const zoomedFov = (Math.atan(halfTan) * 360) / Math.PI;
     if (!this.camera) return zoomedFov;
     if (Math.abs(this.camera.fov - zoomedFov) > 0.05) {
@@ -618,6 +626,11 @@ export class CameraSystem {
     this.chasePitch = 0;
     this.chaseDistance = this.aircraftChaseDistance ?? 55.0;
     this.chaseHeight = this.aircraftChaseHeight ?? 10.5;
+    this.speedFov = 0;
+    this.chaseSpeedLag = 0;
+    this.speedSensationTime = 0;
+    this.vibrationOffset.set(0, 0, 0);
+    this.chaseVibration.set(0, 0, 0);
     this.wingLookYaw = 0;
     this.wingLookPitch = 0;
     this.gearLookYaw = 0;
@@ -907,7 +920,85 @@ export class CameraSystem {
     }
   }
 
+  /**
+   * Continuous physical speed sensation:
+   * 1. Dynamic FOV expansion (optical flow peripheral expansion proportional to IAS / dynamic pressure)
+   * 2. Chase camera dynamic inertial lag and distance breathing
+   * 3. High-frequency physical vibrations (runway roll rumble & aerodynamic transonic / spoiler buffet)
+   */
+  updateSpeedSensation(dt, flightState) {
+    if (!flightState) {
+      this.speedFov = 0;
+      this.chaseSpeedLag = 0;
+      this.vibrationOffset.set(0, 0, 0);
+      this.chaseVibration.set(0, 0, 0);
+      return;
+    }
+
+    const safeDt = Math.max(0.001, Math.min(0.1, dt || 0.016));
+    const ias = flightState.iasKnots || 0;
+    const gs = flightState.groundSpeedKnots || (flightState.groundSpeed ? flightState.groundSpeed * 1.94384 : 0);
+    const onGround = !!flightState.onGround;
+
+    // 1. Dynamic Speed FOV Scaling (Physical expansion of optical flow)
+    // Normalized against typical airliner max cruise / operating limit (~340-360 KT)
+    const speedRatio = Math.max(0, Math.min(1.0, ias / 360.0));
+    let targetFovExpansion = 0;
+    if (this.mode === CameraSystem.MODES.CHASE) {
+      targetFovExpansion = speedRatio * 6.5; // up to +6.5° expansion at high speed
+    } else if (this.mode === CameraSystem.MODES.COCKPIT) {
+      targetFovExpansion = speedRatio * 3.5; // subtle +3.5° in cockpit to preserve panel readability
+    } else if (this.mode === CameraSystem.MODES.WING) {
+      targetFovExpansion = speedRatio * 4.0;
+    }
+
+    // Optical magnification suppresses speed FOV proportionally
+    if (this.opticalZoom > 1.0) {
+      targetFovExpansion /= this.opticalZoom;
+    }
+
+    // Smooth exponential relaxation (continuous physical transition without sudden pops)
+    this.speedFov += (targetFovExpansion - this.speedFov) * (1.0 - Math.exp(-safeDt * 3.0));
+
+    // 2. Chase Camera Dynamic Inertial Lag & Breathing Distance
+    // High-speed air resistance causes the camera to drift slightly back (+0m to +5.5m)
+    const targetChaseLag = (this.mode === CameraSystem.MODES.CHASE) ? (speedRatio * 5.5) : 0;
+    this.chaseSpeedLag += (targetChaseLag - this.chaseSpeedLag) * (1.0 - Math.exp(-safeDt * 2.5));
+
+    // 3. Physical Micro-Vibrations (Deterministic time accumulation)
+    this.speedSensationTime += safeDt;
+    const now = this.speedSensationTime;
+    let vibeX = 0, vibeY = 0, vibeZ = 0;
+    let chaseVibeY = 0;
+
+    if (onGround && gs > 12.0) {
+      // Runway pavement expansion joints and surface micro-texture rumble (12 KT up to takeoff speed ~150 KT)
+      const rollIntensity = Math.min(1.0, Math.max(0, (gs - 12.0) / 120.0));
+      const r1 = Math.sin(now * 165.0) * Math.cos(now * 255.0);
+      const r2 = Math.cos(now * 185.0) * Math.sin(now * 295.0);
+      vibeY = r1 * 0.0035 * rollIntensity; // up to ~3.5mm vertical pavement jolt
+      vibeX = r2 * 0.0020 * rollIntensity;
+      chaseVibeY = r1 * 0.035 * rollIntensity; // subtle ~3.5cm exterior camera roll tremor
+    } else if (!onGround) {
+      // Aerodynamic airframe boundary jitter (> 220 KT) + spoiler turbulence buffet
+      const highSpeedBuffet = Math.max(0, Math.min(1.0, (ias - 220.0) / 120.0));
+      const spoilerBuffet = (flightState.spoilers || 0) * Math.min(1.0, ias / 150.0);
+      const aeroIntensity = highSpeedBuffet * 0.65 + spoilerBuffet * 0.75;
+      if (aeroIntensity > 0.005) {
+        const a1 = (Math.sin(now * 115.0) + Math.cos(now * 195.0)) * 0.5;
+        const a2 = (Math.cos(now * 135.0) + Math.sin(now * 220.0)) * 0.5;
+        vibeY = a1 * 0.0025 * aeroIntensity;
+        vibeX = a2 * 0.0016 * aeroIntensity;
+        chaseVibeY = a1 * 0.025 * aeroIntensity;
+      }
+    }
+
+    this.vibrationOffset.set(vibeX, vibeY, vibeZ);
+    this.chaseVibration.set(0, chaseVibeY, 0);
+  }
+
   update(dt, aircraftMesh, flightState = {}, getTerrainHeight = null) {
+    this.updateSpeedSensation(dt, flightState);
     if (getTerrainHeight) {
       this.setTerrain(getTerrainHeight);
     }
@@ -1013,8 +1104,8 @@ export class CameraSystem {
           const lean = (1 - 1 / this.opticalZoom) / (1 - 1 / this.opticalZoomMax);
           eyeLocal.addScaledVector(this.cockpitZoomLean, lean);
         }
-        eyeLocal.y += this.headGForceOffset.y + buffetY + this.touchJoltOffset;
-        eyeLocal.x += buffetX;
+        eyeLocal.y += this.headGForceOffset.y + buffetY + this.touchJoltOffset + this.vibrationOffset.y;
+        eyeLocal.x += buffetX + this.vibrationOffset.x;
 
         // Transform eye point to world space
         const eyeWorld = eyeLocal.applyMatrix4(aircraftMesh.matrixWorld);
@@ -1053,7 +1144,8 @@ export class CameraSystem {
         const totalYaw = this.chaseYaw + cursorChaseYaw;
         const totalPitch = Math.max(-1.1, Math.min(0.28, this.chasePitch + cursorChasePitch));
 
-        const behindLocal = new THREE.Vector3(0, this.chaseHeight, this.chaseDistance);
+        const effectiveChaseDist = this.chaseDistance + this.chaseSpeedLag;
+        const behindLocal = new THREE.Vector3(0, this.chaseHeight, effectiveChaseDist);
         behindLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), totalPitch);
         behindLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), totalYaw);
 
@@ -1072,7 +1164,11 @@ export class CameraSystem {
           this.queryGroundHeight(this.chasePos.x, this.chasePos.z) + 1.8);
         this.camera.position.copy(this.chasePos);
 
-        const lookTarget = planePos.clone().add(new THREE.Vector3(0, 1.5, 0));
+        const lookTarget = planePos.clone().add(new THREE.Vector3(
+          this.chaseVibration.x,
+          1.5 + this.chaseVibration.y,
+          this.chaseVibration.z
+        ));
         this.camera.up.set(0, 1, 0);
         this.camera.lookAt(lookTarget);
         break;
@@ -1081,6 +1177,8 @@ export class CameraSystem {
       case CameraSystem.MODES.WING: {
         // Passenger Window View (Overlooking Left Wing & Engine)
         const windowLocal = new THREE.Vector3(-1.82, 0.45, 2.2);
+        windowLocal.y += this.vibrationOffset.y * 0.75;
+        windowLocal.x += this.vibrationOffset.x * 0.75;
         const eyeWorld = windowLocal.applyMatrix4(aircraftMesh.matrixWorld);
         this.camera.position.copy(eyeWorld);
 
@@ -1220,6 +1318,10 @@ export class CameraSystem {
       case CameraSystem.MODES.GEAR: {
         // Fuselage Lower Oblique Belly Cam looking at Landing Gear & Runway
         const eyeLocal = this.gearCamOffset.clone();
+        if (Math.abs(this.vibrationOffset.y) > 0.0001) {
+          eyeLocal.y += this.vibrationOffset.y * 1.2;
+          eyeLocal.x += this.vibrationOffset.x * 1.2;
+        }
         const eyeWorld = eyeLocal.applyMatrix4(aircraftMesh.matrixWorld);
 
         const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
