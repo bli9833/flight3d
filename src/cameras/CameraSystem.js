@@ -108,6 +108,12 @@ export class CameraSystem {
     // the pointer several times over.
     this.gazeSensitivity = 0.0011;
 
+    // Look gain for mobile / touch drag gestures in head views (cockpit, wing, gear).
+    // Touch swipes on mobile displays have much shorter physical travel (small screens,
+    // thumb arcs) than desktop mouse drags. Using 0.0035 rad/px provides a natural ~24°
+    // sweep for a 120 px finger swipe without requiring multiple full-screen swipes.
+    this.touchGazeSensitivity = 0.0035;
+
     // Mouse drag & pointer look state
     this.isDragging = false;
     this.pointerLocked = false;
@@ -231,8 +237,8 @@ export class CameraSystem {
           this.prevMouse.x = e.clientX;
           this.prevMouse.y = e.clientY;
 
-          if (this.pointerLocked) this.applyMouseDelta(dx, dy);
-          else this.applyDragDelta(dx, dy);
+          if (this.pointerLocked) this.applyMouseDelta(dx, dy, false);
+          else this.applyDragDelta(dx, dy, false);
         } else {
           this.prevMouse.x = e.clientX;
           this.prevMouse.y = e.clientY;
@@ -382,7 +388,7 @@ export class CameraSystem {
         this.prevMouse.x = touch.clientX;
         this.prevMouse.y = touch.clientY;
 
-        this.applyDragDelta(dx, dy);
+        this.applyDragDelta(dx, dy, true);
         this.setCursorPosition(touch.clientX, touch.clientY);
 
         if (typeof e.preventDefault === 'function' && e.cancelable) {
@@ -495,22 +501,27 @@ export class CameraSystem {
 
   // Grab the scenery: mouse and touch move it with the gesture. Pointer lock
   // retains directional head movement through applyMouseDelta.
-  applyDragDelta(dx, dy) {
+  applyDragDelta(dx, dy, isTouch = (this.activeTouchId !== null)) {
     // Gear yaw offsets the look target along +X, unlike the head/orbit yaw
     // rotations. Its original horizontal mapping already grabs the scenery.
     const lookDx = this.mode === CameraSystem.MODES.GEAR ? dx : -dx;
-    this.applyMouseDelta(lookDx, -dy);
+    this.applyMouseDelta(lookDx, -dy, isTouch);
   }
 
-  applyMouseDelta(dx, dy) {
+  applyTouchDragDelta(dx, dy) {
+    this.applyDragDelta(dx, dy, true);
+  }
+
+  applyMouseDelta(dx, dy, isTouch = (this.activeTouchId !== null)) {
     if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
       this.userLookOverridden = true;
       this.cancelTemporaryView();
     }
+    const sensitivity = isTouch ? this.touchGazeSensitivity : this.gazeSensitivity;
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: {
-        this.lookYaw -= dx * this.gazeSensitivity;
-        this.lookPitch -= dy * this.gazeSensitivity;
+        this.lookYaw -= dx * sensitivity;
+        this.lookPitch -= dy * sensitivity;
         this.lookPitch = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, this.lookPitch));
         break;
       }
@@ -525,8 +536,8 @@ export class CameraSystem {
         break;
       }
       case CameraSystem.MODES.WING: {
-        this.wingLookYaw -= dx * this.gazeSensitivity;
-        this.wingLookPitch -= dy * this.gazeSensitivity;
+        this.wingLookYaw -= dx * sensitivity;
+        this.wingLookPitch -= dy * sensitivity;
         this.wingLookPitch = Math.max(-Math.PI * 0.35, Math.min(Math.PI * 0.35, this.wingLookPitch));
         this.wingLookYaw = Math.max(-Math.PI * 0.55, Math.min(Math.PI * 0.55, this.wingLookYaw));
         break;
@@ -537,8 +548,8 @@ export class CameraSystem {
         break;
       }
       case CameraSystem.MODES.GEAR: {
-        this.gearLookYaw -= dx * this.gazeSensitivity;
-        this.gearLookPitch -= dy * this.gazeSensitivity;
+        this.gearLookYaw -= dx * sensitivity;
+        this.gearLookPitch -= dy * sensitivity;
         this.gearLookPitch = Math.max(-0.6, Math.min(0.6, this.gearLookPitch));
         this.gearLookYaw = Math.max(-0.8, Math.min(0.8, this.gearLookYaw));
         break;
