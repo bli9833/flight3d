@@ -3,7 +3,7 @@
     "denied": true,
     "enabled": true,
     "panel": true,
-    "build": "v1.0.0 · 631742732396 · 2026-10-25T06:55:36.830Z",
+    "build": "v1.0.0 · f88d475f376b · 2026-10-25T11:32:06.294Z",
     "noPublicShadow": true
   },
   "results": {
@@ -405,7 +405,7 @@
         "bodyDamage": true,
         "crashed": true,
         "stopped": false,
-        "speed": 16.382209064784746
+        "speed": 19.661042743757765
       },
       "crashType": "TERRAIN",
       "gearDamage": {
@@ -414,7 +414,7 @@
         "mainRight": "collapsed"
       },
       "bodyDamage": {
-        "engineL": 1,
+        "engineL": 0,
         "engineR": 1,
         "belly": 1,
         "nose": 1,
@@ -428,16 +428,16 @@
       "status": "passed",
       "reason": "dev.reason.expectedCrash",
       "detail": "",
-      "elapsed": 0.15833333333333333,
+      "elapsed": 0.11666666666666665,
       "observation": {
-        "samples": 19,
+        "samples": 14,
         "damaged": false,
         "collapsed": 0,
         "bodyContact": false,
         "bodyDamage": false,
         "crashed": true,
         "stopped": false,
-        "speed": 18.73681401418823
+        "speed": 18.740139690613823
       },
       "crashType": "BUILDING",
       "gearDamage": {
@@ -460,16 +460,16 @@
       "status": "passed",
       "reason": "dev.reason.expectedCrash",
       "detail": "",
-      "elapsed": 0.13333333333333333,
+      "elapsed": 0.12499999999999999,
       "observation": {
-        "samples": 16,
+        "samples": 15,
         "damaged": false,
         "collapsed": 0,
         "bodyContact": false,
         "bodyDamage": false,
         "crashed": true,
         "stopped": false,
-        "speed": 13.744533384678537
+        "speed": 13.744702101754307
       },
       "crashType": "TREE",
       "gearDamage": {

@@ -95,8 +95,9 @@ causes failure. Shadow inspection never auto-passes. Existing previous/next/paus
 controls and six-direction sun motion remain available.
 
 No force, moment, coefficient, damage law or certification limit changes here.
-Both animate and stepSimulation surround the existing dt = 1/120 s integration
-with the same runner hooks. Fixtures use m, m/s and rad. World +Y is up; positive
+Both animate and stepSimulation use the shared physicsTiming.stepPhysics helper,
+which surrounds dt = 1/120 s integration with the same runner hooks. Fixtures use
+m, m/s and rad. World +Y is up; positive
 sink sets negative world Y velocity. Body forward is -Z; yaw -pi/2 points along
 world +X. Quaternions/world matrices are synchronized before contact queries.
 RenderPose resets after teleports, preventing interpolation between unrelated
@@ -138,3 +139,5 @@ pause/resume, restart, repair, lighting restoration, mode gating and cancellatio
 Inspect images as well as JSON. This bounded suite does not establish every
 C172/Lukla shadow combination, all input devices, sound or full normal flight.
 The independent shadow harness also enters through the developer tab.
+
+Recorded results and inspected screenshots: [issue-172 evidence](../../review-artifacts/issue-172/README.md).
