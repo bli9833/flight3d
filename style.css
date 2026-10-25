@@ -2164,7 +2164,21 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 /* Panel content scrolls vertically; the tabs and flight action stay in place. */
 .lobby-card, .lobby-card button, .lobby-card select { touch-action: pan-y; }
 #lobby-time-select { width: 100%; font-variant-numeric: tabular-nums; color-scheme: dark; }
-.lobby-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: rgba(0, 0, 0, .2); border-radius: 10px; }
+.lobby-tabs { display: flex; gap: 4px; padding: 4px; background: rgba(0, 0, 0, .2); border-radius: 10px; }
+.lobby-tabs > .lobby-tab { flex: 1; }
+.lobby-tabs > [hidden] { display: none; }
+#btn-fly[hidden] { display: none; }
+.dev-enable { display: flex; gap: 12px; align-items: center; min-height: 44px; color: #bbf7d0; }
+.dev-build { overflow-wrap: anywhere; color: #94a3b8; font-size: 12px; }
+.dev-description, #dev-live-result { white-space: pre-line; line-height: 1.5; font-size: 13px; }
+.dev-live { position: fixed; right: 12px; top: 110px; z-index: 80; width: min(360px, calc(100vw - 24px)); padding: 14px; box-sizing: border-box; color: #e2e8f0; background: rgba(10, 24, 35, .94); border: 1px solid #4ade80; border-radius: 12px; }
+.dev-live[hidden], body[data-flow="paused"] .dev-live { display: none; }
+.dev-live .btn { min-height: 44px; }
+body[data-dev-scenario="true"] #ap-bar,
+body[data-dev-scenario="true"] #touch-controls-overlay { display: none !important; }
+@media (max-width: 600px) {
+  .dev-live { top: auto; bottom: 12px; max-height: 35dvh; overflow: auto; }
+}
 .lobby-card .lobby-tab { min-height: 44px; font-size: 12px; border-color: transparent; background: transparent; color: #94a3b8; }
 .lobby-card .lobby-tab[aria-selected="true"] { background: #263c51; color: #e0f2fe; border-color: rgba(125, 211, 252, .25); }
 .lobby-panels { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }

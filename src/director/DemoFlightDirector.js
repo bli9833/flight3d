@@ -162,6 +162,7 @@ export class DemoFlightDirector {
   }
 
   start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
+    this.sim.devRunner?.stop();
     if (this.isActive) this.stop();
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
 

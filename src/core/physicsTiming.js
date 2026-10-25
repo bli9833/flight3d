@@ -5,11 +5,14 @@ export function clampFrameDelta(delta) {
 }
 
 export function stepPhysics(simulation) {
+  if (simulation.devRunner?.blocksPhysics) return;
   if (simulation.demoDirector?.isActive) {
     simulation.demoDirector.update(simulation.physicsDt);
   }
   simulation.renderPose.reset(simulation.position, simulation.quaternion);
+  simulation.devRunner?.beforePhysics();
   simulation.integratePhysics(simulation.physicsDt);
+  simulation.devRunner?.afterPhysics(simulation.physicsDt);
 }
 
 export function advancePhysicsFrame(simulation, delta) {
@@ -17,5 +20,6 @@ export function advancePhysicsFrame(simulation, delta) {
   while (simulation.physicsAccumulator >= simulation.physicsDt) {
     stepPhysics(simulation);
     simulation.physicsAccumulator -= simulation.physicsDt;
+    if (simulation.devRunner?.blocksPhysics) { simulation.physicsAccumulator = 0; break; }
   }
 }

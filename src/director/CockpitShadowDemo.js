@@ -32,6 +32,9 @@ export class CockpitShadowDemo {
   }
 
   start() {
+    // Runtime entry points share the same developer-mode gate, including console calls.
+    if (this.sim.developerMode && !this.sim.developerMode.enabled) return false;
+    if (this.sim.devRunner && !this.sim.devRunner.changingState) return this.sim.devRunner.start('shadow');
     this.stop();
     const sim = this.sim;
     this.saved = { cloud: sim.sky.cloudCover, time: sim.sky.timeOfDay,

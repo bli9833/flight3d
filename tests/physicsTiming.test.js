@@ -75,3 +75,21 @@ test('discarding accumulator and render history prevents stale reset motion', ()
   assert.equal(simulation.ticks, 1);
   assert.deepEqual(mesh.position.toArray(), [100, 200, 300]);
 });
+
+test('developer hooks share the fixed-step path and completion discards queued steps', () => {
+  const simulation = createSimulation(), calls = [];
+  simulation.devRunner = {
+    blocksPhysics: false,
+    beforePhysics() { calls.push(['before', simulation.ticks]); },
+    afterPhysics(dt) {
+      calls.push(['after', simulation.ticks, dt]);
+      if (simulation.ticks === 2) this.blocksPhysics = true;
+    },
+  };
+  advancePhysicsFrame(simulation, .1);
+  assert.equal(simulation.ticks, 2);
+  assert.equal(simulation.physicsAccumulator, 0);
+  assert.deepEqual(calls, [['before', 0], ['after', 1, 1 / 120], ['before', 1], ['after', 2, 1 / 120]]);
+  stepPhysics(simulation);
+  assert.equal(simulation.ticks, 2);
+});

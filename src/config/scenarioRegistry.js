@@ -5,6 +5,8 @@
  * Simulator.setPreset/setAirport) derive availability from this table instead
  * of duplicating airport conditionals.
  */
+export { DEV_SCENARIOS } from '../dev/scenarios/index.js';
+
 export const SPAWN_SCENARIOS = {
   runway: {
     airports: ['coastal', 'lukla'],
@@ -29,12 +31,6 @@ export const SPAWN_SCENARIOS = {
     labelKeys: { lukla: 'downhill.takeoff.rwy.24' },
     briefingKey: 'lobby.briefing.scenario.cliff',
     lobbyButtonId: 'lobby-preset-cliff',
-  },
-  shadow: {
-    airports: ['coastal', 'lukla'],
-    labelKeys: { coastal: 'shadow.title', lukla: 'shadow.title' },
-    briefingKey: 'shadow.briefing',
-    lobbyButtonId: 'lobby-preset-shadow',
   },
   demo: {
     airports: ['coastal', 'lukla'],

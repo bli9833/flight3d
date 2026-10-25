@@ -44,6 +44,9 @@ import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
 import { initFlightPanels, updateControlState, touchLabel } from './ui/FlightPanels.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
 import { initLobbyScreen } from './ui/LobbyScreen.js';
+import { DeveloperModeController } from './dev/DeveloperModeController.js';
+import { DevScenarioRunner } from './dev/DevScenarioRunner.js';
+import { DeveloperPanel } from './ui/DeveloperPanel.js';
 import {
   DEFAULT_SCENARIO,
   isScenarioAvailable,
@@ -189,6 +192,8 @@ class FlightSimulator {
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
     this.shadowDemo = new CockpitShadowDemo(this, () => this.updateShadowDemoUi());
+    this.developerMode = new DeveloperModeController(() => this.devRunner?.stop());
+    this.devRunner = new DevScenarioRunner(this, this.developerMode);
 
     // Game flow: lobby (cinematic menu) / flight / paused
     this.gameFlow = new GameFlowController({
@@ -338,24 +343,29 @@ class FlightSimulator {
     };
 
     this.controls.onToggleGear = () => {
+      if (this.devRunner?.active) return;
       this.gear.toggleGear();
     };
 
     this.controls.onToggleSpoilers = () => {
+      if (this.devRunner?.active) return;
       this.aero.toggleSpoilers();
     };
 
     this.controls.onCycleFlaps = (inc) => {
+      if (this.devRunner?.active) return;
       this.aero.cycleFlaps(inc);
       this.telemetry.flapIndex = this.aero.flapsIndex;
       this.telemetry.flapDegree = this.aero.currentFlapAngle;
     };
 
     this.controls.onToggleReverser = () => {
+      if (this.devRunner?.active) return;
       this.engines.toggleReverser(this.telemetry.onGround);
     };
 
     this.controls.onCycleEngineFailure = () => {
+      if (this.devRunner?.active) return;
       if (this.engines.numEngines === 1) {
         const isFailed = !this.engines.failed[0];
         this.engines.setEngineFailure(0, isFailed);
@@ -423,7 +433,8 @@ class FlightSimulator {
   syncFlowUi() {
     const state = this.gameFlow.state;
     document.body.dataset.flow = state;
-    this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active;
+    document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
+    this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active);
     if (state !== FLOW.FLIGHT) {
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0.0, 0.0);
@@ -443,6 +454,7 @@ class FlightSimulator {
 
   /** Leave the lobby: stop the cinematic and spawn the player at their choice. */
   fly() {
+    this.devRunner.stop();
     this.shadowDemo.stop();
     const wantsDemo = this.lobby.preset === 'demo';
     if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
@@ -507,6 +519,7 @@ class FlightSimulator {
   setAircraft(aircraftId = 'B738') {
     const config = AIRCRAFT_REGISTRY[aircraftId];
     if (!config) return;
+    this.devRunner?.stop();
 
     if (this.demoDirector && this.demoDirector.isActive && aircraftId !== this.currentAircraftId) {
       this.demoDirector.stop(() => t('manual.control.engaged'));
@@ -553,13 +566,13 @@ class FlightSimulator {
   }
 
   setPreset(type, isDemoInternal = false) {
+    if (type === 'shadow' && !this.devRunner?.changingState) {
+      return this.devRunner?.start('shadow') ?? false;
+    }
+    this.devRunner?.stop();
     // Scenario availability depends on the active airport; an unavailable
     // pick (e.g. cliff at coastal) falls back instead of leaving a stale pose.
     if (!isScenarioAvailable(this.activeAirport, type)) type = DEFAULT_SCENARIO;
-    if (type === 'shadow') {
-      this.shadowDemo.start();
-      return;
-    }
     this.shadowDemo?.stop();
     this.lastPresetType = type;
     if (!isDemoInternal) this.loadAircraftConfig(this.currentAircraftConfig || BOEING_737_800);
@@ -816,6 +829,7 @@ class FlightSimulator {
    * Switch Active Airport Environment (Coastal International vs Nepal Lukla)
    */
   setAirport(id) {
+    this.devRunner?.stop();
     if (this.activeAirport === id) return;
     this.activeAirport = id;
     const isLukla = id === 'lukla';
@@ -1302,12 +1316,18 @@ class FlightSimulator {
   }
 
   resetCrash() {
+    if (this.devRunner.active) { this.devRunner.restart(); return; }
     this.clearCrashState();
     this.setPreset('runway');
     this.showToast(() => t('aircraft.repaired.restarted.on.runway.09l'));
   }
 
   exitCrashToLobby() {
+    if (this.devRunner.active) {
+      this.devRunner.stop();
+      this.gameFlow.returnToLobby(true);
+      return;
+    }
     if (!this.isCrashed) return;
     this.clearCrashState();
     this.gameFlow.returnToLobby();
@@ -1354,9 +1374,12 @@ class FlightSimulator {
    * @returns {object} updated telemetry state
    */
   stepSimulation(simSeconds) {
+    if (this.devRunner.active && this.gameFlow.isPhysicsFrozen()) return this.telemetry;
+    this.devRunner.updatePreparation(0);
     if (this.shadowDemo.active) this.shadowDemo.update(simSeconds);
     const numSubsteps = Math.max(1, Math.round(simSeconds * this.physicsHz));
     for (let i = 0; i < numSubsteps; i++) {
+      if (this.devRunner.blocksPhysics) break;
       stepPhysics(this);
       this.totalSimTime += this.physicsDt;
     }
@@ -1424,12 +1447,15 @@ class FlightSimulator {
 
     const frameDelta = clampFrameDelta(this.clock.getDelta());
     this.totalSimTime += frameDelta;
+    if (!this.gameFlow.isPhysicsFrozen()) this.devRunner.updatePreparation(frameDelta);
+    this.devPanelTimer = (this.devPanelTimer || 0) + frameDelta;
+    if (this.devPanelTimer >= .2) { this.developerPanel?.refresh(); this.devPanelTimer = 0; }
 
     // High-rate substepping for rock-solid flight physics
     if (this.shadowDemo.active) {
       this.physicsAccumulator = 0;
       if (!this.gameFlow.isPhysicsFrozen()) this.shadowDemo.update(frameDelta);
-    } else if (this.gameFlow.isPhysicsFrozen()) {
+    } else if (this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics) {
       this.physicsAccumulator = 0;
     } else {
       advancePhysicsFrame(this, frameDelta);
@@ -1812,9 +1838,11 @@ class FlightSimulator {
       },
       onFly: () => this.fly(),
     });
+    this.developerPanel = new DeveloperPanel(this);
     document.getElementById('btn-pause-resume')?.addEventListener('click', () => this.gameFlow.resume());
     document.getElementById('btn-pause-restart')?.addEventListener('click', () => {
       this.gameFlow.resume();
+      if (this.devRunner.active) { this.devRunner.restart(); return; }
       this.setPreset(this.lastPresetType || 'runway');
     });
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
@@ -1824,6 +1852,7 @@ class FlightSimulator {
     document.getElementById('shadow-next')?.addEventListener('click', () => this.shadowDemo.next());
     document.getElementById('shadow-pause')?.addEventListener('click', () => this.shadowDemo.togglePause());
     document.getElementById('shadow-exit')?.addEventListener('click', () => {
+      this.devRunner.stop();
       this.shadowDemo.stop();
       this.lastPresetType = 'runway';
       this.gameFlow.returnToLobby(true);
