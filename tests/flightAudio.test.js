@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { CESSNA_172, BOEING_737_800 } from '../src/config/aircraftConfigs.js';
 import { FlightAudio } from '../src/audio/FlightAudio.js';
 
 /**
@@ -44,6 +45,7 @@ function createMockAudioContext() {
   }
 
   class MockOscillatorNode extends MockNode {
+    setPeriodicWave(wave) { this.wave = wave; }
     constructor() {
       super();
       this.type = 'sine';
@@ -72,6 +74,7 @@ function createMockAudioContext() {
     }
     createGain() { return new MockGainNode(); }
     createBiquadFilter() { return new MockBiquadFilterNode(); }
+    createPeriodicWave(real, imaginary) { return { real, imaginary }; }
     createOscillator() { return new MockOscillatorNode(); }
     createDynamicsCompressor() { return new MockCompressorNode(); }
     createBuffer(channels, size, sampleRate) {
@@ -255,4 +258,110 @@ describe('FlightAudio (Web Audio Engine)', () => {
       }
     }
   });
+});
+
+
+function withPiston(test) {
+  const previous = globalThis.window;
+  let cancellations = 0;
+  globalThis.window = { AudioContext: createMockAudioContext(), speechSynthesis: { cancel() { cancellations++; } } };
+  try {
+    const audio = new FlightAudio(); audio.loadAircraftConfig(CESSNA_172); audio.init();
+    test(audio, () => cancellations);
+  } finally {
+    if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+  }
+}
+const pistonState = (n1, extra = {}) => ({ engine1: { n1, failed: false }, iasKnots: 0, groundSpeedKnots: 0, onGround: true, ...extra });
+
+describe('C172 piston sound and lifecycle', () => {
+  it('never activates the jet oscillators or pack for a piston aircraft, including initialization', () => withPiston(audio => {
+    for (const stage of [null, 25, 70, 100, 25]) {
+      if (stage !== null) audio.update(0.1, pistonState(stage), false);
+      for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'packGain']) assert.equal(audio[name].gain.value, 0, name);
+    }
+    assert.ok(audio.pistonGain.gain.value > 0);
+  }));
+
+  it('follows shaft speed through idle, power up and release at firing/blade-passage frequencies', () => withPiston(audio => {
+    const frequencies = [];
+    for (const n1 of [25, 70, 100, 25]) {
+      audio.update(0.1, pistonState(n1), false);
+      frequencies.push(audio.pistonPulse.frequency.value);
+      assert.equal(audio.pistonPulse.frequency.value, audio.propBeat.frequency.value);
+    }
+    assert.ok(Math.abs(frequencies[0] - 700 / 30) < 1e-8);
+    assert.equal(frequencies[2], 90);
+    assert.ok(frequencies[1] > frequencies[0] && frequencies[1] < frequencies[2]);
+    assert.equal(frequencies[3], frequencies[0]);
+  }));
+
+  it('cuts firing on failure and does not leave a running engine sound when parked', () => withPiston(audio => {
+    audio.update(0.1, pistonState(100), false);
+    audio.update(0.1, pistonState(100, { engine1: { n1: 100, failed: true } }), false);
+    assert.equal(audio.pistonGain.gain.value, 0);
+    assert.equal(audio.propGain.gain.value, 0);
+    assert.equal(audio.propModGain.gain.value, 0);
+    audio.update(0.1, pistonState(9, { engine1: { n1: 9, failed: true }, iasKnots: 90, onGround: false }), false);
+    assert.equal(audio.pistonGain.gain.value, 0);
+    assert.ok(audio.propGain.gain.value > 0, 'quiet windmilling air sound is distinct from firing');
+    audio.update(0.1, pistonState(25), false);
+    assert.ok(audio.pistonGain.gain.value > 0, 'restart restores combustion');
+  }));
+
+  it('switches profiles without another context, removes residual piston tones, and resets callouts', () => withPiston((audio, cancellations) => {
+    const context = audio.ctx, pulse = audio.pistonPulse;
+    audio.update(0.1, pistonState(70), false);
+    audio.calledAltitudes.add(50);
+    audio.loadAircraftConfig(BOEING_737_800);
+    assert.equal(audio.calledAltitudes.size, 0);
+    assert.equal(audio.pistonGain.gain.value, 0);
+    audio.update(0.1, pistonState(80), false);
+    assert.ok(audio.turbineGain.gain.value > 0);
+    audio.loadAircraftConfig(CESSNA_172);
+    audio.init(); audio.update(0.1, pistonState(70), false);
+    assert.equal(audio.ctx, context); assert.equal(audio.pistonPulse, pulse);
+    assert.equal(audio.turbineGain.gain.value, 0);
+    assert.equal(audio.packGain.gain.value, 0);
+    assert.ok(cancellations() > 0);
+  }));
+
+  it('suppresses Boeing altitude callouts and uses a continuous light-aircraft stall horn', () => withPiston(audio => {
+    let calls = 0; audio.playGpwsCallout = () => calls++;
+    audio.update(0.1, pistonState(70, { onGround: false, radioAltFt: 40, vsiFpm: -500, isPreStall: true }), true);
+    assert.equal(calls, 0);
+    assert.equal(audio.warningGain.gain.value, 0.3);
+    audio.update(0.2, pistonState(70, { onGround: false, isPreStall: true }), true);
+    assert.equal(audio.warningGain.gain.value, 0.3);
+    audio.update(0.1, pistonState(70, {isStalled:true}), true);
+    assert.equal(audio.warningGain.gain.value, 0, 'ground horn inhibited');
+  }));
+
+  it('rearms Boeing altitude callouts after climbing and clears them on a preset reset', () => withPiston(audio => {
+    audio.loadAircraftConfig(BOEING_737_800);
+    const calls = []; audio.playGpwsCallout = value => calls.push(value);
+    const update = (height, vsi) => audio.update(0.1, pistonState(70, {onGround:false,radioAltFt:height,vsiFpm:vsi}), false);
+    update(600,-500); update(490,-500);
+    update(1200,700); update(490,-500);
+    assert.deepEqual(calls, ['500','500']);
+    audio.reset(); assert.equal(audio.calledAltitudes.size,0);
+  }));
+
+  it('keeps engine parameters current while muted so unmute does not revive a stale engine', () => withPiston(audio => {
+    audio.update(0.1, pistonState(100), false); audio.setMuted(true);
+    audio.update(0.1, pistonState(9, { engine1: { n1: 9, failed: true } }), false);
+    audio.setMuted(false);
+    assert.equal(audio.masterGain.gain.value, 1);
+    assert.equal(audio.pistonGain.gain.value, 0);
+    assert.equal(audio.propGain.gain.value, 0);
+  }));
+
+  it('does not restart continuous sounds after a crash, including a muted crash and preset reset', () => withPiston(audio => {
+    audio.update(0.1, pistonState(100, { iasKnots: 90 }), false);
+    audio.setMuted(true); audio.playExplosion(); audio.setMuted(false);
+    audio.update(0.1, pistonState(100), false);
+    for (const name of ['pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain']) assert.equal(audio[name].gain.value, 0, name);
+    audio.reset(); audio.update(0.1, pistonState(25), false);
+    assert.ok(audio.pistonGain.gain.value > 0);
+  }));
 });

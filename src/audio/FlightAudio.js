@@ -1,6 +1,7 @@
+import { pistonSoundState } from './pistonSoundState.js';
 import { t } from '../i18n/index.js';
 /**
- * Procedural Web Audio API Sound Engine for Boeing Airliner
+ * Aircraft-specific procedural Web Audio: turbofan or piston/propeller.
  * Synthesizes twin turbofan engines (combustion roar + N1/N2 turbine whine), aerodynamic airflow slipstream,
  * cockpit air conditioning & avionics cooling pack blower, runway rumble, touchdown tire screech & oleo thump,
  * stall horn, and Boeing GPWS voice callouts.
@@ -18,6 +19,47 @@ export class FlightAudio {
     this.lastRadioAlt = 9999;
     this.calledAltitudes = new Set();
     this.stallBeepTime = 0;
+    this.loadAircraftConfig();
+  }
+
+  loadAircraftConfig(config = {}) {
+    const settings = config.audio || {};
+    this.profile = {
+      engineType: settings.engineType || 'jet',
+      idleN1: config.propulsion?.idleN1Percent ?? 22,
+      maxN1: config.propulsion?.togaN1Percent ?? 100,
+      idleRpm: settings.idleRpm ?? 700,
+      maxRpm: settings.maxRpm ?? 2700,
+      cylinders: settings.cylinders ?? 4,
+      propellerBlades: settings.propellerBlades ?? 2,
+    };
+    this.reset();
+    // Do not wait for the next render frame to remove the previous aircraft's
+    // signature. The same audio graph is reused across any number of switches.
+    this.silenceEngines();
+  }
+
+  get isPiston() { return this.profile.engineType === 'piston'; }
+
+  cancelSpeech() {
+    if (typeof window !== 'undefined') window.speechSynthesis?.cancel?.();
+  }
+
+  reset() {
+    this.crashed = false;
+    this.lastRadioAlt = 9999;
+    this.calledAltitudes.clear();
+    this.stallBeepTime = 0;
+    this.cancelSpeech();
+    if (this.packGain) this.packGain.gain.setTargetAtTime(this.isPiston ? 0 : 0.16, this.ctx.currentTime, 0.04);
+    if (this.warningGain) this.warningGain.gain.setValueAtTime(0, this.ctx.currentTime);
+  }
+
+  silenceEngines() {
+    if (!this.ctx) return;
+    for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain']) {
+      this[name]?.gain.setTargetAtTime(0, this.ctx.currentTime, 0.04);
+    }
   }
 
   get effectiveVolume() {
@@ -25,12 +67,12 @@ export class FlightAudio {
     return this.volume;
   }
 
-  init() {
+  init(context = null) {
     if (this.isInitialized) return;
 
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AudioContext();
+      this.ctx = context || new AudioContext();
 
       // Listen for audio route changes (e.g. Bluetooth connection/interruption)
       if (typeof this.ctx.onstatechange !== 'undefined') {
@@ -75,6 +117,7 @@ export class FlightAudio {
 
       // 6. Turbofan Jet Engine Synthesizer (Pink Noise Roar + Twin Spool Whine)
       this.initEngineSynth();
+      this.initPistonSynth();
 
       // 7. Airflow / Wind Slipstream Synthesizer
       this.initWindSynth();
@@ -86,6 +129,10 @@ export class FlightAudio {
       this.initWarningSynth();
 
       this.isInitialized = true;
+      for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain']) {
+        this[name].gain.setValueAtTime(0, this.ctx.currentTime);
+      }
+      this.packGain.gain.setValueAtTime(this.isPiston ? 0 : 0.16, this.ctx.currentTime);
     } catch (e) {
       console.warn('Web Audio initialization error:', e);
     }
@@ -156,6 +203,8 @@ export class FlightAudio {
       }
     }
 
+    this.engineNoiseBuffer = noiseBuffer;
+
     // Engine Roar Source
     this.engineNoise = this.ctx.createBufferSource();
     this.engineNoise.buffer = noiseBuffer;
@@ -199,6 +248,66 @@ export class FlightAudio {
     this.turbineWhine2.connect(this.turbineGain2);
     this.turbineGain2.connect(this.cockpitFilter);
     this.turbineWhine2.start();
+  }
+
+  initPistonSynth() {
+    // A short pressure pulse repeated at the four-stroke firing rate. Harmonics
+    // provide the exhaust's throaty "putter", without N1/N2 whistle oscillators.
+    const real = new Float32Array(33), imaginary = new Float32Array(33);
+    for (let harmonic = 1; harmonic < real.length; harmonic++) {
+      real[harmonic] = 1 / (1 + (harmonic / 5) ** 2);
+      imaginary[harmonic] = -0.35 * real[harmonic];
+    }
+    this.pistonPulse = this.ctx.createOscillator();
+    this.pistonPulse.setPeriodicWave(this.ctx.createPeriodicWave(real, imaginary));
+    this.pistonPulse.frequency.setValueAtTime(24, this.ctx.currentTime);
+    this.pistonFilter = this.ctx.createBiquadFilter();
+    this.pistonFilter.type = 'lowpass';
+    this.pistonFilter.frequency.setValueAtTime(1800, this.ctx.currentTime);
+    this.pistonFilter.Q.setValueAtTime(0.7, this.ctx.currentTime);
+    this.pistonGain = this.ctx.createGain();
+    this.pistonGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    this.pistonPulse.connect(this.pistonFilter);
+    this.pistonFilter.connect(this.pistonGain);
+    this.pistonGain.connect(this.cockpitFilter);
+    this.pistonPulse.start();
+
+    // Propeller air noise is amplitude-modulated by blade passage, not pitched
+    // up into a turbine whine. Reuse the existing noise buffer, without a download.
+    this.propNoise = this.ctx.createBufferSource();
+    this.propNoise.buffer = this.engineNoiseBuffer;
+    this.propNoise.loop = true;
+    this.propFilter = this.ctx.createBiquadFilter();
+    this.propFilter.type = 'bandpass';
+    this.propFilter.frequency.setValueAtTime(550, this.ctx.currentTime);
+    this.propFilter.Q.setValueAtTime(0.6, this.ctx.currentTime);
+    this.propGain = this.ctx.createGain();
+    this.propGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    this.propNoise.connect(this.propFilter);
+    this.propFilter.connect(this.propGain);
+    this.propGain.connect(this.cockpitFilter);
+    this.propBeat = this.ctx.createOscillator();
+    this.propBeat.type = 'sine';
+    this.propBeat.frequency.setValueAtTime(24, this.ctx.currentTime);
+    this.propModGain = this.ctx.createGain();
+    this.propModGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    this.propBeat.connect(this.propModGain);
+    this.propModGain.connect(this.propGain.gain);
+    this.propBeat.start();
+    this.propNoise.start();
+  }
+
+  updatePiston(state, now) {
+    const sound = pistonSoundState(state.engine1, state.iasKnots || 0, this.profile);
+    const rotor = Math.min(1, sound.rpm / this.profile.maxRpm);
+    this.pistonPulse.frequency.setTargetAtTime(Math.max(1, sound.firingHz), now, 0.06);
+    this.pistonFilter.frequency.setTargetAtTime(1100 + sound.power * 1500, now, 0.08);
+    this.pistonGain.gain.setTargetAtTime(sound.combustion * (0.32 + sound.power * 0.40), now, 0.10);
+    this.propBeat.frequency.setTargetAtTime(Math.max(1, sound.bladeHz), now, 0.06);
+    this.propFilter.frequency.setTargetAtTime(350 + rotor * 700, now, 0.10);
+    const air = rotor * (sound.combustion ? 1 : 0.2);
+    this.propGain.gain.setTargetAtTime(air * (0.08 + sound.power * 0.12), now, 0.10);
+    this.propModGain.gain.setTargetAtTime(air * (0.04 + sound.power * 0.06), now, 0.10);
   }
 
   initWindSynth() {
@@ -334,13 +443,13 @@ export class FlightAudio {
   }
 
   playGpwsCallout(text) {
-    if (this.isMuted) return;
+    if (this.isMuted || this.effectiveVolume === 0 || this.isPiston || this.crashed) return;
     if ('speechSynthesis' in window) {
       try {
         const u = new SpeechSynthesisUtterance(text);
         u.rate = 1.15;
         u.pitch = 0.95;
-        u.volume = 1.0;
+        u.volume = this.effectiveVolume;
         window.speechSynthesis.speak(u);
       } catch (e) {}
     }
@@ -351,11 +460,13 @@ export class FlightAudio {
     if (this.volume > 0.0) {
       this.isMuted = false;
     }
+    if (this.volume === 0) this.cancelSpeech();
     this.applyMasterGain();
   }
 
   setMuted(muted) {
     this.isMuted = !!muted;
+    if (this.isMuted) this.cancelSpeech();
     this.applyMasterGain();
   }
 
@@ -371,7 +482,7 @@ export class FlightAudio {
   }
 
   cycleVolume() {
-    this.isMuted = !this.isMuted;
+    this.setMuted(!this.isMuted);
     this.volume = 1.0;
     this.applyMasterGain();
     return this.getVolumeState();
@@ -385,7 +496,7 @@ export class FlightAudio {
   }
 
   update(dt, state, isCockpitCam) {
-    if (!this.isInitialized || !this.ctx || this.isMuted) return;
+    if (!this.isInitialized || !this.ctx || this.crashed) return;
 
     const now = this.ctx.currentTime;
 
@@ -393,29 +504,33 @@ export class FlightAudio {
     const targetCutoff = isCockpitCam ? 2700 : 8800;
     this.cockpitFilter.frequency.setTargetAtTime(targetCutoff, now, 0.1);
 
-    // 1. Turbofan Engines Pitch and Roar based on N1%
-    const n1 = Math.max(20, (state.engine1 ? state.engine1.n1 : 22));
-    const n1Ratio = Math.max(0.0, Math.min(1.0, (n1 - 20) / 80.0)); // 0.0 to 1.0
+    if (this.isPiston) {
+      this.updatePiston(state, now);
+    } else {
+      // 1. Turbofan Engines Pitch and Roar based on N1%
+      const n1 = Math.max(20, (state.engine1 ? state.engine1.n1 : 22));
+      const n1Ratio = Math.max(0.0, Math.min(1.0, (n1 - 20) / 80.0)); // 0.0 to 1.0
 
-    // Cutoff: 280 Hz (idle) to 950 Hz (TOGA) -> directly in mobile & earphone sweet spot!
-    const engineFreq = 280 + n1Ratio * 670;
-    // Volume: 0.38 (idle) to 1.15 (TOGA) -> loud, powerful, audible on all Bluetooth gear
-    const engineVol = 0.38 + Math.pow(n1Ratio, 1.3) * 0.77;
-    this.engineFilter.frequency.setTargetAtTime(engineFreq, now, 0.08);
-    this.engineGain.gain.setTargetAtTime(engineVol, now, 0.08);
+      // Cutoff: 280 Hz (idle) to 950 Hz (TOGA) -> directly in mobile & earphone sweet spot!
+      const engineFreq = 280 + n1Ratio * 670;
+      // Volume: 0.38 (idle) to 1.15 (TOGA) -> loud, powerful, audible on all Bluetooth gear
+      const engineVol = 0.38 + Math.pow(n1Ratio, 1.3) * 0.77;
+      this.engineFilter.frequency.setTargetAtTime(engineFreq, now, 0.08);
+      this.engineGain.gain.setTargetAtTime(engineVol, now, 0.08);
 
-    // Primary N1 Fan Compressor Whine: 420 Hz to 1800 Hz
-    const turbineFreq = 420 + Math.pow(n1Ratio, 1.2) * 1380;
-    const turbineVol = 0.08 + n1Ratio * 0.22;
-    this.turbineWhine.frequency.setTargetAtTime(turbineFreq, now, 0.08);
-    this.turbineGain.gain.setTargetAtTime(turbineVol, now, 0.08);
+      // Primary N1 Fan Compressor Whine: 420 Hz to 1800 Hz
+      const turbineFreq = 420 + Math.pow(n1Ratio, 1.2) * 1380;
+      const turbineVol = 0.08 + n1Ratio * 0.22;
+      this.turbineWhine.frequency.setTargetAtTime(turbineFreq, now, 0.08);
+      this.turbineGain.gain.setTargetAtTime(turbineVol, now, 0.08);
 
-    // Secondary N2 Core Whine & Harmonics: 840 Hz to 3200 Hz
-    if (this.turbineWhine2 && this.turbineGain2) {
-      const turbineFreq2 = 840 + Math.pow(n1Ratio, 1.1) * 2360;
-      const turbineVol2 = 0.04 + n1Ratio * 0.12;
-      this.turbineWhine2.frequency.setTargetAtTime(turbineFreq2, now, 0.08);
-      this.turbineGain2.gain.setTargetAtTime(turbineVol2, now, 0.08);
+      // Secondary N2 Core Whine & Harmonics: 840 Hz to 3200 Hz
+      if (this.turbineWhine2 && this.turbineGain2) {
+        const turbineFreq2 = 840 + Math.pow(n1Ratio, 1.1) * 2360;
+        const turbineVol2 = 0.04 + n1Ratio * 0.12;
+        this.turbineWhine2.frequency.setTargetAtTime(turbineFreq2, now, 0.08);
+        this.turbineGain2.gain.setTargetAtTime(turbineVol2, now, 0.08);
+      }
     }
 
     // 2. Wind Slipstream Noise proportional to IAS
@@ -446,7 +561,10 @@ export class FlightAudio {
     }
 
     // 5. Stall Warning Horn (+ quieter stick-shaker chirp approaching the stall)
-    if (state.isStalled) {
+    if (this.isPiston) {
+      const horn = !state.onGround && (state.isStalled || state.isPreStall);
+      this.warningGain.gain.setValueAtTime(horn ? 0.30 : 0, now);
+    } else if (state.isStalled) {
       this.stallBeepTime += dt;
       // Pulsing tone: 4 beeps per second
       const beepActive = (this.stallBeepTime % 0.25) < 0.14;
@@ -463,7 +581,7 @@ export class FlightAudio {
 
     // 6. Boeing GPWS Altitude Voice Callouts
     const rAlt = state.radioAltFt;
-    if (rAlt !== undefined && !state.onGround && state.vsiFpm < -100) {
+    if (!this.isPiston && rAlt !== undefined && !state.onGround && state.vsiFpm < -100) {
       const callouts = [500, 100, 50, 40, 30, 20, 10];
       for (const call of callouts) {
         if (this.lastRadioAlt > call && rAlt <= call && !this.calledAltitudes.has(call)) {
@@ -472,26 +590,22 @@ export class FlightAudio {
           break;
         }
       }
-      // Reset callout set when climbing back above 1000 ft
-      if (rAlt > 1000) {
-        this.calledAltitudes.clear();
-      }
+
     }
+    if (rAlt > 1000) this.calledAltitudes.clear();
     this.lastRadioAlt = rAlt;
   }
 
   playExplosion(isWater = false) {
+    this.crashed = true;
+    this.cancelSpeech();
+    if (this.ctx) {
+      for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain']) {
+        this[name]?.gain.setValueAtTime(0, this.ctx.currentTime);
+      }
+    }
     if (!this.isInitialized || !this.ctx || this.isMuted) return;
     const now = this.ctx.currentTime;
-
-    // Cut ongoing engine, turbine, wind, rumble & pack sounds
-    if (this.engineGain) this.engineGain.gain.setValueAtTime(0, now);
-    if (this.turbineGain) this.turbineGain.gain.setValueAtTime(0, now);
-    if (this.turbineGain2) this.turbineGain2.gain.setValueAtTime(0, now);
-    if (this.windGain) this.windGain.gain.setValueAtTime(0, now);
-    if (this.rumbleGain) this.rumbleGain.gain.setValueAtTime(0, now);
-    if (this.packGain) this.packGain.gain.setValueAtTime(0, now);
-    if (this.warningGain) this.warningGain.gain.setValueAtTime(0, now);
 
     // 1. Deep Low-Frequency Subwoofer Detonation Thump
     const bufferSize = Math.floor(this.ctx.sampleRate * 3.5);

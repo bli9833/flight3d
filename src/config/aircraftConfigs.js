@@ -16,6 +16,7 @@ import { C172_BODY_SUPPORT_POINTS } from '../physics/groundContacts.js';
  * @property {Object} propulsion - Engine thrust and spool dynamics
  * @property {Object} landingGear - Gear suspension, steering, and braking parameters
  * @property {Object} cockpit - Cockpit geometry, eye offsets, and instrument placements
+ * @property {Object} [audio] - Engine sound profile and synthesized RPM tuning
  */
 
 export const BOEING_737_800 = {
@@ -334,6 +335,16 @@ export const CESSNA_172 = {
     maxFuelFlowKgPerHour: 48.0,
     fuelCapacityKg: 144.0,
     momentArmMeters: 0.0
+  },
+
+  // Synthesized piston/propeller sound tuning. RPM is estimated from the
+  // current normalized engine telemetry, rather than treated as turbine N1.
+  audio: {
+    engineType: 'piston',
+    idleRpm: 700,
+    maxRpm: 2700,
+    cylinders: 4,
+    propellerBlades: 2
   },
 
   // 4. Landing Gear & Ground Interaction (Fixed Tricycle Gear)

@@ -497,6 +497,7 @@ class FlightSimulator {
 
   loadAircraftConfig(config = BOEING_737_800) {
     this.currentAircraftConfig = config;
+    this.audio?.loadAircraftConfig(config);
     if (this.aero?.loadConfig) this.aero.loadConfig(config);
     if (this.engines?.loadConfig) this.engines.loadConfig(config);
     if (this.gear?.loadConfig) this.gear.loadConfig(config);
@@ -562,6 +563,7 @@ class FlightSimulator {
     }
     this.shadowDemo?.stop();
     this.lastPresetType = type;
+    this.audio?.reset();
     if (!isDemoInternal) this.loadAircraftConfig(this.currentAircraftConfig || BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
