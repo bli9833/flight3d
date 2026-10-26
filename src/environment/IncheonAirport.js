@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { IncheonTraffic } from './IncheonTraffic.js';
 import { loadIncheonTerrain } from '../geospatial/IncheonTerrain.js';
 import { IncheonFlightSurface, INCHEON_AIRFIELD } from '../geospatial/IncheonFlightSurface.js';
 import { generatePlanting, pointInRing, segmentDistance } from '../geospatial/incheonDressing.js';
@@ -25,7 +26,7 @@ function ribbon(points,width,dashed=false) {
 
 export async function loadIncheonAirport(base) {
   const json=async file=> {const r=await fetch(base+file);if(!r.ok)throw new Error(`${file}: ${r.status}`);return r.json();};
-  const [source,patch,dressing,mask]=await Promise.all([loadIncheonTerrain(base),json('patch.json'),json('dressing.json'),new THREE.TextureLoader().loadAsync(base+'land-mask.png')]);
+  const [source,patch,dressing,mask,trafficData]=await Promise.all([loadIncheonTerrain(base),json('patch.json'),json('dressing.json'),new THREE.TextureLoader().loadAsync(base+'land-mask.png'),json('traffic.json')]);
   const terrain=new IncheonFlightSurface(source);
   terrain.mesh=new THREE.Group();
   const group=new THREE.Group();
@@ -94,7 +95,13 @@ export async function loadIncheonAirport(base) {
     }
   }
   group.traverse(o=>{if(o.isMesh)o.receiveShadow=true;});
-  return {terrain,group,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),update(){},
+  const traffic=new IncheonTraffic(trafficData,height,(x,z)=>source.isLand(x,z) && !terrain.isOnRunway(x,z)
+    && !colliders.some(c=>x>=c.bounds.min.x-1 && x<=c.bounds.max.x+1 && z>=c.bounds.min.z-1 && z<=c.bounds.max.z+1
+      && (pointInRing(x,z,c.points) || c.points.slice(1).some((b,i)=>segmentDistance(x,z,c.points[i],b)<1))));
+  group.add(traffic.mesh);
+  return {terrain,group,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,
+    resetTraffic(){traffic.reset();},
+    update(dt,position,time,options={}){traffic.update(dt,options.cameraPosition??position,options.quality,options.paused);},
     checkBuildingCollision(probes) {
       for(const p of probes) for(const c of colliders) {
         if(p.pos.y-p.radius>c.top || p.pos.y+p.radius<c.bounds.min.y

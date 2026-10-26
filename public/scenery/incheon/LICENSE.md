@@ -44,3 +44,7 @@ response, retaining complete runway/taxiway/apron ways instead of the 2km crop.
 Rebuild with `node scripts/scenery/build-incheon-airfield.mjs`. Its source checksum
 is recorded in the file. Runway markings and the constant 7m pavement profile are
 illustrative model approximations, not surveyed or operational navigation data.
+
+`traffic.json` is an ODbL road-route derivative of the same frozen source. Rebuild
+with `node scripts/scenery/build-incheon-traffic.mjs`. Vehicle shapes, colors,
+speeds and density are illustrative original code, not measured traffic data.
