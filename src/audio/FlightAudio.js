@@ -1,4 +1,5 @@
 import { pistonSoundState } from './pistonSoundState.js';
+import { exteriorDistanceGain, exteriorAirCutoff } from './distanceAcoustics.js';
 import { t } from '../i18n/index.js';
 /**
  * Aircraft-specific procedural Web Audio: turbofan or piston/propeller.
@@ -6,6 +7,7 @@ import { t } from '../i18n/index.js';
  * cockpit air conditioning & avionics cooling pack blower, runway rumble, touchdown tire screech & oleo thump,
  * stall horn, and Boeing GPWS voice callouts.
  * Uses dynamic range compression with normal-volume and muted output states.
+ * Exterior camera views attenuate this mix by camera-to-aircraft distance.
  */
 export class FlightAudio {
   constructor() {
@@ -101,7 +103,7 @@ export class FlightAudio {
       const initialGain = this.effectiveVolume;
       this.masterGain.gain.setValueAtTime(initialGain, this.ctx.currentTime);
 
-      // Mastering signal chain: sources -> cockpitFilter -> masterGain -> compressor -> makeupGain -> destination
+      // Mastering signal chain: sources -> cockpitFilter -> distanceGain -> masterGain -> compressor -> makeupGain -> destination
       this.masterGain.connect(this.compressor);
       this.compressor.connect(this.makeupGain);
       this.makeupGain.connect(this.ctx.destination);
@@ -110,7 +112,13 @@ export class FlightAudio {
       this.cockpitFilter = this.ctx.createBiquadFilter();
       this.cockpitFilter.type = 'lowpass';
       this.cockpitFilter.frequency.setValueAtTime(2800, this.ctx.currentTime);
-      this.cockpitFilter.connect(this.masterGain);
+
+      // 4b. Distance stage: exterior views attenuate with camera-to-aircraft range,
+      // so a distant tower view hears a quieter, duller flyby than chase cam.
+      this.distanceGain = this.ctx.createGain();
+      this.distanceGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      this.cockpitFilter.connect(this.distanceGain);
+      this.distanceGain.connect(this.masterGain);
 
       // 5. Cockpit Avionics Cooling Fan & Air Conditioning Packs (Continuous ambient hum)
       this.initPackSynth();
@@ -495,14 +503,20 @@ export class FlightAudio {
     return { muted: false, level: 1.0, mode: 'normal', text: t('normal.volume.100'), icon: '🔊' };
   }
 
-  update(dt, state, isCockpitCam) {
+  update(dt, state, isCockpitCam, cameraDistanceMeters = 0) {
     if (!this.isInitialized || !this.ctx || this.crashed) return;
 
     const now = this.ctx.currentTime;
 
-    // Interior vs Exterior camera acoustic filter
-    const targetCutoff = isCockpitCam ? 2700 : 8800;
-    this.cockpitFilter.frequency.setTargetAtTime(targetCutoff, now, 0.1);
+    // Interior vs Exterior camera acoustics: the cockpit keeps a fixed muffled
+    // level; exterior views attenuate volume and treble with camera-to-aircraft distance.
+    if (isCockpitCam) {
+      this.cockpitFilter.frequency.setTargetAtTime(2700, now, 0.1);
+      this.distanceGain.gain.setTargetAtTime(1.0, now, 0.1);
+    } else {
+      this.cockpitFilter.frequency.setTargetAtTime(exteriorAirCutoff(cameraDistanceMeters), now, 0.1);
+      this.distanceGain.gain.setTargetAtTime(exteriorDistanceGain(cameraDistanceMeters), now, 0.1);
+    }
 
     if (this.isPiston) {
       this.updatePiston(state, now);

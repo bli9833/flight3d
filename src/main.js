@@ -1601,7 +1601,8 @@ class FlightSimulator {
         this.cockpitPhotoOverlay.update(this.telemetry);
       }
     }
-    this.audio.update(frameDelta, this.telemetry, isCockpit);
+    const cameraToAircraftMeters = this.camera.position.distanceTo(this.aircraft.group.position);
+    this.audio.update(frameDelta, this.telemetry, isCockpit, cameraToAircraftMeters);
 
     // 6. Update Camera System & Dynamic FOV (60° in cockpit eliminates fisheye speed distortion)
     let targetFov = isCockpit ? 60 : 54;
