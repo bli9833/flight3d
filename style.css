@@ -1994,6 +1994,8 @@ body.demo-active #touch-controls-overlay {
   content: attr(data-short-label);
   font: 600 10px system-ui;
 }
+.flight-toolbar #btn-auto-camera { flex-basis: 64px; min-width: 64px; }
+.flight-toolbar #btn-auto-camera[aria-pressed="true"] { color: #67e8f9; background: #164e63; }
 .flight-toolbar .quick-mute { display: block; font-size: 18px; }
 
 /* The AP trigger stays anchored; its dropdown clears both control strips. */

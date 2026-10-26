@@ -171,3 +171,98 @@ test('scenic auto adapts at cut boundaries and never tours distant towers or idl
   assert.equal(system.mode, M.CHASE);
   assert.equal(system.autoSwitch, false);
 });
+
+
+test('touch look holds while touching, resumes after release, and grants a fresh shot', () => {
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  const aircraft = new THREE.Object3D();
+  aircraft.position.y = 500;
+  system.setMode(CameraSystem.MODES.AUTO, true);
+  system.update(9.9, aircraft);
+  system.activeTouchId = 1;
+  system.isDragging = true;
+  system.applyTouchDragDelta(25, 0);
+  system.update(20, aircraft);
+  assert.equal(system.userLookOverridden, true);
+  assert.equal(system.touchAutoResumeTimer, 4);
+  system.activeTouchId = null;
+  system.isDragging = false;
+  system.update(3, aircraft);
+  assert.equal(system.userLookOverridden, true);
+  system.applyTouchDragDelta(15, 0); // Another swipe restarts the grace period.
+  system.update(3, aircraft);
+  assert.equal(system.userLookOverridden, true);
+  system.update(1, aircraft);
+  assert.equal(system.userLookOverridden, false);
+  assert.equal(system.autoSwitchTimer, 0);
+  assert.equal(system.mode, CameraSystem.MODES.CHASE);
+  assert.notEqual(system.chaseYaw, 0, 'resume retains the current framing');
+  system.update(10, aircraft);
+  assert.equal(system.mode, CameraSystem.MODES.DRONE);
+});
+
+test('explicit pause holds orbit and cuts until resumed, including touch and recentering', () => {
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  const aircraft = new THREE.Object3D();
+  aircraft.position.y = 500;
+  system.toggleAutoViewing();
+  system.update(10, aircraft);
+  assert.equal(system.mode, CameraSystem.MODES.DRONE);
+  system.toggleAutoViewing();
+  assert.equal(system.autoPaused, true);
+  const angle = system.droneOrbitAngle;
+  system.showTemporaryView(CameraSystem.MODES.GEAR, 3);
+  system.update(30, aircraft);
+  assert.equal(system.mode, CameraSystem.MODES.DRONE);
+  assert.equal(system.droneOrbitAngle, angle);
+  system.applyTouchDragDelta(25, 0);
+  assert.equal(system.touchAutoResumeTimer, null);
+  system.resetLook();
+  system.update(30, aircraft);
+  assert.equal(system.autoPaused, true);
+  assert.equal(system.mode, CameraSystem.MODES.DRONE);
+  system.toggleAutoViewing();
+  assert.equal(system.autoPaused, false);
+  assert.equal(system.userLookOverridden, false);
+  system.update(14, aircraft);
+  assert.equal(system.mode, CameraSystem.MODES.FLYBY);
+});
+
+test('manual selection cancels pending touch resume and mouse interruption stays paused', () => {
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  const aircraft = new THREE.Object3D();
+  system.toggleAutoViewing();
+  system.applyTouchDragDelta(20, 0);
+  system.setMode(CameraSystem.MODES.WING, true);
+  system.update(30, aircraft);
+  assert.equal(system.autoSwitch, false);
+  assert.equal(system.touchAutoResumeTimer, null);
+  assert.equal(system.mode, CameraSystem.MODES.WING);
+  system.toggleAutoViewing();
+  system.applyTouchDragDelta(20, 0);
+  system.applyMouseDelta(20, 0, false);
+  system.update(30, aircraft);
+  assert.equal(system.userLookOverridden, true);
+  assert.equal(system.touchAutoResumeTimer, null);
+  system.toggleAutoViewing();
+  assert.equal(system.userLookOverridden, false);
+  assert.equal(system.autoSwitch, true);
+});
+
+test('pinch waits until every scenery finger lifts before automatic resume', () => {
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  const aircraft = new THREE.Object3D();
+  system.toggleAutoViewing();
+  system.isPinching = true;
+  system.applyPinchZoom(20);
+  system.update(20, aircraft);
+  assert.equal(system.touchAutoResumeTimer, 4);
+  system.isPinching = false;
+  system.activeTouchId = 1;
+  system.isDragging = true;
+  system.update(20, aircraft);
+  assert.equal(system.touchAutoResumeTimer, 4);
+  system.handleTouchEnd({ touches: [] });
+  system.update(4, aircraft);
+  assert.equal(system.userLookOverridden, false);
+});

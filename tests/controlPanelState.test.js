@@ -5,7 +5,7 @@ import { setLanguage } from '../src/i18n/index.js';
 
 test('shared controls track deployment, damage, keyboard changes and input mode switches', () => {
   const previous = globalThis.document;
-  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'open-camera', 'camera-select'];
+  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'open-camera', 'camera-select', 'btn-auto-camera'];
   const nodes = Object.fromEntries(ids.map(id => [id, { textContent: '', setAttribute(key, value) { this[key] = value; } }]));
   let touch = true;
   globalThis.document = {
@@ -24,6 +24,25 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['camera-select'].value, '0');
     assert.equal(nodes['open-camera'].textContent, 'Camera: Cockpit');
     assert.equal(nodes['open-camera']['data-short-label'], 'CAM');
+    assert.equal(nodes['btn-auto-camera']['data-short-label'], '▶ Auto');
+    camera.autoSwitch = true;
+    updateControlState(telemetry, camera);
+    assert.equal(nodes['btn-auto-camera']['aria-pressed'], 'true');
+    assert.equal(nodes['btn-auto-camera']['data-short-label'], 'Ⅱ Auto');
+    camera.autoPaused = true;
+    updateControlState(telemetry, camera);
+    assert.equal(nodes['btn-auto-camera']['aria-pressed'], 'false');
+    assert.match(nodes['btn-auto-camera']['aria-label'], /paused.*resume/);
+    camera.autoPaused = false;
+    camera.userLookOverridden = true;
+    camera.touchAutoResumeTimer = 3.2;
+    updateControlState(telemetry, camera);
+    assert.equal(nodes['btn-auto-camera']['data-short-label'], 'Auto 4s');
+    camera.touchAutoResumeTimer = null;
+    updateControlState(telemetry, camera);
+    assert.equal(nodes['btn-auto-camera']['data-short-label'], '▶ Resume');
+    camera.userLookOverridden = false;
+    camera.autoSwitch = false;
     camera.opticalZoom = 2;
     updateControlState(telemetry, camera);
     assert.equal(nodes['open-camera'].textContent, 'Camera: Cockpit · 2.0×', 'magnification is readable in the camera control');

@@ -90,8 +90,63 @@ try {
   await evaluate(`document.getElementById('open-camera').click()`);
   assert.equal(await evaluate('window.simulator.cameraSystem.autoSwitch'), false);
   assert.equal(await evaluate('window.simulator.cameraSystem.mode'), 1);
+  await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
+  await evaluate(`(() => {
+    const s = window.simulator;
+    const update = s.cameraSystem.update.bind(s.cameraSystem);
+    window.stepScenicCamera = dt => update(dt, s.aircraft.group, s.telemetry,
+      (x,z) => s.currentTerrain.getHeight(x,z));
+    // Render the real scene while advancing camera timers explicitly below.
+    s.cameraSystem.update = (_dt, ...args) => update(0, ...args);
+  })()`);
+  const tap = async id => {
+    const point = await evaluate(`(() => {
+      const r = document.getElementById('${id}').getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2, width: r.width, height: r.height };
+    })()`);
+    assert.ok(point.x > 0 && point.x < 390 && point.width >= 44 && point.height >= 44,
+      `${id} must be visible and touch-sized`);
+    await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: point.x, y: point.y }] });
+    await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  const dragStart = async () => {
+    await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 150, y: 420 }] });
+    await call('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 230, y: 440 }] });
+  };
+  await tap('btn-auto-camera');
+  assert.equal(await evaluate('window.simulator.cameraSystem.autoSwitch'), true);
+  await tap('btn-auto-camera');
+  assert.equal(await evaluate('window.simulator.cameraSystem.autoPaused'), true);
+  await capture('mobile-auto-paused');
+  await dragStart();
+  await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await evaluate('window.stepScenicCamera(20)');
+  assert.equal(await evaluate('window.simulator.cameraSystem.autoPaused'), true, 'explicit pause survives touch');
+  await tap('btn-auto-camera');
+  assert.equal(await evaluate('window.simulator.cameraSystem.autoPaused'), false);
+  await evaluate('window.stepScenicCamera(9.9)');
+  await dragStart();
+  await evaluate('window.stepScenicCamera(20)');
+  assert.equal(await evaluate('window.simulator.cameraSystem.touchAutoResumeTimer'), 4, 'timer waits for release');
+  await capture('mobile-auto-looking');
+  await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await evaluate('window.stepScenicCamera(3)');
+  assert.equal(await evaluate('window.simulator.cameraSystem.userLookOverridden'), true);
+  await evaluate('window.stepScenicCamera(1.1)');
+  assert.equal(await evaluate('window.simulator.cameraSystem.userLookOverridden'), false);
+  assert.equal(await evaluate('window.simulator.cameraSystem.autoSwitchTimer'), 0, 'fresh shot after resume');
+  await capture('mobile-auto-playing');
+  await evaluate('window.stepScenicCamera(10)');
+  assert.equal(await evaluate('window.simulator.cameraSystem.mode'), 6);
+  await dragStart();
+  await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await tap('btn-auto-camera');
+  assert.equal(await evaluate('window.simulator.cameraSystem.userLookOverridden'), false, 'tap resumes immediately');
+  await tap('open-camera');
+  await evaluate('window.stepScenicCamera(20)');
+  assert.equal(await evaluate('window.simulator.cameraSystem.autoSwitch'), false, 'manual selection cancels resume');
   assert.deepEqual(errors, [], 'no runtime exceptions');
-  fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ passed: true, errors, quickCycle: [1, 6, 4, 2, 0], specialistSelections: [3, 5, 7] }, null, 2));
+  fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ passed: true, errors, quickCycle: [1, 6, 4, 2, 0], specialistSelections: [3, 5, 7], mobileAutoPauseResume: true }, null, 2));
   console.log('Scenic camera browser checks passed:', dir);
 } finally {
   ws.close();

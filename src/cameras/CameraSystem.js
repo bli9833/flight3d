@@ -27,6 +27,8 @@ export class CameraSystem {
     // asynchronous GLB, so starting in the cockpit shows an unfinished interior.
     this.mode = CameraSystem.MODES.CHASE;
     this.autoSwitch = false;
+    this.autoPaused = false;
+    this.touchAutoResumeTimer = null;
     // Explicit view choices persist across demo stages, presets and look resets.
     this.userModeSelected = false;
     this.autoSwitchTimer = 0;
@@ -141,7 +143,7 @@ export class CameraSystem {
     this.touchMoved = false;
     this.onResetLook = null;
 
-    // User manual look override flag (유저가 시선을 수동 변경한 경우 카메라 모드 전환 전까지 앱 자동 시선 개입 차단)
+    // Manual look holds automatic framing; touch interruptions in AUTO resume after release.
     this.userLookOverridden = false;
 
     // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
@@ -207,12 +209,10 @@ export class CameraSystem {
       this.domElement.addEventListener('wheel', (e) => {
         if (this.mode === CameraSystem.MODES.CHASE) {
           this.chaseDistance = Math.max(20.0, Math.min(140.0, this.chaseDistance + e.deltaY * 0.05));
-          this.userLookOverridden = true;
-          this.cancelTemporaryView();
+          this.holdForManualLook();
         } else if (this.mode === CameraSystem.MODES.DRONE) {
           this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance + e.deltaY * 0.04));
-          this.userLookOverridden = true;
-          this.cancelTemporaryView();
+          this.holdForManualLook();
         } else if (this.usesOpticalZoom()) {
           // Scroll down widens the field of view (zoom out), like backing away.
           this.zoomOpticalBy(Math.exp(-e.deltaY * 0.0015));
@@ -453,8 +453,7 @@ export class CameraSystem {
    */
   applyPinchZoom(deltaDist) {
     if (Math.abs(deltaDist) > 0) {
-      this.userLookOverridden = true;
-      this.cancelTemporaryView();
+      this.holdForManualLook(true);
     }
     if (this.mode === CameraSystem.MODES.CHASE) {
       this.chaseDistance = Math.max(20.0, Math.min(140.0, this.chaseDistance - deltaDist * 0.15));
@@ -462,7 +461,7 @@ export class CameraSystem {
       this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance - deltaDist * 0.12));
     } else if (this.usesOpticalZoom()) {
       // Fingers spreading apart magnifies, matching the exterior pinch direction.
-      this.zoomOpticalBy(Math.exp(deltaDist * 0.0035));
+      this.zoomOpticalBy(Math.exp(deltaDist * 0.0035), true);
     }
   }
 
@@ -482,13 +481,12 @@ export class CameraSystem {
    * Scale the optical magnification. ratio > 1 zooms in; the result is clamped
    * to [opticalZoomMin, opticalZoomLimit()] and reports whether anything changed.
    */
-  zoomOpticalBy(ratio) {
+  zoomOpticalBy(ratio, isTouch = false) {
     if (!Number.isFinite(ratio) || ratio === 1) return false;
     const clamped = Math.min(this.opticalZoomLimit(), Math.max(this.opticalZoomMin, this.opticalZoom * ratio));
     if (clamped === this.opticalZoom) return false;
     this.opticalZoom = clamped;
-    this.userLookOverridden = true;
-    this.cancelTemporaryView();
+    this.holdForManualLook(isTouch);
     return true;
   }
 
@@ -526,8 +524,7 @@ export class CameraSystem {
 
   applyMouseDelta(dx, dy, isTouch = (this.activeTouchId !== null)) {
     if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
-      this.userLookOverridden = true;
-      this.cancelTemporaryView();
+      this.holdForManualLook(isTouch);
     }
     const sensitivity = isTouch ? this.touchGazeSensitivity : this.gazeSensitivity;
     switch (this.mode) {
@@ -623,6 +620,7 @@ export class CameraSystem {
   }
 
   resetLook() {
+    this.touchAutoResumeTimer = null;
     this.userLookOverridden = false;
     this.lookYaw = 0;
     this.lookPitch = this.aircraftLookPitch ?? -0.25;
@@ -816,7 +814,7 @@ export class CameraSystem {
   }
 
   showTemporaryView(m, durationSeconds = 4.5, onComplete = null) {
-    if (this.userLookOverridden || (this.userModeSelected && !this.autoSwitch)) {
+    if (this.autoPaused || this.userLookOverridden || (this.userModeSelected && !this.autoSwitch)) {
       return;
     }
     if (this.mode !== m && this.temporaryViewTimer <= 0) {
@@ -857,6 +855,28 @@ export class CameraSystem {
     return this.getModeName();
   }
 
+  holdForManualLook(isTouch = false) {
+    this.userLookOverridden = true;
+    this.touchAutoResumeTimer = isTouch && this.autoSwitch && !this.autoPaused ? 4 : null;
+    this.cancelTemporaryView();
+  }
+
+  toggleAutoViewing() {
+    if (!this.autoSwitch) {
+      this.setMode(CameraSystem.MODES.AUTO, true);
+    } else if (this.autoPaused || this.userLookOverridden) {
+      // Resume from the current framing, without snapping back to chase.
+      this.autoPaused = false;
+      this.userLookOverridden = false;
+      this.touchAutoResumeTimer = null;
+      this.autoSwitchTimer = 0;
+    } else {
+      this.cancelTemporaryView();
+      this.autoPaused = true;
+      this.touchAutoResumeTimer = null;
+    }
+  }
+
   setCustomViewUpdater(fn) {
     this.customViewUpdater = typeof fn === 'function' ? fn : null;
   }
@@ -876,6 +896,7 @@ export class CameraSystem {
     this.userLookOverridden = false;
     this.cancelTemporaryView();
     this.autoSwitch = m === CameraSystem.MODES.AUTO;
+    this.autoPaused = false;
     this.autoSwitchTimer = 0;
     this.mode = this.autoSwitch ? CameraSystem.MODES.CHASE : m;
     this.resetLook();
@@ -1016,7 +1037,22 @@ export class CameraSystem {
     if (getTerrainHeight) {
       this.setTerrain(getTerrainHeight);
     }
-    if (this.autoSwitch && !this.userLookOverridden && this.temporaryViewTimer <= 0) {
+    let resumedTouchLook = false;
+    // The four-second grace period starts after the final scenery touch lifts.
+    // Explicit pause is sticky; only a touch interruption resumes by itself.
+    if (this.autoSwitch && !this.autoPaused && this.touchAutoResumeTimer !== null
+        && this.activeTouchId === null && !this.isPinching && !this.isDragging) {
+      this.touchAutoResumeTimer = Math.max(0, this.touchAutoResumeTimer - Math.max(0, dt));
+      if (this.touchAutoResumeTimer === 0) {
+        this.touchAutoResumeTimer = null;
+        this.userLookOverridden = false;
+        this.autoSwitchTimer = 0;
+        resumedTouchLook = true;
+      }
+    }
+    if (this.autoSwitch && !this.autoPaused && !this.userLookOverridden
+        && !resumedTouchLook && this.activeTouchId === null && !this.isPinching
+        && !this.isDragging && this.temporaryViewTimer <= 0) {
       this.autoSwitchTimer += Math.max(0, dt);
       const M = CameraSystem.MODES;
       // A flyby needs a short pass; an orbit needs time to reveal the airframe.
@@ -1382,7 +1418,7 @@ export class CameraSystem {
 
       case CameraSystem.MODES.DRONE: {
         // Continuous 360° circular drone orbit around aircraft from slightly above (pauses when user overrides look)
-        if (!this.userLookOverridden) {
+        if (!this.userLookOverridden && !this.autoPaused) {
           this.droneOrbitAngle += this.droneOrbitSpeed * dt;
         }
 

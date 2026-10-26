@@ -6,7 +6,7 @@ export function touchLabel(text) {
 }
 
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
-export function initFlightPanels({ onCycleCamera, onSelectCamera }) {
+export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCamera }) {
   const hud = document.getElementById('hud-overlay');
   // Let keyboard users scroll the full telemetry row as well as touch users.
   const strip = document.querySelector('.hud-strip');
@@ -30,6 +30,12 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera }) {
   bindText(cameraButton, () => t('change.camera.c'), 'title');
   cameraButton.addEventListener('click', () => onCycleCamera());
   bar.append(cameraButton);
+  const autoCameraButton = document.createElement('button');
+  autoCameraButton.id = 'btn-auto-camera';
+  autoCameraButton.className = 'btn';
+  autoCameraButton.type = 'button';
+  autoCameraButton.addEventListener('click', () => onToggleAutoCamera());
+  bar.append(autoCameraButton);
   // Settings belong to the main menu, not the in-flight HUD.
   const settings = document.getElementById('lobby-settings');
   const cameraLabel = document.createElement('label');
@@ -163,6 +169,14 @@ export function updateControlState(telemetry, camera, options = {}) {
   const zoomValue = zoomed ? `${camera.opticalZoom.toFixed(1)}×` : '';
   set('open-camera', 'ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName }, undefined,
     zoomed ? `${t('ui.strip.camera')}${zoomValue}` : t('ui.strip.camera'));
+  const autoState = !camera.autoSwitch ? 'start'
+    : camera.autoPaused ? 'resume'
+    : camera.userLookOverridden ? 'looking' : 'pause';
+  const seconds = Math.ceil(camera.touchAutoResumeTimer ?? 0);
+  const autoLabel = autoState === 'looking' && seconds > 0 ? 'waiting' : autoState;
+  set('btn-auto-camera', `ui.camera.auto.${autoLabel}`, { seconds },
+    camera.autoSwitch && !camera.autoPaused && !camera.userLookOverridden,
+    t(`ui.camera.auto.${autoLabel}.short`, { seconds }));
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
 }
