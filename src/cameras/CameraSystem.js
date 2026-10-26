@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /**
- * 6-Perspective Camera System (Cockpit, Chase, Wing View, Control Tower, Flyby, Landing Gear Belly Cam)
+ * Seven camera views with a separate automatic scenic director
  * Features G-force cockpit head dynamics, stall buffeting vibration, touchdown shock jolt,
  * smooth exterior damping, and automatic temporary cinematic view cuts for takeoff/landing/gear transit.
  */
@@ -16,6 +16,9 @@ export class CameraSystem {
     DRONE: 6,
     AUTO: 7
   };
+
+  // Keep digit shortcuts stable; the quick cycle follows viewing intent instead.
+  static QUICK_CYCLE = [1, 6, 4, 2, 0];
 
   constructor(camera, domElement) {
     this.camera = camera;
@@ -843,8 +846,11 @@ export class CameraSystem {
   }
 
   cycleMode() {
-    const selected = this.autoSwitch ? CameraSystem.MODES.AUTO : (this.savedMode ?? this.mode);
-    this.setMode((selected + 1) % 8, true);
+    const selected = this.savedMode ?? this.mode;
+    const index = CameraSystem.QUICK_CYCLE.indexOf(selected);
+    const next = this.autoSwitch ? CameraSystem.MODES.CHASE
+      : CameraSystem.QUICK_CYCLE[(index + 1) % CameraSystem.QUICK_CYCLE.length];
+    this.setMode(next, true);
     if (this.onCycleMode) {
       this.onCycleMode(this.mode);
     }
@@ -1012,8 +1018,19 @@ export class CameraSystem {
     }
     if (this.autoSwitch && !this.userLookOverridden && this.temporaryViewTimer <= 0) {
       this.autoSwitchTimer += Math.max(0, dt);
-      if (this.autoSwitchTimer >= 10) {
-        this.#applyMode((this.mode + 1) % 7);
+      const M = CameraSystem.MODES;
+      // A flyby needs a short pass; an orbit needs time to reveal the airframe.
+      const duration = this.mode === M.DRONE ? 14 : this.mode === M.WING ? 12
+        : this.mode === M.FLYBY ? 8 : 10;
+      if (this.autoSwitchTimer >= duration) {
+        const agl = aircraftMesh.position.y - this.queryGroundHeight(aircraftMesh.position.x, aircraftMesh.position.z);
+        // Keep the runway and aircraft readable near the ground. Tower and gear
+        // remain deliberate selections (gear also has event-driven close-ups).
+        const shots = flightState.onGround ? [M.CHASE, M.DRONE, M.FLYBY]
+          : agl < 120 ? [M.CHASE, M.FLYBY]
+          : [M.CHASE, M.DRONE, M.FLYBY, M.WING];
+        const next = shots[(shots.indexOf(this.mode) + 1) % shots.length];
+        this.#applyMode(next);
         this.autoSwitch = true;
       }
     }

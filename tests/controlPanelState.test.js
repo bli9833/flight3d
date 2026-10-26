@@ -5,7 +5,7 @@ import { setLanguage } from '../src/i18n/index.js';
 
 test('shared controls track deployment, damage, keyboard changes and input mode switches', () => {
   const previous = globalThis.document;
-  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'open-camera'];
+  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'open-camera', 'camera-select'];
   const nodes = Object.fromEntries(ids.map(id => [id, { textContent: '', setAttribute(key, value) { this[key] = value; } }]));
   let touch = true;
   globalThis.document = {
@@ -21,6 +21,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-gear'].textContent, 'Gear down');
     assert.equal(nodes['btn-gear']['aria-pressed'], 'true');
     assert.equal(nodes['btn-flaps-ret'].disabled, false);
+    assert.equal(nodes['camera-select'].value, '0');
     assert.equal(nodes['open-camera'].textContent, 'Camera: Cockpit');
     assert.equal(nodes['open-camera']['data-short-label'], 'CAM');
     camera.opticalZoom = 2;
@@ -35,12 +36,13 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     Object.assign(telemetry, { gearState: .5, flapDegree: 12, flapIndex: 6, spoilers: 1, reverserActive: true, engine1: {} });
     camera.autoSwitch = true;
     updateControlState(telemetry, camera);
+    assert.equal(nodes['camera-select'].value, '7');
     assert.equal(nodes['btn-gear'].textContent, 'Gear moving');
     assert.equal(nodes['btn-flaps-ext'].disabled, true, 'limit follows commanded detent while flaps are moving');
     assert.match(nodes['btn-flaps-ext'].textContent, /12°/);
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'true');
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'true');
-    assert.equal(nodes['open-camera'].textContent, 'Camera: Auto');
+    assert.equal(nodes['open-camera'].textContent, 'Camera: Scenic auto');
     Object.assign(telemetry, { gearState: 0, gearDamage: { left: 'collapsed' }, flapIndex: 0, spoilers: 0, reverserActive: false, engine1: {} });
     camera.autoSwitch = false;
     camera.mode = 6;
