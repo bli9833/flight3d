@@ -1,0 +1,421 @@
+{
+  "schemaVersion": 1,
+  "origin": {
+    "latitude": 37.448,
+    "longitude": 126.455
+  },
+  "axes": "+X east, +Z south; rows north to south; Float32 little-endian",
+  "horizontalFrame": "WGS84 ellipsoid ECEF -> local east/north tangent plane; Z=-north",
+  "verticalDatum": "EGM2008 orthometric meters (Copernicus DSM); modeled sea level Y=0, no tides",
+  "dem": {
+    "dataset": "Copernicus GLO-30 DSM",
+    "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N37_00_E126_00_DEM/Copernicus_DSM_COG_10_N37_00_E126_00_DEM.tif",
+    "sourceSha256": "f530dd28308ecd6c5ceb0405dc1ffb7113bcafdec30d023de50f16dc433a274f",
+    "sourceSpacingArcSec": 1,
+    "resampling": "bilinear at local-grid node coordinates",
+    "attribution": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "checkpoints": [
+      {
+        "x": 0.0,
+        "z": 0.0,
+        "longitude": 126.455,
+        "latitude": 37.448,
+        "heightM": 7.419179916381836,
+        "roundTripErrorM": 0.0
+      },
+      {
+        "x": -4800.0,
+        "z": -4800.0,
+        "longitude": 126.40072334726457,
+        "latitude": 37.4912360409152,
+        "heightM": 0.0,
+        "roundTripErrorM": 0.0
+      },
+      {
+        "x": 3000.0,
+        "z": -3000.0,
+        "longitude": 126.48891558836019,
+        "latitude": 37.475025490866834,
+        "heightM": 23.472658157348633,
+        "roundTripErrorM": 0.0
+      },
+      {
+        "x": -3000.0,
+        "z": 3000.0,
+        "longitude": 126.42110880808137,
+        "latitude": 37.420964659825714,
+        "heightM": 0.9719020128250122,
+        "roundTripErrorM": 0.0
+      },
+      {
+        "x": 4800.0,
+        "z": 4800.0,
+        "longitude": 126.50921419786653,
+        "latitude": 37.40473874486087,
+        "heightM": 0.0,
+        "roundTripErrorM": 0.0
+      }
+    ]
+  },
+  "coast": {
+    "sourceSha256": "de8110a39194d447f76576749dd7866d356ccf1c1800aceca1f8ef995c91ecbc",
+    "sourceWayIds": [
+      "way/22784501",
+      "way/22785716",
+      "way/22785996",
+      "way/22786080",
+      "way/22786351",
+      "way/22786622",
+      "way/22786688",
+      "way/28109186",
+      "way/234327353",
+      "way/894079008",
+      "way/894079011",
+      "way/894079013",
+      "way/894091299",
+      "way/894091301"
+    ],
+    "requests": [
+      {
+        "url": "https://api.openstreetmap.org/api/0.6/map.json?bbox=126.382,37.39,126.455,37.448",
+        "retrievedAt": "2026-10-26T00:48:11.520840+00:00",
+        "responseSha256": "48a3b6d8b36b67d1ff4287e569ecc3940bdb318a68c5e8edd493c8a141585537"
+      },
+      {
+        "url": "https://api.openstreetmap.org/api/0.6/map.json?bbox=126.455,37.39,126.528,37.448",
+        "retrievedAt": "2026-10-26T00:48:13.904077+00:00",
+        "responseSha256": "1044d53ba25cc69e527e50a61ddffed3e86773bcaba464a522f00577fe8c3588"
+      },
+      {
+        "url": "https://api.openstreetmap.org/api/0.6/map.json?bbox=126.382,37.448,126.455,37.506",
+        "retrievedAt": "2026-10-26T00:48:17.433624+00:00",
+        "responseSha256": "d2dd8985423fbfde87ef6ecd4d4dadbfc32827a3e5ad0ebb43fdb6336e9bd797"
+      },
+      {
+        "url": "https://api.openstreetmap.org/api/0.6/map.json?bbox=126.455,37.448,126.528,37.477",
+        "retrievedAt": "2026-10-26T00:48:47.171233+00:00",
+        "responseSha256": "74eb0b657ab6c4f847403315d55ed90171168019fa0880b2d7a60ef47c2c994c"
+      },
+      {
+        "url": "https://api.openstreetmap.org/api/0.6/map.json?bbox=126.455,37.477,126.4915,37.4915",
+        "retrievedAt": "2026-10-26T00:51:02.082332+00:00",
+        "responseSha256": "bea06f8c8ac05692bc4c6168068dc29de3579c6b5c1fb12e8103f494471b3f93"
+      },
+      {
+        "url": "https://api.openstreetmap.org/api/0.6/map.json?bbox=126.455,37.4915,126.4915,37.506",
+        "retrievedAt": "2026-10-26T00:51:04.762407+00:00",
+        "responseSha256": "40c43ed1dd1a1a8de25c401655e293351be04bf93274b29ee523a9dd32d2d15c"
+      },
+      {
+        "url": "https://api.openstreetmap.org/api/0.6/map.json?bbox=126.4915,37.477,126.528,37.4915",
+        "retrievedAt": "2026-10-26T00:51:08.077223+00:00",
+        "responseSha256": "bab02b861cc557425fca7d828742c88d7ecb866aa44587caab45b88ce06c46b6"
+      },
+      {
+        "url": "https://api.openstreetmap.org/api/0.6/map.json?bbox=126.4915,37.4915,126.528,37.506",
+        "retrievedAt": "2026-10-26T00:51:10.894914+00:00",
+        "responseSha256": "6834b6644d7d94f9eda3f85d81f318ec0b2121c142734dae39e32b58a9900adc"
+      }
+    ],
+    "faceCount": 14,
+    "checkpoints": [
+      {
+        "name": "T1 airport land",
+        "longitude": 126.455,
+        "latitude": 37.448,
+        "x": -0.0,
+        "z": -0.0,
+        "land": true
+      },
+      {
+        "name": "southwest sea",
+        "longitude": 126.397,
+        "latitude": 37.403,
+        "x": -5135.3,
+        "z": 4992.77,
+        "land": false
+      },
+      {
+        "name": "northeast land",
+        "longitude": 126.5,
+        "latitude": 37.49,
+        "x": 3979.68,
+        "z": -4662.38,
+        "land": true
+      }
+    ]
+  },
+  "grids": {
+    "regional-natural": {
+      "file": "regional-natural.bin",
+      "gridSize": 401,
+      "worldSize": 12000,
+      "spacingM": 30.0,
+      "sha256": "39e8d1a2cd87858588bc844d14d96cbf1dad5fa1dedd35d8aed14f63d2b486ba",
+      "minM": 0.0,
+      "maxM": 251.90296936035156
+    },
+    "local-natural": {
+      "file": "local-natural.bin",
+      "gridSize": 161,
+      "worldSize": 2000,
+      "spacingM": 12.5,
+      "sha256": "cd0df416af235ebaaf8d83a5b37e3fa8f1104a489140a3ff0e4342a1db7420d0",
+      "minM": 1.36398184299469,
+      "maxM": 38.44428253173828
+    },
+    "local-graded": {
+      "file": "local-graded.bin",
+      "gridSize": 161,
+      "worldSize": 2000,
+      "spacingM": 12.5,
+      "sha256": "460c54e1971bf401d8bb87a0014a5bfc3cbdccdbbfc2b45dd007a52e80a96d14",
+      "minM": 1.36398184299469,
+      "maxM": 23.350595474243164
+    }
+  },
+  "mask": {
+    "file": "land-mask.png",
+    "pixels": 1024,
+    "pixelSizeM": 11.71875
+  },
+  "grading": {
+    "patchSha256": "9283e4a3024a150fba5343496a1a90a11a286f1b8520df090263d4fbb6172b0a",
+    "airportReferenceM": 7,
+    "airportReferenceSource": "https://aim.koca.go.kr/eaipPub/Package/2026-06-25/html/eAIP/KR-AD-2.RKSI-en-GB.html",
+    "airportReferenceNote": "AD 2.2 aerodrome elevation is a reference, NOT surveyed elevations of every apron or threshold",
+    "airportBlendM": 80,
+    "localEdgeBlendM": 80,
+    "buildingPads": [
+      {
+        "id": "relation/3917466",
+        "baseM": 7.0,
+        "reason": "airport-reference"
+      },
+      {
+        "id": "relation/6309696",
+        "baseM": 7.774,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/179263792",
+        "baseM": 6.822,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/179263808",
+        "baseM": 5.757,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/179263809",
+        "baseM": 7.089,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/179263810",
+        "baseM": 5.627,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/179263812",
+        "baseM": 6.879,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/179263814",
+        "baseM": 7.557,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/234428610",
+        "baseM": 6.322,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/424584631",
+        "baseM": 4.219,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/424584647",
+        "baseM": 4.798,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/424584648",
+        "baseM": 6.65,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/429005057",
+        "baseM": 5.017,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/429005058",
+        "baseM": 3.572,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/447703436",
+        "baseM": 4.042,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486042972",
+        "baseM": 5.513,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486042975",
+        "baseM": 5.727,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486042978",
+        "baseM": 5.374,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486042979",
+        "baseM": 5.204,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486042987",
+        "baseM": 6.409,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486105485",
+        "baseM": 5.753,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486105486",
+        "baseM": 7.171,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486105490",
+        "baseM": 4.856,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486113535",
+        "baseM": 4.419,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486113541",
+        "baseM": 3.463,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486419571",
+        "baseM": 7.072,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486419573",
+        "baseM": 6.521,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/486419582",
+        "baseM": 7.206,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/839988066",
+        "baseM": 4.097,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/840727362",
+        "baseM": 6.912,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/840727363",
+        "baseM": 6.93,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/840743948",
+        "baseM": 5.198,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/841272989",
+        "baseM": 6.868,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/852033407",
+        "baseM": 5.265,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/895137430",
+        "baseM": 5.857,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/895137431",
+        "baseM": 5.545,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/895137432",
+        "baseM": 7.059,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/895137433",
+        "baseM": 5.214,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/895137434",
+        "baseM": 6.814,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/1293612506",
+        "baseM": 5.527,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/1293612507",
+        "baseM": 5.043,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/1471518751",
+        "baseM": 5.597,
+        "reason": "surrounding-DSM-p20"
+      },
+      {
+        "id": "way/1471518752",
+        "baseM": 5.599,
+        "reason": "surrounding-DSM-p20"
+      }
+    ],
+    "note": "Preview model grading only; natural grids are retained unmodified. Building reference is DSM lower quintile around footprint, not a DTM.",
+    "changedSamples": 14462,
+    "maxDeltaM": 31.44428253173828
+  },
+  "limitations": [
+    "12km western airport region, not all Yeongjong",
+    "Buildings/roads remain the original central 2km patch",
+    "DSM includes buildings/vegetation; grading is an approximation, not surveyed airport pavement",
+    "Coastline OSM epoch differs from DSM; mask resolution 11.72m; no bathymetry or tides",
+    "Bridge/tunnel clearances and flight/collision integration are not implemented"
+  ],
+  "assetSha256": {
+    "land-mask.png": "a167cebca1864af25caff4732b8ef324fb668c8e40a6807c9042228ebcc37222",
+    "coastline.json": "8bd5dd1c83fdca12965603dcf31fdd8633b96b02bbc05b52cf19ecaa703a1f0a"
+  }
+}
