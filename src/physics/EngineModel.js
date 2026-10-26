@@ -96,19 +96,37 @@ export class EngineModel {
     this.reverserActive = onGround && active;
   }
 
+  /** Fan speed a steady throttle command converges to, reverser schedule included. */
+  commandedN1() {
+    if (this.reverserDeployment > 0.5 && this.reverseThrustEfficiency > 0) {
+      // Reverser spool to ~75% N1
+      return this.idleN1 + (this.throttleCommand > 0.1 ? this.throttleCommand : 0.65) * (this.togaN1 - this.idleN1) * 0.70;
+    }
+    return this.idleN1 + this.throttleCommand * (this.togaN1 - this.idleN1);
+  }
+
+  /** Fan speed engine `index` converges to for the current command and health. */
+  fanTarget(index) {
+    const out = this.failed[index] || this.fuelKg <= 0.0;
+    const commanded = this.commandedN1();
+    return out ? this.windmillingN1
+      : this.windmillingN1 + (commanded - this.windmillingN1) * (1 - this.contactDamage[index]);
+  }
+
+  /**
+   * Bring the fan speed to what the commanded throttle holds in steady state.
+   * A preset declares a flight state, and N1 is part of that state: leaving it
+   * at idle makes the first seconds of every airborne spawn a spool transient
+   * instead of the balance the preset describes.
+   */
+  settleSpool() {
+    for (let i = 0; i < this.numEngines; i++) this.n1[i] = this.targetN1[i] = this.fanTarget(i);
+  }
+
   update(dt, altitudeMeters, tas, densityRatio) {
     // Reverser mechanical deployment rate
     const reverserTarget = this.reverserActive ? 1.0 : 0.0;
     this.reverserDeployment += (reverserTarget - this.reverserDeployment) * Math.min(1.0, dt * 2.5);
-
-    // Target N1 based on throttle and reverser
-    let targetN1Value;
-    if (this.reverserDeployment > 0.5 && this.reverseThrustEfficiency > 0) {
-      // Reverser spool to ~75% N1
-      targetN1Value = this.idleN1 + (this.throttleCommand > 0.1 ? this.throttleCommand : 0.65) * (this.togaN1 - this.idleN1) * 0.70;
-    } else {
-      targetN1Value = this.idleN1 + this.throttleCommand * (this.togaN1 - this.idleN1);
-    }
 
     const altitudeLapse = Math.pow(Math.max(0.1, densityRatio), 0.75);
     // Ram drag / airspeed lapse: slight decrease in net thrust as TAS increases
@@ -122,8 +140,7 @@ export class EngineModel {
       // no combustion, and the fan is held down by the airstream.
       const out = this.failed[i] || fuelStarved;
       const integrity = 1 - this.contactDamage[i];
-      this.targetN1[i] = out ? this.windmillingN1
-        : this.windmillingN1 + (targetN1Value - this.windmillingN1) * integrity;
+      this.targetN1[i] = this.fanTarget(i);
 
       // Realistic non-linear spool inertia
       const diff = this.targetN1[i] - this.n1[i];

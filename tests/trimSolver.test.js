@@ -5,6 +5,7 @@ import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { EngineModel } from '../src/physics/EngineModel.js';
 import { Atmosphere } from '../src/physics/Atmosphere.js';
 import { solveTrim } from '../src/physics/TrimSolver.js';
+import { BOEING_737_800, CESSNA_172 } from '../src/config/aircraftConfigs.js';
 import { AutopilotController } from '../src/physics/Autopilot.js';
 
 function trimmedAero() {
@@ -90,6 +91,54 @@ describe('solveTrim steady level flight', () => {
         }
       }
     }
+  });
+});
+
+describe('trim wheel hands-off authority', () => {
+  // The wheel exists to neutralize whatever elevator deflection steady flight
+  // needs. Any state whose demand sits outside the wheel's travel cannot be
+  // flown hands-off, and installing the clamped value pretends otherwise.
+  const grids = [
+    { id: 'B738', config: BOEING_737_800, speeds: [120, 135, 145, 160, 180, 210, 250, 290, 320] },
+    { id: 'C172', config: CESSNA_172, speeds: [50, 60, 70, 85, 100, 115, 130] },
+  ];
+
+  it('holds every feasible operable state on the wheel alone', () => {
+    for (const { id, config, speeds } of grids) {
+      const aero = new Aerodynamics(config), engines = new EngineModel(config);
+      for (let flapsIndex = 0; flapsIndex < aero.flapAngles.length; flapsIndex++) {
+        for (const gearState of [0, 1]) {
+          // The last flap detents are landing-only, so gear-up combinations
+          // there are not states the aircraft can actually be in.
+          if (gearState === 0 && flapsIndex > aero.flapAngles.length - 3) continue;
+          for (const iasKnots of speeds) {
+            for (const altitudeMeters of [0, 300, 900, 3000, 6000, 11000]) {
+              for (const flightPathAngleDeg of [-6, -3, 0, 2]) {
+                const t = solveTrim(aero, engines, {
+                  iasKnots, altitudeMeters, flightPathAngleDeg, flapsIndex, gearState,
+                });
+                if (!t.feasible) continue;
+                assert.ok(t.handsOffFeasible,
+                  `${id} ${iasKnots} kt/${altitudeMeters} m/flaps${aero.flapAngles[flapsIndex]}°` +
+                  `/gear${gearState}/γ${flightPathAngleDeg}° needs ` +
+                  `${t.handsOffTrimDegRaw?.toFixed(2)}° of wheel`);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('reports a wheel out of travel instead of hiding the clamp', () => {
+    const { aero, engines } = trimmedAero();
+    const t = solveTrim(aero, engines, {
+      iasKnots: 290, altitudeMeters: 0, flightPathAngleDeg: -3, flapsIndex: 6, gearState: 0,
+    });
+    assert.equal(t.feasible, true);
+    assert.equal(t.handsOffFeasible, false);
+    assert.ok(t.handsOffTrimDegRaw < -5, `raw wheel ${t.handsOffTrimDegRaw}`);
+    assert.equal(t.handsOffTrimDeg, -5); // the clamped value callers must not install
   });
 });
 

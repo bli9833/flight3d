@@ -242,3 +242,40 @@ describe('engine-failure shortcut routing', () => {
     assert.strictEqual(cycles, 1, 'P stays the demo start/restart shortcut');
   });
 });
+
+describe('settled spool for a declared flight state', () => {
+  const density = Atmosphere.getConditions(0).densityRatio;
+  const settleTo = (engines, steps) => {
+    for (let i = 0; i < steps; i++) engines.update(1 / 60, 0, 74, density);
+    return engines.thrust.reduce((sum, t) => sum + t, 0);
+  };
+
+  it('delivers the commanded thrust on the first step instead of over seconds', () => {
+    const reference = new EngineModel();
+    reference.setThrottle(0.5);
+    reference.settleSpool();
+    const steady = settleTo(reference, 600);
+
+    const settled = new EngineModel();
+    settled.setThrottle(0.5);
+    settled.settleSpool();
+    settled.update(1 / 60, 0, 74, density);
+    assert.ok(settled.thrust.reduce((a, b) => a + b, 0) > steady * 0.99,
+      `settled first step ${settled.thrust} vs steady ${steady}`);
+
+    const cold = new EngineModel();
+    cold.setThrottle(0.5);
+    cold.update(1 / 60, 0, 74, density);
+    assert.ok(cold.thrust.reduce((a, b) => a + b, 0) < steady * 0.5,
+      'starting from ground idle must still be a spool transient');
+  });
+
+  it('leaves a failed core windmilling when the spool settles', () => {
+    const engines = new EngineModel();
+    engines.setThrottle(1);
+    engines.failed[0] = true;
+    engines.settleSpool();
+    assert.strictEqual(engines.n1[0], engines.windmillingN1);
+    assert.ok(engines.n1[1] > engines.idleN1);
+  });
+});
