@@ -45,6 +45,15 @@ export class DiagnosticsInspector {
           <div class="diag-row"><span class="k"><span data-i18n="aircraft.mass">현재 기체 질량</span></span><span id="m-mass" class="v">66,000 kg</span></div>
         </div>
 
+        <!-- Input latency & boot responsiveness -->
+        <div class="diag-section">
+          <div class="diag-subheading"><span data-i18n="performance.input.latency">⏱ Input latency & boot responsiveness</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="input.latency.last.click">Last input: paint / handler wait</span></span><span id="m-input-last" class="v">–</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="input.latency.worst.5s">Worst handler wait (30 s)</span></span><span id="m-input-worst" class="v">–</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="input.latency.long.tasks">Long tasks (5 s / max)</span></span><span id="m-input-longtask" class="v">–</span></div>
+          <div class="diag-row"><span class="k"><span data-i18n="input.latency.boot.first.input">First input after page load</span></span><span id="m-input-boot" class="v">–</span></div>
+        </div>
+
         <!-- Terrain PBR Rendering Metrics & Controls -->
         <div class="diag-section">
           <div class="diag-subheading"><span data-i18n="terrain.pbr.shaders.triplanar.mapping">🏔️ 지형 PBR 셰이더 & 트라이플래너 (Terrain)</span></div>
@@ -246,6 +255,8 @@ export class DiagnosticsInspector {
     const elFps = document.getElementById('m-fps');
     if (elFps) elFps.textContent = `${this.fps} FPS (${this.frameTimeMs} ms)`;
 
+    this.updateLatencyRows();
+
     const aero = this.sim.aero;
     const engines = this.sim.engines;
 
@@ -317,6 +328,31 @@ export class DiagnosticsInspector {
 
     // Draw Sparkline Graph
     this.drawSparkline();
+  }
+
+  /** Live input-latency rows; collection always runs in the monitor, we only paint here. */
+  updateLatencyRows() {
+    const lat = this.sim.inputLatency?.snapshot?.();
+    if (!lat) return;
+    const setRow = (id, text, cls) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      if (cls) el.className = `v ${cls}`;
+    };
+    const latencyClass = ms => (ms === null || ms === undefined ? '' : ms < 50 ? 'status-green' : ms < 150 ? 'status-amber' : 'status-red');
+    const last = lat.last;
+    const win = lat.worst30s || {};
+    setRow('m-input-last', last
+      ? `${last.totalMs} ms paint / ${last.processingMs ?? '–'} ms wait (${last.type}, ${last.source})`
+      : '–', latencyClass(last?.processingMs));
+    setRow('m-input-worst', `${win.worstProcessingMs ?? '–'} ms (n=${win.inputs || 0})`, latencyClass(win.worstProcessingMs));
+    const lt = lat.longTasks5s;
+    setRow('m-input-longtask', lt.count ? `${lt.count} / ${lt.maxMs} ms` : 'none', lt.count ? 'status-amber' : 'status-green');
+    const boot = lat.boot;
+    setRow('m-input-boot', boot.firstInputMs === null ? 'no input yet'
+      : `+${(boot.firstInputMs / 1000).toFixed(1)}s → ${boot.firstInputLatencyMs} ms paint`,
+    latencyClass(boot.firstInputLatencyMs));
   }
 
   drawSparkline() {

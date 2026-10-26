@@ -55,6 +55,7 @@ import {
 } from './config/scenarioRegistry.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
+import { installInputLatencyMonitor } from './ui/InputLatencyMonitor.js';
 
 // Expose THREE globally for test harness and browser console debugging
 if (typeof window !== 'undefined') {
@@ -63,6 +64,11 @@ if (typeof window !== 'undefined') {
 
 initLocalization();
 
+// Attach latency telemetry before the simulator constructor: its synchronous scene
+// build is exactly the window where user input stalls, and event-timing entries are
+// buffered retroactively to navigation start.
+const inputLatency = installInputLatencyMonitor();
+
 /**
  * Main Simulation Coordinator
  * Integrates 6-DOF rigid body physics, aircraft systems, procedural world, audio, and user interface.
@@ -70,6 +76,7 @@ initLocalization();
 class FlightSimulator {
   constructor() {
     this.container = document.getElementById('canvas-container');
+    this.inputLatency = inputLatency;
 
     // 1. Scene, Camera, Renderer
     this.scene = new THREE.Scene();
@@ -330,6 +337,7 @@ class FlightSimulator {
     // toggle (or ESC > pause). #123 hardcoded the markup to
     // boot at the lobby, so that first-paint attribute is flipped to flight too.
     this.fly();
+    inputLatency?.mark('fly');
     this.syncFlowUi();
   }
 
@@ -549,6 +557,7 @@ class FlightSimulator {
   queueLobbySelection() {
     this.lobbySelectionPending = true;
     this.lobbyScreen?.setSelectionBusy(true);
+    inputLatency?.noteSelectionStart();
     if (this.lobbySelectionDraining) return;
     this.lobbySelectionDraining = true;
     const nextPaint = () => new Promise(resolve => document.hidden
@@ -569,6 +578,7 @@ class FlightSimulator {
         this.lobbySelectionDraining = false;
         this.lobbySelectionPending = false;
         this.lobbyScreen?.setSelectionBusy(false);
+        inputLatency?.noteSelectionApplied();
       }
     });
   }
@@ -1704,6 +1714,7 @@ class FlightSimulator {
     if (!this.hasRenderedFirstFrame) {
       this.hasRenderedFirstFrame = true;
       document.body.classList.remove('booting');
+      inputLatency?.mark('first-frame');
     }
 
     // 9. Render 2D Photorealistic Cockpit Overlay (when in photo cockpit mode)
@@ -2127,6 +2138,9 @@ function initFlightSimulator() {
   if (!window.simulator) {
     window.simulator = new FlightSimulator();
     window.sim = window.simulator;
+    // The latency monitor is exposed as window.sim.inputLatency (constructor-assigned);
+    // `sim.telemetry` stays the physics snapshot namespace, rewritten by fly().
+    inputLatency?.mark('ready');
   }
 }
 
