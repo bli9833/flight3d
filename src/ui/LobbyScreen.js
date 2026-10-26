@@ -5,6 +5,8 @@ import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../confi
 
 const AIRPORT_BUTTONS = { incheon: 'lobby-airport-incheon', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla' };
 const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172' };
+/** Aircraft the lobby offers, so warmup can prepare exactly this set. */
+export const LOBBY_AIRCRAFT_IDS = Object.keys(AIRCRAFT_BUTTONS);
 const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
 
 /**

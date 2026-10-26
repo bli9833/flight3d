@@ -45,7 +45,7 @@ import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
 import { initFlightPanels, updateControlState, touchLabel } from './ui/FlightPanels.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
-import { initLobbyScreen } from './ui/LobbyScreen.js';
+import { initLobbyScreen, LOBBY_AIRCRAFT_IDS } from './ui/LobbyScreen.js';
 import { DeveloperModeController } from './dev/DeveloperModeController.js';
 import { DevScenarioRunner } from './dev/DevScenarioRunner.js';
 import { DeveloperPanel } from './ui/DeveloperPanel.js';
@@ -63,6 +63,10 @@ if (typeof window !== 'undefined') {
 }
 
 initLocalization();
+
+// Upper bound on waiting for an idle slot; the browser runs the callback by then even if
+// the thread is still busy, so warmup cannot be starved by a long boot.
+const PRELOAD_IDLE_TIMEOUT_MS = 1500;
 
 // Attach latency telemetry before the simulator constructor: its synchronous scene
 // build is exactly the window where user input stalls, and event-timing entries are
@@ -583,6 +587,76 @@ class FlightSimulator {
     });
   }
 
+  /**
+   * Construct an aircraft model for the per-session cache. The instrument canvases are
+   * shared: a model only draws into them while it is the active aircraft, so building a
+   * second one ahead of the user's pick costs memory but cannot disturb the current view.
+   */
+  buildAircraftInstance(aircraftId) {
+    return aircraftId === 'C172'
+      ? new Cessna172(this.pfdCanvas, this.ndCanvas)
+      : new Boeing737(
+        this.pfdCanvas,
+        this.ndCanvas,
+        this.eicasCanvas,
+        this.mcpCanvas,
+        this.isfdCanvas,
+        this.cduCanvas
+      );
+  }
+
+  /**
+   * Build and warm a model the lobby offers but the scene does not have yet, without
+   * touching the active aircraft. Selecting it later then costs the cache hit plus the
+   * first-draw uploads, instead of those uploads and the whole geometry build.
+   */
+  prebuildAircraftInstance(aircraftId) {
+    if (!AIRCRAFT_REGISTRY[aircraftId]) return false;
+    if (this.aircraftInstances.has(aircraftId)) return false;
+    let instance;
+    try {
+      instance = this.buildAircraftInstance(aircraftId);
+    } catch (error) {
+      console.warn(`Aircraft preload failed for ${aircraftId}:`, error);
+      return false;
+    }
+    this.aircraftInstances.set(aircraftId, instance);
+    this.warmCockpitShaders(instance);
+    // Lets a report answer the question this raised: did warmup land before the pick?
+    inputLatency?.mark(`aircraft-preload:${aircraftId}`);
+    return true;
+  }
+
+  /**
+   * One model per idle period, after the first frame: building both planes up front in
+   * the constructor would add to the load stall this is meant to remove, and doing them
+   * together would just move the freeze instead of softening it.
+   */
+  scheduleAircraftPreload() {
+    if (this.aircraftPreloadScheduled) return;
+    this.aircraftPreloadScheduled = true;
+    const pending = () => LOBBY_AIRCRAFT_IDS.filter(id =>
+      AIRCRAFT_REGISTRY[id] && id !== this.currentAircraftId && !this.aircraftInstances.has(id));
+    const requestIdle = (task) => (typeof window !== 'undefined' && window.requestIdleCallback)
+      ? window.requestIdleCallback(task, { timeout: PRELOAD_IDLE_TIMEOUT_MS })
+      : setTimeout(task, PRELOAD_IDLE_TIMEOUT_MS);
+    const onIdle = () => {
+      // A lobby choice or a scenery load owns the main thread and has its own progress
+      // indication; both clear on their own, and the idle timeout still bounds the wait.
+      if (this.lobbySelectionPending || this.airportLoading) {
+        requestIdle(onIdle);
+        return;
+      }
+      const next = pending()[0];
+      if (!next) return;
+      // Stops on a build failure rather than retrying the same id every idle period.
+      if (this.prebuildAircraftInstance(next)) {
+        if (pending().length) requestIdle(onIdle);
+      }
+    };
+    requestIdle(onIdle);
+  }
+
   setAircraft(aircraftId = 'B738') {
     const config = AIRCRAFT_REGISTRY[aircraftId];
     if (!config) return;
@@ -608,16 +682,7 @@ class FlightSimulator {
       instance = null;
     }
     if (!instance) {
-      instance = aircraftId === 'C172'
-        ? new Cessna172(this.pfdCanvas, this.ndCanvas)
-        : new Boeing737(
-          this.pfdCanvas,
-          this.ndCanvas,
-          this.eicasCanvas,
-          this.mcpCanvas,
-          this.isfdCanvas,
-          this.cduCanvas
-        );
+      instance = this.buildAircraftInstance(aircraftId);
       this.aircraftInstances.set(aircraftId, instance);
       this.warmCockpitShaders(instance);
     }
@@ -1715,6 +1780,7 @@ class FlightSimulator {
       this.hasRenderedFirstFrame = true;
       document.body.classList.remove('booting');
       inputLatency?.mark('first-frame');
+      this.scheduleAircraftPreload();
     }
 
     // 9. Render 2D Photorealistic Cockpit Overlay (when in photo cockpit mode)
