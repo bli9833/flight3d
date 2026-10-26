@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { colourIncheonGround, createIncheonGroundTexture } from './IncheonGround.js';
 import { IncheonTraffic } from './IncheonTraffic.js';
 import { createControlTower } from './IncheonControlTower.js';
 import { loadIncheonTerrain } from '../geospatial/IncheonTerrain.js';
@@ -32,8 +33,9 @@ export async function loadIncheonAirport(base) {
   terrain.mesh=new THREE.Group();
   const group=new THREE.Group();
   const height=(x,z)=>terrain.getHeight(x,z);
-  const groundMaterial=new THREE.MeshLambertMaterial({color:0xa4b18c,alphaMap:mask,alphaTest:.5});
+  const groundMaterial=new THREE.MeshLambertMaterial({vertexColors:true,map:createIncheonGroundTexture(),alphaMap:mask,alphaTest:.5});
   for(const geometry of [terrainGeometry(12000,480,height,true)]) {
+    colourIncheonGround(geometry);
     terrain.mesh.add(new THREE.Mesh(geometry,groundMaterial));
   }
   const trees=generatePlanting(patch,dressing).filter(t=>!terrain.isRunwaySafetyArea(t.x,t.z));
