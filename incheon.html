@@ -3,36 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>인천·영종도 — 2단계 지형·해안선 | Flight3d</title>
+  <title>인천·영종도 — 3단계 도시 표현 | Flight3d</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/src/previews/incheon.css">
 </head>
 <body>
   <header>
     <div><span class="eyebrow">FLIGHT3D · INCHEON / YEONGJONG</span><h1>실제 배치부터, 작게 시작합니다.</h1>
-      <p>2단계 · 실제 지형·해안선 12 × 12 km와 1터미널 주변 상세</p></div>
+      <p>3단계 · 실제 배치 위에 도로·주차장·건물·녹지를 더합니다</p></div>
     <a href="./">비행 시뮬레이터로</a>
   </header>
   <main>
     <section class="viewport" aria-label="인천공항 주변 3D 배치 미리보기">
       <canvas id="scene" aria-label="실제 도로·건물 윤곽의 3D 모형. 마우스로 회전·확대할 수 있습니다."></canvas>
-      <div class="view-buttons"><button id="regional" type="button">주변 지형·해안선</button><button id="oblique" type="button">1터미널 상세</button><button id="top" type="button">상세 평면 · 북쪽 위</button></div>
+      <div class="view-buttons"><button id="regional" type="button">주변 지형·해안선</button><button id="oblique" type="button">1터미널 상세</button><button id="top" type="button">상세 평면 · 북쪽 위</button><button id="close" type="button">건물·녹지 근접</button></div>
       <div class="orientation">주황 테두리 2 km <span>지형 높이 과장 없음</span></div>
       <div class="map-attribution"><a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a> · <a href="https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM">Copernicus DEM</a></div>
-      <div class="caption">실제 표면고도 + 국소 부지 보정 · 건물 높이 추정 · 조석·차량 미포함</div>
+      <div class="caption">실제 배치 · 주차선·식재·외관은 모형 · 차량 미포함</div>
     </section>
     <aside>
-      <span class="eyebrow">TERRAIN & COAST / 02</span><h2>지형 위에 배치를 맞춥니다.</h2>
+      <span class="eyebrow">CITY & GREEN / 03</span><h2>도시의 바닥과 표정을 만듭니다.</h2>
       <p id="status" role="status">고정된 지도 데이터를 불러오는 중…</p>
       <dl id="counts"></dl>
       <fieldset><legend>레이어</legend>
+        <label><input type="checkbox" id="city-mode" checked> 도시 표현 · 끄면 이전 단계 비교</label>
         <label><input type="checkbox" id="natural-dsm"> 원본 DSM 비교 · 보정 전 지형만</label>
         <label><input type="checkbox" data-layer="buildings" checked> 건물 윤곽과 추정 높이</label>
         <label><input type="checkbox" data-layer="roads" checked> 도로 · 활주로 · 유도로</label>
         <label><input type="checkbox" data-layer="surfaces" checked> 녹지 · 토지 이용</label>
+        <label><input type="checkbox" data-layer="vegetation" checked> 공원 · 가로수 모형</label>
       </fieldset>
-      <div class="legend"><span><i class="estimated"></i>층수 × 3 m 추정</span><span><i class="placeholder"></i>높이 미상 · 임시 8 m</span></div>
-      <p class="note">Copernicus DSM은 건물·수목을 포함한 표면고도입니다. 일부 공항 포장은 7 m 기준, 건물 부지는 주변 표고를 이용해 보정한 모형입니다. 원본 비교로 보정 전후를 볼 수 있습니다. 고가·지하 도로의 입체 연결은 아직 반영하지 않았습니다.</p>
+      <div class="legend-slot"><div class="legend" id="height-legend" hidden><span><i class="estimated"></i>층수 × 3 m 추정</span><span><i class="placeholder"></i>높이 미상 · 임시 8 m</span></div></div>
+      <p class="note">주차장 윤곽은 OSM 기준이며 유형 미상 14개는 지상 주차로 가정했습니다. 주차선·외벽·식재 위치는 시각화 모형입니다. 나무는 지도상 녹지 안에서 도로·건물·공항 부지를 피해 배치합니다. 지형은 DSM에 국소 보정을 적용했습니다. 고가·지하 도로와 차량은 아직 연결하지 않았습니다.</p>
       <p class="note" id="coverage"></p>
       <p class="note">드래그: 회전 · 휠/핀치: 확대 · 오른쪽 드래그: 이동<br>키보드: 캔버스를 누른 뒤 방향키로 이동, 버튼으로 시점 복원</p>
       <div class="render-info" id="render-info"></div>
