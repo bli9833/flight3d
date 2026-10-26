@@ -18,8 +18,11 @@ configuration. Completion retains power for manual flight; cancellation clears
 virtual inputs. These tours do not include takeoff or landing.
 
 City corridors are selected against the current generated building footprints,
-including buildings tall enough to intersect the flight altitude. Terrain is
-sampled across the entire corridor. Building placement is randomized, so the
+including buildings tall enough to intersect the flight altitude. The proximity
+montage's skyscraper scene resolves its spawn, heading and altitude from the
+same corridor selection at scene entry, and its ledge camera sits on a real
+flanking tower, so random building placement cannot put the flight path inside
+a high-rise. Terrain is sampled across the entire corridor. Building placement is randomized, so the
 chosen corridor and flight altitude can differ across page loads. Climb guidance
 also scans terrain ahead. The canyon flight waits for loaded DEM data.
 
@@ -42,7 +45,7 @@ chrome-session --project flight3d node scripts/verify-cessna-demos.mjs
 ```
 
 The harness owns one tab, freezes wall-clock physics, and steps real physics for
-all four airport/route combinations. It checks completion, aircraft identity,
+all five airport/route combinations. It checks completion, aircraft identity,
 finite positions, no sampled stalls/crashes, terrain clearance, multiple camera
 views, demonstrated bank angles and powered handoff. It captures menu layouts at
 1440×900 and 390×844 plus flight frames and writes samples to

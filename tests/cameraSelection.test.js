@@ -127,3 +127,18 @@ test('camera cuts and recentering retain the active aircraft chase framing', () 
   assert.equal(system.chaseDistance, 55);
   assert.equal(system.chaseHeight, 10.5);
 });
+
+test('custom view updater receives a bound queryGroundHeight helper', () => {
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  system.setTerrain({ getHeight: (x, z) => 10 + x * 0.1 + z * 0.01 });
+  let observed = null;
+  system.setCustomViewUpdater(({ queryGroundHeight }) => {
+    observed = queryGroundHeight(50, 100);
+    return false;
+  });
+  const aircraft = new THREE.Object3D();
+  aircraft.position.y = 100;
+  aircraft.updateMatrixWorld();
+  system.update(0.1, aircraft);
+  assert.equal(observed, 16, 'queryGroundHeight must keep its receiver when handed to the updater');
+});
