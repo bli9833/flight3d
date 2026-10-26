@@ -18,7 +18,7 @@ test('scenario availability is scoped to the airport', () => {
 });
 
 test('unknown airports or scenarios degrade to unavailable', () => {
-  assert.deepEqual(scenariosForAirport('incheon'), []);
+  assert.deepEqual(scenariosForAirport('unknown'), []);
   assert.deepEqual(scenariosForAirport(undefined), []);
   assert.equal(isScenarioAvailable('lukla', 'goaround'), false);
   assert.equal(isScenarioAvailable('lukla', undefined), false);

@@ -3,7 +3,7 @@ import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../config/scenarioRegistry.js';
 
-const AIRPORT_BUTTONS = { coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla' };
+const AIRPORT_BUTTONS = { incheon: 'lobby-airport-incheon', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla' };
 const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172' };
 const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
 
@@ -52,6 +52,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
   for (const [id, handler] of [
     ['btn-fly', onFly],
     ['lobby-airport-coastal', () => onAirport('coastal')],
+    ['lobby-airport-incheon', () => onAirport('incheon')],
     ['lobby-airport-lukla', () => onAirport('lukla')],
     ['lobby-aircraft-b738', () => { onAircraft?.('B738'); refresh(); }],
     ['lobby-aircraft-c172', () => { onAircraft?.('C172'); refresh(); }],

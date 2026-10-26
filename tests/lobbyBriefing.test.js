@@ -38,7 +38,7 @@ test('demo scenario is briefed for both airports', () => {
 
 test('unknown airport or preset degrades without leaking raw keys', () => {
   setLanguage('en');
-  assert.deepEqual(lobbyBriefing('incheon', 'runway'), []);
+  assert.deepEqual(lobbyBriefing('unknown', 'runway'), []);
   const unknownPreset = lobbyBriefing('coastal', 'goaround');
   assert.equal(unknownPreset.length, 2);
   for (const line of [...lobbyBriefing('lukla', 'cruise'), ...unknownPreset]) {

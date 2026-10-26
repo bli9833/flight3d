@@ -166,6 +166,7 @@ export class DemoFlightDirector {
   }
 
   start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
+    if ((targetAirport || this.sim.activeAirport) === 'incheon') return false;
     this.sim.devRunner?.stop();
     if (this.isActive) this.stop();
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
