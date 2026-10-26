@@ -626,7 +626,7 @@ class FlightSimulator {
       this.gear.gearState = this.gear.isFixed || type !== 'cruise' ? 1 : 0;
       this.aero.setFlapPosition(type === 'approach' ? 5 : type === 'runway' ? 2 : 0);
       this.aero.spoilers = 0;
-      this.controls.pitchTrim = this.aero.pitchTrim = 4.5;
+      this.controls.pitchTrim = this.aero.pitchTrim = 1.6;
       const label = { runway: 'incheon.runway', approach: 'incheon.approach', cruise: 'incheon.cruise' }[type];
       this.showToast(() => t(label));
     } else if (this.activeAirport === 'lukla') {
@@ -659,7 +659,7 @@ class FlightSimulator {
         this.gear.gearState = 1.0;
         this.aero.setFlapPosition(2); // Flaps 5
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 5.5;
+        this.aero.pitchTrim = 1.9;
 
         this.showToast(() => t('preset.lukla.runway.24.takeoff.roll'));
       } else if (type === 'approach') {
@@ -687,7 +687,7 @@ class FlightSimulator {
         this.gear.gearState = 1.0;
         this.aero.setFlapPosition(5); // Flaps 30 for short runway landing
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 6.2;
+        this.aero.pitchTrim = 2.2;
 
         this.showToast(() => t('preset.lukla.canyon.landing.challenge.10.070'));
       } else if (type === 'cliff') {
@@ -713,8 +713,8 @@ class FlightSimulator {
         this.gear.gearState = 1.0;
         this.aero.setFlapPosition(3); // Flaps 15 (mountain short-field takeoff)
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 5.5;
-        this.controls.pitchTrim = 5.5;
+        this.aero.pitchTrim = 1.9;
+        this.controls.pitchTrim = 1.9;
 
         this.showToast(() => t('preset.lukla.runway.24.downhill.takeoff.11'));
       } else if (type === 'cruise') {
@@ -730,7 +730,7 @@ class FlightSimulator {
         this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
         this.aero.setFlapPosition(0);
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 2.5;
+        this.aero.pitchTrim = 0.9;
 
         this.showToast(() => t('preset.himalayan.cruise.13.000.ft'));
       }
@@ -750,7 +750,7 @@ class FlightSimulator {
         this.gear.gearState = 1.0;
         this.aero.setFlapPosition(2); // Flaps 5 for takeoff
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 4.5; // Takeoff trim
+        this.aero.pitchTrim = 1.6; // Takeoff trim
 
         this.showToast(() => t('preset.coastal.runway'));
       } else if (type === 'approach') {
@@ -770,7 +770,7 @@ class FlightSimulator {
         this.gear.gearState = 1.0;
         this.aero.setFlapPosition(5); // Flaps 30 for landing
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 6.0;
+        this.aero.pitchTrim = 2.1;
 
         this.showToast(() => t('preset.coastal.approach'));
       } else if (type === 'cruise') {
@@ -786,7 +786,7 @@ class FlightSimulator {
         this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
         this.aero.setFlapPosition(0); // Clean
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 2.5;
+        this.aero.pitchTrim = 0.9;
 
         this.showToast(() => t('preset.coastal.cruise'));
       }
@@ -800,7 +800,20 @@ class FlightSimulator {
     this.engines.failed.fill(false);
     this.engines.contactDamage.fill(0);
 
-    if (type === 'approach' || type === 'cruise') this.applyComputedTrim();
+    if (type === 'approach' || type === 'cruise') {
+      // A preset declares a settled state, not a set of control inputs, so the
+      // state variables have to be where the declared configuration puts them:
+      // the wing at the commanded flap angle, the fans at the commanded N1, the
+      // stick centered. Each ramps otherwise (τ = 2.5 s flaps, ~3 s spool,
+      // rate-limited surfaces), and whatever the previous segment left behind is
+      // not part of the declared state: 1.4° of carried-over elevator costs the
+      // B738 approach spawn 0.11 qSc of pitch moment, which flies it off the
+      // equilibrium installed below.
+      this.aero.currentFlapAngle = this.aero.flapAngles[this.aero.flapsIndex];
+      this.controls.elevator = this.controls.aileron = this.controls.rudder = 0;
+      this.applyComputedTrim();
+      this.engines.settleSpool();
+    }
 
     this.controls.clearVirtualInputs();
     this.controls.setParkingBrake?.(false);
@@ -819,8 +832,11 @@ class FlightSimulator {
    * Derive the spawn trim state for airborne presets from the steady-state
    * solver instead of hand-tuned constants: sets the trim wheel, throttle and
    * pitch attitude to the equilibrium solution for the just-assigned velocity,
-   * altitude and configuration. Falls back to the preset's literal values
-   * when no solution exists (near-stagnant or beyond-envelope spawns).
+   * altitude and configuration. Falls back to the preset's literal values when
+   * the aircraft cannot hold this state hands-off — no solution at all, or one
+   * the trim wheel lacks the authority to hold. A clamped wheel is not an
+   * equilibrium: it leaves a sustained pitch moment that flies the aircraft off
+   * the preset's path.
    */
   applyComputedTrim() {
     const tas = this.linearVelocity.length();
@@ -836,7 +852,7 @@ class FlightSimulator {
       gearState: this.gear.gearState,
       spoilers: this.aero.spoilers,
     });
-    if (!solution.feasible) return;
+    if (!solution.feasible || !solution.handsOffFeasible) return;
     this.controls.throttle = solution.throttle;
     this.engines.setThrottle(solution.throttle);
     this.controls.pitchTrim = solution.handsOffTrimDeg;

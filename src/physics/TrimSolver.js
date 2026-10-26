@@ -1,8 +1,8 @@
 import { Atmosphere } from './Atmosphere.js';
+import { TRIM_WHEEL_AUTHORITY } from './trimWheel.js';
 
 // Constants mirroring Aerodynamics.computeAero's control-surface geometry.
 const MAX_ELEVATOR_RAD = 0.349;  // ±20° elevator travel
-const TRIM_AUTHORITY = 0.35;     // trim-wheel degrees → equivalent elevator radians
 const THRUST_MOMENT_ARM = 0.32;  // engine up-cant moment arm (m), nose-up per N of thrust
 
 function clamp(v, lo, hi) {
@@ -40,6 +40,8 @@ function clamp(v, lo, hi) {
  * @returns {object} feasible trim ({feasible:true, elevator, pitchTrimDeg,
  *   throttle, thrustN, alphaDeg, ...}) or a rejection with `reason`
  *   ('airspeed', 'stall', 'thrust') and the diagnostic coefficients.
+ *   Hands-off callers (presets, trim install) need `handsOffFeasible`: it says
+ *   whether the wheel alone can hold this attitude inside its travel.
  */
 export function solveTrim(aero, engines, state = {}) {
   const iasMs = Atmosphere.knotsToMs(state.iasKnots ?? 0);
@@ -118,11 +120,13 @@ export function solveTrim(aero, engines, state = {}) {
   const elevator = clamp(elevatorEffectiveRad / (MAX_ELEVATOR_RAD * sensitivity), -1, 1);
   // Trim wheel that centers the elevator: (elevatorRad + trimRad) = elevatorEffectiveRad
   const pitchTrimDeg = ((elevatorEffectiveRad -
-    elevator * MAX_ELEVATOR_RAD * sensitivity) / TRIM_AUTHORITY) * 180 / Math.PI;
+    elevator * MAX_ELEVATOR_RAD * sensitivity) / TRIM_WHEEL_AUTHORITY) * 180 / Math.PI;
   // Full wheel setting for hands-off flight (elevator neutral); the wheel
-  // limits are Aerodynamics.setTrim's ±(−5..12).
-  const handsOffTrimDeg = clamp(
-    (elevatorEffectiveRad / TRIM_AUTHORITY) * 180 / Math.PI, -5, 12);
+  // limits are Aerodynamics.setTrim's ±(−5..12). A wheel that needs to sit
+  // outside them cannot hold this attitude hands-off, so the clamped value is
+  // not an equilibrium: callers must check handsOffFeasible before trusting it.
+  const handsOffTrimDegRaw = (elevatorEffectiveRad / TRIM_WHEEL_AUTHORITY) * 180 / Math.PI;
+  const handsOffTrimDeg = clamp(handsOffTrimDegRaw, -5, 12);
 
   return {
     feasible: true,
@@ -134,6 +138,8 @@ export function solveTrim(aero, engines, state = {}) {
     elevator,
     pitchTrimDeg: clamp(pitchTrimDeg, -5, 12), // Aerodynamics.setTrim wheel limits
     handsOffTrimDeg,
+    handsOffTrimDegRaw,
+    handsOffFeasible: handsOffTrimDegRaw >= -5 && handsOffTrimDegRaw <= 12,
     surfaceLimited: Math.abs(elevatorEffectiveRad) > MAX_ELEVATOR_RAD * sensitivity,
     throttle,
     thrustN: effectiveThrust,

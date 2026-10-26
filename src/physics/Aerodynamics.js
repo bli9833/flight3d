@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Atmosphere } from './Atmosphere.js';
 import { BOEING_737_800 } from '../config/aircraftConfigs.js';
+import { TRIM_WHEEL_AUTHORITY } from './trimWheel.js';
 
 export function createAeroResult() {
   return { forceWorld: new THREE.Vector3(), momentBody: new THREE.Vector3() };
@@ -341,7 +342,7 @@ export class Aerodynamics {
     // Pitching moment coefficient Cm:
     // Includes static stability (Cma), elevator input, pitch trim, pitch damping (Cmq)
     const elevatorRad = this.elevator * maxElevatorRad * this.tuning.elevatorSensitivity;
-    const trimRad = THREE.MathUtils.degToRad(this.pitchTrim) * 0.35;
+    const trimRad = THREE.MathUtils.degToRad(this.pitchTrim) * TRIM_WHEEL_AUTHORITY;
     // As separation spreads outboard the horizontal tail buries itself in the
     // wake and progressively loses authority (continuous with the state).
     const elevatorEffectiveness = 1.0 - 0.8 * this.separation;

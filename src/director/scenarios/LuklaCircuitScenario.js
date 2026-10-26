@@ -213,8 +213,8 @@ export class LuklaCircuitScenario {
         const aileronCmd = (0.0 - tel.rollDeg) * 0.035 - rollRateDeg * 0.02;
         this.sim.controls.setVirtualInput('aileron', Math.max(-0.15, Math.min(0.15, aileronCmd)));
 
-        if (this.sim.aero) this.sim.aero.pitchTrim = 5.5;
-        if (this.sim.controls) this.sim.controls.pitchTrim = 5.5;
+        if (this.sim.aero) this.sim.aero.pitchTrim = 1.9;
+        if (this.sim.controls) this.sim.controls.pitchTrim = 1.9;
 
         // Vr Rotation: Begin rotation when approaching cliff edge
         if (s <= -50.0 || tel.iasKnots >= 80.0 || (!tel.onGround && tel.radioAltFt > 10.0)) {
@@ -254,8 +254,8 @@ export class LuklaCircuitScenario {
         if (!tel.onGround && tel.radioAltFt > 20.0 && tel.gearState > 0.1 && !tel.isTransit) {
           this.sim.gear.setGearTarget(false);
         }
-        if (this.sim.aero) this.sim.aero.pitchTrim = 5.2;
-        if (this.sim.controls) this.sim.controls.pitchTrim = 5.2;
+        if (this.sim.aero) this.sim.aero.pitchTrim = 1.8;
+        if (this.sim.controls) this.sim.controls.pitchTrim = 1.8;
 
         // Track southwest along deep canyon valley floor (heading 238°)
         // Move toward w = -300m after s = -1100m
@@ -295,10 +295,10 @@ export class LuklaCircuitScenario {
       // -------------------------------------------------------------
       case LuklaCircuitScenario.STAGES.HIMALAYAN_CRUISE: {
         if (this.sim.aero) {
-          this.sim.aero.pitchTrim = 5.2;
+          this.sim.aero.pitchTrim = 1.8;
           this.sim.aero.setFlapPosition(4); // Flaps 25 for compact high-lift turnaround
         }
-        if (this.sim.controls) this.sim.controls.pitchTrim = 5.2;
+        if (this.sim.controls) this.sim.controls.pitchTrim = 1.8;
 
         // Tactical 180° left valley turnaround back to Runway 06 (inbound heading 058°)
         // When offset to the right/SE (w > 300m), roll out directly toward the localizer intercept course (~020°)

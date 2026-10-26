@@ -11,6 +11,12 @@ import { scenariosForAirport } from '../src/config/scenarioRegistry.js';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { terrainGeometry } from '../src/previews/incheonGeometry.js';
 import { GameFlowController } from '../src/ui/GameFlowController.js';
+import * as THREE from 'three';
+import { Aerodynamics } from '../src/physics/Aerodynamics.js';
+import { EngineModel } from '../src/physics/EngineModel.js';
+import { Atmosphere } from '../src/physics/Atmosphere.js';
+import { solveTrim } from '../src/physics/TrimSolver.js';
+import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 const base=new URL('../public/scenery/incheon/',import.meta.url);
 const metadata=JSON.parse(readFileSync(new URL('terrain-metadata.json',base)));
 const grids=Object.fromEntries(Object.entries(metadata.grids).map(([key,d])=>{
@@ -90,4 +96,48 @@ test('physics height agrees with the rendered triangle plane, including local me
 test('P-key demo entry cannot run the coastal route at Incheon',()=>{
   const director={sim:{activeAirport:'incheon'}};
   assert.equal(DemoFlightDirector.prototype.start.call(director),false);
+});
+
+test('the approach spawn is an unattended equilibrium of the live force model',()=>{
+  // The scenario is flown hands-off between the lobby and the pilot's first input,
+  // so the spawn state has to be a trim the aircraft actually holds: a wheel clamped
+  // at its travel leaves a sustained pitch moment and flies the preset off its path.
+  for(const id of ['B738','C172']) {
+    const aero=new Aerodynamics(AIRCRAFT_REGISTRY[id]),engines=new EngineModel(AIRCRAFT_REGISTRY[id]);
+    const spawn=incheonSpawn('approach',3.5,id);
+    const tas=Math.hypot(spawn.vx,spawn.vy,spawn.vz);
+    const gammaRad=Math.asin(spawn.vy/tas);
+    const flapsIndex=Math.min(5,aero.flapAngles.length-1);
+    const atmos=Atmosphere.getConditions(spawn.y);
+    const trim=solveTrim(aero,engines,{
+      iasKnots:Atmosphere.msToKnots(Atmosphere.tasToIas(tas,atmos.densityRatio)),
+      altitudeMeters:spawn.y,flightPathAngleDeg:THREE.MathUtils.radToDeg(gammaRad),
+      flapsIndex,gearState:1,spoilers:0});
+    assert.equal(trim.feasible,true,`${id}: ${trim.reason}`);
+    assert.equal(trim.handsOffFeasible,true,
+      `${id}: ${trim.handsOffTrimDegRaw}° of wheel needed, travel is -5..12`);
+    assert.ok(Math.abs(trim.handsOffTrimDeg-12)>1e-9&&Math.abs(trim.handsOffTrimDeg+5)>1e-9,
+      `${id}: spawn trim sits on the wheel limit`);
+
+    // Same state through the real force model, configuration settled as the preset
+    // installs it: neutral stick, solved attitude, solved wheel.
+    const mesh=new THREE.Object3D();
+    mesh.quaternion.setFromEuler(new THREE.Euler(
+      THREE.MathUtils.degToRad(trim.alphaDeg)+gammaRad,0,0));
+    aero.setFlapPosition(flapsIndex);
+    aero.currentFlapAngle=aero.flapAngles[flapsIndex];
+    aero.pitchTrim=trim.handsOffTrimDeg;
+    const res=aero.computeAero(1/120,mesh,
+      new THREE.Vector3(0,tas*Math.sin(gammaRad),-tas*Math.cos(gammaRad)),
+      new THREE.Vector3(0,0,0),spawn.y,spawn.y-surface.getHeight(spawn.x,spawn.z),
+      trim.thrustN,1);
+    const qSc=res.qDyn*aero.wingArea*aero.meanChord,weight=aero.mass*Atmosphere.G0;
+    assert.ok(Math.abs(res.momentBody.x)<.005*qSc,
+      `${id}: ${res.momentBody.x} N·m of pitch moment left in the spawn (qSc ${qSc})`);
+    const net=res.forceWorld.clone()
+      .add(new THREE.Vector3(0,0,-trim.thrustN).applyQuaternion(mesh.quaternion))
+      .add(new THREE.Vector3(0,-weight,0));
+    assert.ok(Math.abs(net.y)<.03*weight,`${id}: ${net.y/weight} of weight unbalanced`);
+    assert.ok(Math.abs(res.cl-trim.cl)<.005,`${id}: cl ${res.cl} vs solved ${trim.cl}`);
+  }
 });

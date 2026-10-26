@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { t } from '../../i18n/index.js';
 import { Atmosphere } from '../../physics/Atmosphere.js';
+import { TRIM_WHEEL_AUTHORITY } from '../../physics/trimWheel.js';
 import { flyBank, alphaGuarded } from '../PilotControlLaws.js';
 import { cityRoute } from './cessnaRoutes.js';
 
@@ -330,7 +331,7 @@ export class CessnaProximityScenario {
     const requiredCm = (aero.Iyy * desiredAcceleration - thrustMoment) / qSc;
     const qHat = q * aero.meanChord / (2 * Math.max(10, aero.tas));
     const effectiveElevator = (requiredCm - aero.Cm0 - aero.Cma * aero.alpha - aero.Cmq * qHat) / -aero.Cm_de;
-    const elevator = (effectiveElevator - THREE.MathUtils.degToRad(aero.pitchTrim) * 0.35) / THREE.MathUtils.degToRad(20);
+    const elevator = (effectiveElevator - THREE.MathUtils.degToRad(aero.pitchTrim) * TRIM_WHEEL_AUTHORITY) / THREE.MathUtils.degToRad(20);
 
     sim.controls.setVirtualInput('elevator', alphaGuarded(clamp(elevator, -0.8, 0.8), THREE.MathUtils.radToDeg(aero.alpha)));
     sim.controls.setVirtualInput('throttle', clamp(0.55 + (targetIas - sim.telemetry.iasKnots) * 0.04 + targetVz * 0.035, 0.05, 1));

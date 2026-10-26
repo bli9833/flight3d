@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TRIM_WHEEL_AUTHORITY } from '../physics/trimWheel.js';
 
 // Autoflight alpha protection, like a real flight-director limiter: caps nose-up
 // elevator as AoA climbs and commands an uncommanded-pitch-down recovery above the margin.
@@ -53,7 +54,7 @@ export function flyVerticalPath(sim, targetVz, targetIas, tel, pathAcceleration 
   const requiredCm = (aero.Iyy * desiredAcceleration - thrustMoment - gearMoment) / qSc;
   const qHat = q * aero.meanChord / (2 * Math.max(10, aero.tas));
   const effectiveElevator = (requiredCm - aero.Cm0 - aero.Cma * aero.alpha - aero.Cmq * qHat) / -aero.Cm_de;
-  const elevator = (effectiveElevator - THREE.MathUtils.degToRad(aero.pitchTrim) * 0.35) / THREE.MathUtils.degToRad(20);
+  const elevator = (effectiveElevator - THREE.MathUtils.degToRad(aero.pitchTrim) * TRIM_WHEEL_AUTHORITY) / THREE.MathUtils.degToRad(20);
   sim.controls.setVirtualInput('elevator', alphaGuarded(THREE.MathUtils.clamp(elevator, -0.8, 0.8), THREE.MathUtils.radToDeg(aero.alpha)));
   if (groundPitch === null) sim.controls.setVirtualInput('throttle', THREE.MathUtils.clamp(0.50 + (targetIas - tel.iasKnots) * 0.035 + targetVz * 0.02, 0.05, 0.95) * throttleScale);
 }
