@@ -76,6 +76,9 @@ describe('C172 ground artifact occlusion', () => {
     for (const part of ['Object_10', 'Object_54', 'Object_4', 'Object_19', 'Object_39', 'Object_37']) {
       assert.ok(visible.includes(part), `${part} must stay visible`);
     }
-    assert.equal(hidden.length + visible.length, asset.meshes.length);
+    // A glTF mesh may be referenced by several nodes, so the auditable population is
+    // mesh-bearing nodes rather than the mesh definitions.
+    const meshNodes = asset.nodes.filter(node => node.mesh !== undefined).length;
+    assert.equal(hidden.length + visible.length, meshNodes);
   });
 });
