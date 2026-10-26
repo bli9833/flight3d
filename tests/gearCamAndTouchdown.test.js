@@ -23,28 +23,22 @@ import { Boeing737 } from '../src/aircraft/Boeing737.js';
 
 describe('Landing Gear View & Touchdown Effects', () => {
   describe('CameraSystem (GEAR View & Temporary Auto-Cut)', () => {
-    it('should include GEAR and DRONE camera modes in MODES and cycle through 7 views and automatic mode', () => {
-      const camera = new THREE.PerspectiveCamera();
-      const mockDom = { addEventListener: () => {} };
-      const camSystem = new CameraSystem(camera, mockDom);
-
-      assert.strictEqual(CameraSystem.MODES.GEAR, 5, 'GEAR mode index should be 5');
-      assert.strictEqual(CameraSystem.MODES.DRONE, 6, 'DRONE mode index should be 6');
-      camSystem.setMode(CameraSystem.MODES.COCKPIT, true);
-      assert.strictEqual(camSystem.mode, CameraSystem.MODES.COCKPIT);
-
-      // Cycle through all modes: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> AUTO -> 0
-      assert.strictEqual(camSystem.cycleMode(), 'CHASE (EXTERIOR)');
-      assert.strictEqual(camSystem.cycleMode(), 'WING VIEW');
-      assert.strictEqual(camSystem.cycleMode(), 'AIRPORT TOWER');
-      assert.strictEqual(camSystem.cycleMode(), 'CINEMATIC FLYBY');
-      assert.strictEqual(camSystem.cycleMode(), 'GEAR CAM (BELLY)');
-      assert.strictEqual(camSystem.mode, CameraSystem.MODES.GEAR);
-      assert.strictEqual(camSystem.cycleMode(), 'DRONE (ORBIT VIEW)');
-      assert.strictEqual(camSystem.mode, CameraSystem.MODES.DRONE);
-      assert.strictEqual(camSystem.cycleMode(), 'AUTO · CHASE (EXTERIOR)');
-      assert.strictEqual(camSystem.autoSwitch, true);
-      assert.strictEqual(camSystem.cycleMode(), 'COCKPIT (CAPTAIN)');
+    it('keeps specialist views available while the quick cycle stays scenic', () => {
+      const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+      system.setMode(CameraSystem.MODES.COCKPIT, true);
+      const modes = [];
+      for (let i = 0; i < 5; i++) {
+        system.cycleMode();
+        modes.push(system.mode);
+        assert.equal(system.autoSwitch, false);
+      }
+      assert.deepEqual(modes, [1, 6, 4, 2, 0]);
+      for (const mode of [CameraSystem.MODES.GEAR, CameraSystem.MODES.TOWER]) {
+        system.setMode(mode, true);
+        assert.equal(system.mode, mode);
+        system.cycleMode();
+        assert.equal(system.mode, CameraSystem.MODES.CHASE);
+      }
     });
 
     it('should position camera under fuselage facing landing gear in GEAR mode', () => {

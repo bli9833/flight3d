@@ -6,7 +6,7 @@ export function touchLabel(text) {
 }
 
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
-export function initFlightPanels({ onCycleCamera }) {
+export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCamera }) {
   const hud = document.getElementById('hud-overlay');
   // Let keyboard users scroll the full telemetry row as well as touch users.
   const strip = document.querySelector('.hud-strip');
@@ -30,8 +30,33 @@ export function initFlightPanels({ onCycleCamera }) {
   bindText(cameraButton, () => t('change.camera.c'), 'title');
   cameraButton.addEventListener('click', () => onCycleCamera());
   bar.append(cameraButton);
+  const autoCameraButton = document.createElement('button');
+  autoCameraButton.id = 'btn-auto-camera';
+  autoCameraButton.className = 'btn';
+  autoCameraButton.type = 'button';
+  autoCameraButton.addEventListener('click', () => onToggleAutoCamera());
+  bar.append(autoCameraButton);
   // Settings belong to the main menu, not the in-flight HUD.
   const settings = document.getElementById('lobby-settings');
+  const cameraLabel = document.createElement('label');
+  cameraLabel.className = 'language-control';
+  cameraLabel.htmlFor = 'camera-select';
+  const caption = document.createElement('span');
+  bindText(caption, () => t('ui.camera.select'));
+  const cameraSelect = document.createElement('select');
+  cameraSelect.id = 'camera-select';
+  cameraSelect.className = 'btn';
+  // Match the quick cycle, then list specialist views and automatic viewing.
+  for (const [mode, name] of [[1, 'chase'], [6, 'drone'], [4, 'flyby'],
+    [2, 'wing'], [0, 'cockpit'], [3, 'tower'], [5, 'gear'], [7, 'auto']]) {
+    const option = document.createElement('option');
+    option.value = String(mode);
+    bindText(option, () => touchLabel(t(`ui.camera.${name}`)));
+    cameraSelect.append(option);
+  }
+  cameraSelect.addEventListener('change', () => onSelectCamera(Number(cameraSelect.value)));
+  cameraLabel.append(caption, cameraSelect);
+  settings.append(cameraLabel);
   for (const selector of ['.language-control[for="render-quality"]', '.language-control[for="cockpit-quality"]', '#btn-sound', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-help']) {
     const node = document.querySelector(selector);
     if (node) settings.append(node);
@@ -134,6 +159,8 @@ export function updateControlState(telemetry, camera, options = {}) {
   const reverserBtn = document.getElementById('btn-reverser');
   if (reverserBtn) reverserBtn.disabled = isDemo;
   const mode = camera.autoSwitch ? 7 : camera.mode;
+  const cameraSelect = document.getElementById('camera-select');
+  if (cameraSelect) cameraSelect.value = String(mode);
   const cameraName = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto'][mode];
   const viewName = t(`ui.camera.${cameraName}`).replace(/ · [1-8]$/, '');
   // Optical zoom only exists in the fixed eye-point views, so chase and drone
@@ -142,6 +169,14 @@ export function updateControlState(telemetry, camera, options = {}) {
   const zoomValue = zoomed ? `${camera.opticalZoom.toFixed(1)}×` : '';
   set('open-camera', 'ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName }, undefined,
     zoomed ? `${t('ui.strip.camera')}${zoomValue}` : t('ui.strip.camera'));
+  const autoState = !camera.autoSwitch ? 'start'
+    : camera.autoPaused ? 'resume'
+    : camera.userLookOverridden ? 'looking' : 'pause';
+  const seconds = Math.ceil(camera.touchAutoResumeTimer ?? 0);
+  const autoLabel = autoState === 'looking' && seconds > 0 ? 'waiting' : autoState;
+  set('btn-auto-camera', `ui.camera.auto.${autoLabel}`, { seconds },
+    camera.autoSwitch && !camera.autoPaused && !camera.userLookOverridden,
+    t(`ui.camera.auto.${autoLabel}.short`, { seconds }));
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
 }
