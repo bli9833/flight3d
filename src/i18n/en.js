@@ -1,4 +1,5 @@
 export default {
+  "incheon.repaired": "Aircraft repaired: restarted on runway 15R.",
   "incheon.airport": "Incheon Airport (RKSI)",
   "incheon.runway": "Runway 15R · Ready for takeoff",
   "incheon.approach": "Runway 15R · 1.5 km final",

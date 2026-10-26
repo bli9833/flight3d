@@ -1,4 +1,5 @@
 export default {
+  "incheon.repaired": "기체 수리 완료: 활주로 15R에서 재시작되었습니다.",
   "incheon.airport": "인천공항 (RKSI)",
   "incheon.runway": "15R 이륙 준비",
   "incheon.approach": "15R 최종 접근 · 1.5 km",

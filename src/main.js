@@ -1379,7 +1379,8 @@ class FlightSimulator {
     if (this.devRunner.active) { this.devRunner.restart(); return; }
     this.clearCrashState();
     this.setPreset('runway');
-    this.showToast(() => t('aircraft.repaired.restarted.on.runway.09l'));
+    this.showToast(() => t(this.activeAirport === 'incheon'
+      ? 'incheon.repaired' : 'aircraft.repaired.restarted.on.runway.09l'));
   }
 
   exitCrashToLobby() {
