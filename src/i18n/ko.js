@@ -456,6 +456,7 @@ export default {
   "lobby.spawn": "시나리오",
   "lobby.preset.demo": "🎬 데모 비행",
   "lobby.time": "시간대",
+  "lobby.applying": "선택을 적용하는 중…",
   "lobby.fly": "비행 시작",
   "lobby.hint.esc": "비행 중 ESC를 누르면 일시정지 메뉴가 열립니다.",
   "lobby.briefing.runway": "활주로 {heading} · 문턱 고도 {elevationFt} ft · 접근각 {gsAngle}\u00b0",

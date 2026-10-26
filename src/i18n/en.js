@@ -456,6 +456,7 @@ export default {
   "lobby.spawn": "Spawn scenario",
   "lobby.preset.demo": "🎬 Demo flight",
   "lobby.time": "Time of day",
+  "lobby.applying": "Applying your selection…",
   "lobby.fly": "Fly",
   "lobby.hint.esc": "In flight, press ESC for the pause menu.",
   "lobby.briefing.runway": "Rwy {heading} · threshold elev {elevationFt} ft · glideslope {gsAngle}\u00b0",

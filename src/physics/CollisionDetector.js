@@ -51,6 +51,7 @@ export class CollisionDetector {
     this.gridCellSize = 150.0; // meters per cell
     this.treeGrid = new Map();
     this.buildingGrid = new Map();
+    this.gridSource = foliageAndCities;
 
     this.buildSpatialGrids();
   }
@@ -117,6 +118,10 @@ export class CollisionDetector {
     this.foliage = foliage;
     this.ships = ships;
     this.water = water;
+    // The grids index static foliage/building data, so re-selecting an airport can
+    // reuse them instead of re-binning every tree and building on the click thread.
+    if (this.gridSource === foliage) return;
+    this.gridSource = foliage;
     this.treeGrid.clear();
     this.buildingGrid.clear();
     this.buildSpatialGrids();

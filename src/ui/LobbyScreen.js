@@ -15,6 +15,7 @@ const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
 export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly, getDemoProfile, onDemoProfile }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
+  const selectionEl = document.getElementById('lobby-selection');
   const demoGroup = document.getElementById('lobby-demo-options');
   const demoSelect = document.getElementById('lobby-demo-select');
   const demoBriefing = document.getElementById('lobby-demo-briefing');
@@ -54,8 +55,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     ['lobby-airport-coastal', () => onAirport('coastal')],
     ['lobby-airport-incheon', () => onAirport('incheon')],
     ['lobby-airport-lukla', () => onAirport('lukla')],
-    ['lobby-aircraft-b738', () => { onAircraft?.('B738'); refresh(); }],
-    ['lobby-aircraft-c172', () => { onAircraft?.('C172'); refresh(); }],
+    ['lobby-aircraft-b738', () => onAircraft?.('B738')],
+    ['lobby-aircraft-c172', () => onAircraft?.('C172')],
   ]) {
     document.getElementById(id)?.addEventListener('click', handler);
   }
@@ -138,6 +139,13 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     if (loadingEl) loadingEl.hidden = !waiting;
   }
 
+  /** Show that a choice is being applied while the host defers the heavy work. */
+  function setSelectionBusy(busy) {
+    if (selectionEl) selectionEl.hidden = !busy;
+    const flyBtn = document.getElementById('btn-fly');
+    if (flyBtn) flyBtn.disabled = busy;
+  }
+
   refresh();
-  return { refresh, setWaitingForTerrain };
+  return { refresh, setWaitingForTerrain, setSelectionBusy };
 }
