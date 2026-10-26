@@ -91,3 +91,33 @@ test('P-key demo entry cannot run the coastal route at Incheon',()=>{
   const director={sim:{activeAirport:'incheon'}};
   assert.equal(DemoFlightDirector.prototype.start.call(director),false);
 });
+
+
+test('cached interior land lookup preserves exact coast and hole classification',()=>{
+  const original=surface.source.isLand.bind(surface.source);
+  let calls=0;surface.source.isLand=(x,z)=>{calls++;return original(x,z);};
+  for(let i=0;i<1000;i++)surface.getHeight(-1588,-3665);
+  assert.equal(calls,0,'runway contacts never traverse the coast polygon');
+  let coastalQueries=0;
+  for(let row=0;row<480;row+=3)for(let col=0;col<480;col+=3) {
+    const x=col*25-5993.25,z=row*25-5988.75;
+    const expected=original(x,z);
+    const before=calls,height=surface.getHeight(x,z);
+    if(surface.coastCells[row*480+col]){assert.equal(calls,before+1);coastalQueries++;}
+    else assert.equal(Boolean(surface.landNodes[row*481+col]),expected);
+    if(!expected)assert.equal(height,0);
+  }
+  assert.ok(coastalQueries>0);
+  surface.source.isLand=original;
+});
+
+test('a sub-cell water hole uses the exact coast predicate even when all grid nodes are land',()=>{
+  const outer=[[-6000,-6000],[6000,-6000],[6000,6000],[-6000,6000],[-6000,-6000]];
+  const hole=[[10,10],[14,10],[14,14],[10,14],[10,10]];
+  let calls=0;
+  const source={coastline:{land:{type:'Polygon',coordinates:[outer,hole]}},
+    isLand:(x,z)=>{calls++;return !(x>10&&x<14&&z>10&&z<14);},getHeight:()=>12};
+  const terrain=new IncheonFlightSurface(source);calls=0;
+  assert.equal(terrain.getHeight(12,12),0);assert.equal(calls,1);
+  calls=0;assert.ok(terrain.getHeight(-100,-100)>0);assert.equal(calls,0);
+});

@@ -16,8 +16,25 @@ export class IncheonFlightSurface {
     // One 25m triangle grid drives both rendered terrain and contact queries.
     this.gridSize = 481;
     this.elevations = new Float32Array(this.gridSize ** 2);
+    this.landNodes = new Uint8Array(this.gridSize ** 2);
+    this.coastCells = new Uint8Array(480 ** 2);
+    const land = source.coastline.land;
+    const polygons = land.type === 'Polygon' ? [land.coordinates] : land.coordinates;
+    // Conservatively mark every cell in each coast segment's bounds. Interior
+    // cells then have constant land/water membership; tiny islands/holes still
+    // trigger the exact polygon query in every touched cell.
+    for (const rings of polygons) for (const ring of rings) for (let i=0;i<ring.length;i++) {
+      const a=ring[i],b=ring[(i+1)%ring.length];
+      const minX=Math.max(0,Math.floor((Math.min(a[0],b[0])+6000)/25)-1);
+      const maxX=Math.min(479,Math.floor((Math.max(a[0],b[0])+6000)/25));
+      const minZ=Math.max(0,Math.floor((Math.min(a[1],b[1])+6000)/25)-1);
+      const maxZ=Math.min(479,Math.floor((Math.max(a[1],b[1])+6000)/25));
+      for(let row=minZ;row<=maxZ;row++)for(let col=minX;col<=maxX;col++)this.coastCells[row*480+col]=1;
+    }
     for (let row=0;row<this.gridSize;row++) for (let col=0;col<this.gridSize;col++) {
-      this.elevations[row*this.gridSize+col] = this.gradedHeight(col*25-6000,row*25-6000);
+      const x=col*25-6000,z=row*25-6000,land=source.isLand(x,z);
+      this.landNodes[row*this.gridSize+col]=Number(land);
+      this.elevations[row*this.gridSize+col] = this.gradedHeight(x,z,land);
     }
   }
 
@@ -41,10 +58,10 @@ export class IncheonFlightSurface {
     return this.surfaces.some(s=>s.kind==='runway' && this.nearby(s,x,z,60) && this.distance(s,x,z)<=60);
   }
 
-  gradedHeight(x,z) {
+  gradedHeight(x,z,land=this.source.isLand(x,z)) {
     // Outside the finite DSM: sea-level continuation, explicitly not real scenery.
     if (Math.max(Math.abs(x),Math.abs(z))>6000) return 0;
-    if (!this.source.isLand(x,z)) return 0;
+    if (!land) return 0;
     let weight=0;
     for (const s of this.surfaces) {
       if (!this.nearby(s,x,z,120)) continue;
@@ -59,10 +76,11 @@ export class IncheonFlightSurface {
   getHeight(x,z) {
     if (![x,z].every(Number.isFinite)) throw new Error('Invalid flight terrain coordinate');
     if (Math.max(Math.abs(x),Math.abs(z))>6000) return 0;
-    if (!this.source.isLand(x,z)) return 0;
     const col=(x+6000)/25,row=(z+6000)/25;
     const ix=Math.min(Math.floor(col),480-1),iz=Math.min(Math.floor(row),480-1);
     const u=col-ix,v=row-iz,i=iz*this.gridSize+ix,g=this.elevations;
+    const isLand=this.coastCells[iz*480+ix] ? this.source.isLand(x,z) : this.landNodes[i];
+    if (!isLand) return 0;
     // PlaneGeometry's NW/SW/NE and SW/SE/NE triangles, not bilinear sampling.
     return u+v<=1 ? g[i]*(1-u-v)+g[i+1]*u+g[i+this.gridSize]*v
       : g[i+this.gridSize+1]*(u+v-1)+g[i+1]*(1-v)+g[i+this.gridSize]*(1-u);

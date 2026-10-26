@@ -1,0 +1,14 @@
+import { readFile,writeFile } from 'node:fs/promises';
+import { gunzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
+import { buildTrafficRoutes } from '../../src/geospatial/incheonTraffic.js';
+const base=new URL('../../public/scenery/incheon/',import.meta.url);
+const bytes=gunzipSync(await readFile(new URL('source.osm.json.gz',base)));
+const source=JSON.parse(await readFile(new URL('source-metadata.json',base)));
+if(createHash('sha256').update(bytes).digest('hex')!==source.sha256||bytes.length!==source.rawBytes)throw new Error('Source mismatch');
+const patch=JSON.parse(await readFile(new URL('patch.json',base)));
+const result=buildTrafficRoutes(patch,JSON.parse(bytes));
+result.sourceSha256=source.sha256;
+result.license='ODbL-1.0';
+await writeFile(new URL('traffic.json',base),JSON.stringify(result)+'\n');
+console.log(result.routes.map(r=>({id:r.id,length:Math.round(r.length),edges:r.edges.length})));
