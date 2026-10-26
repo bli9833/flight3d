@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { IncheonTraffic } from './IncheonTraffic.js';
+import { createControlTower } from './IncheonControlTower.js';
 import { loadIncheonTerrain } from '../geospatial/IncheonTerrain.js';
 import { IncheonFlightSurface, INCHEON_AIRFIELD } from '../geospatial/IncheonFlightSurface.js';
 import { generatePlanting, pointInRing, segmentDistance } from '../geospatial/incheonDressing.js';
@@ -48,6 +49,9 @@ export async function loadIncheonAirport(base) {
     geometry.computeBoundingBox();
     colliders.push({points,top:floor+feature.height.meters,bounds:geometry.boundingBox.clone()});
   }
+  const tower = createControlTower(height);
+  colliders.push(tower.collider);
+  group.add(tower.group);
   group.add(createTexturedBuildings(records,createBuildingMaterials()));
   records.forEach(r=>r.geometry.dispose());
   group.add(createPlantingInstances(trees,height));
@@ -100,6 +104,7 @@ export async function loadIncheonAirport(base) {
       && (pointInRing(x,z,c.points) || c.points.slice(1).some((b,i)=>segmentDistance(x,z,c.points[i],b)<1))));
   group.add(traffic.mesh);
   return {terrain,group,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,
+    towerCab:tower.cab,
     resetTraffic(){traffic.reset();},
     update(dt,position,time,options={}){traffic.update(dt,options.cameraPosition??position,options.quality,options.paused);},
     checkBuildingCollision(probes) {

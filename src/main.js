@@ -941,7 +941,8 @@ class FlightSimulator {
     if (this.cameraSystem) {
       this.cameraSystem.setTerrain(this.currentTerrain);
       if (isIncheon) {
-        this.cameraSystem.towerPos.set(-300, 85, -500);
+        const cab = this.incheonAirport.towerCab;
+        this.cameraSystem.towerPos.set(cab.x, cab.y, cab.z);
       } else if (isLukla) {
         const t = this.luklaAirport.controlTowerData;
         this.cameraSystem.towerPos.set(t.x, t.y + t.height - 1.5, t.z);
