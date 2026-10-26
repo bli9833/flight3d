@@ -172,7 +172,14 @@ class FlightSimulator {
     this.audio = new FlightAudio();
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
-    initFlightPanels({ onCycleCamera: () => this.controls.onCycleCamera() });
+    initFlightPanels({
+      onCycleCamera: () => this.controls.onCycleCamera(),
+      onSelectCamera: mode => this.controls.onSelectCamera(mode),
+      onToggleAutoCamera: () => {
+        this.cameraSystem.toggleAutoViewing();
+        if (this.demoDirector?.isActive) this.demoDirector.onUserCameraChange();
+      },
+    });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
     this.cameraSystem.onResetLook = () => {
@@ -1350,7 +1357,8 @@ class FlightSimulator {
     }
 
     // 12. Cinematic Camera Cuts: Automatic temporary gear view for Takeoff, Touchdown, and Gear Retract/Extend
-    const allowAutoCut = (!this.cameraSystem.userModeSelected || this.cameraSystem.autoSwitch)
+    const allowAutoCut = !this.cameraSystem.autoPaused
+      && (!this.cameraSystem.userModeSelected || this.cameraSystem.autoSwitch)
       && !this.cameraSystem.userLookOverridden
       && !(this.demoDirector && this.demoDirector.isActive && this.demoDirector.userCameraOverridden);
     if (allowAutoCut && !this.landingIncident && this.lastOnGround && !gearResult.onGround && gsKnots > 75) {

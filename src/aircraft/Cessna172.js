@@ -2,6 +2,24 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
+// Ground-handling assembly baked into c172.glb, which must never travel with the
+// aircraft: tie-down straps, their metal spreader bars and cables, the chock bar,
+// and the concrete pad. GLTFLoader passes every node name through
+// PropertyBinding.sanitizeNodeName, which strips the dots from these raw names, so
+// match against the sanitized form instead of the authored spelling.
+export const GROUND_ARTIFACT_NODES = new Set([
+  'Circle.002_32', // wing tie-down straps
+  'Plane.022_20',  // tie-down cable
+  'Plane.029_33',  // wing tie-down spreader bar
+  'Plane.030_34',  // nose tie-down strap
+  'Plane.031_35',  // tie-down strap and cable
+  'Circle.005_49', // chock bar
+  'Cube.010_50'    // concrete pad
+].map(name => THREE.PropertyBinding.sanitizeNodeName(name)));
+
+// Material markers the asset author uses for parking geometry.
+export const GROUND_ARTIFACT_MATERIALS = ['Concrete', 'remove_before_flight'];
+
 /**
  * Cessna 172 Skyhawk Single-Engine Aircraft
  *
@@ -122,11 +140,11 @@ export class Cessna172 {
     });
 
     const glassMat = new THREE.MeshStandardMaterial({
-      color: 0x121b24,
+      color: 0x31414f,
       roughness: 0.1,
       metalness: 0.85,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.25,
       name: 'C172_Glass'
     });
 
@@ -492,20 +510,27 @@ export class Cessna172 {
                 node.name.toLowerCase().includes('window') ||
                 (mat && (mat.transparent || mat.opacity < 0.95));
 
+              // Weaken the authored smoked-glass tint so cabin windows read as clear glass
+              for (const windowMat of (Array.isArray(mat) ? mat : [mat])) {
+                if (windowMat?.name === 'Window') {
+                  windowMat.color.setRGB(0.2, 0.22, 0.25);
+                  windowMat.opacity = 0.15;
+                }
+              }
+
               // Transparent cockpit and cabin windows must not cast shadows into the cockpit,
               // or they block sunlight from illuminating the instrument panel and deck through the glass.
               node.castShadow = !isWindow;
               node.receiveShadow = !isWindow;
 
               // Occlude static ground parking / mooring artifacts
-              if (matName.includes('Concrete') || matName.includes('remove_before_flight')) {
+              if (GROUND_ARTIFACT_MATERIALS.some(marker => matName.includes(marker))) {
                 node.visible = false;
               }
             }
 
-            // Hide ground mooring / chock bar
-            if (node.name === 'Circle.005_49' || node.name === 'Cube.010_50' ||
-                node.name === 'Circle.002_32' || node.name === 'Plane.030_34' || node.name === 'Plane.031_35') {
+            // Hide the ground mooring assembly that shares the airframe hierarchy
+            if (GROUND_ARTIFACT_NODES.has(node.name)) {
               node.visible = false;
             }
 
