@@ -1,5 +1,58 @@
 # City buildings (issue #11)
 
+## North hillside district (issue #207)
+
+[`NorthCityDistrict.js`](../../src/environment/NorthCityDistrict.js) replaces the
+north random cluster with a deterministic, terrain-screened neighborhood. The
+50 m survey around (-800, -2800), radius 1,000 m, found heights -45 to 396 m,
+median analytical gradient magnitude 0.467 (25 degrees), and median rendered vs
+analytical height error 1.19 m (p95 5.37 m). Consequently, the former 180 placement
+attempts are an upper bound, not a building-count target. The current actual
+22,000 m / 256-segment terrain admits 13 buildings on the largest connected
+street component. East and south building records retain the original random
+sequence and are compared exactly with the post-#211 baseline.
+
+World units are meters, +Y is up, north is negative Z. The central finite-difference
+gradient uses a 2 m offset on each side. A contour tangent defines the rotated
+street grid; each candidate is then checked over its whole width at at most 4 m
+spacing, at the center, and at intersections with rendered terrain triangles.
+The analytical gradient and exact rendered triangle-plane gradients both count
+toward the limits. Roads include their junction/end squares in these checks.
+
+The design limits are 18% longitudinal grade, 30% cross slope, lot gradient
+magnitude 0.32, 6 m maximum plinth height including the two 5 cm margins, minimum
+5 m elevation on both surfaces, and 2.5 m maximum surface disagreement. These
+are simulator placement limits selected after the survey, not civil-engineering
+standards. Full footprints avoid the airport and extended approach corridor.
+Water and extreme terrain are excluded rather than filled. The 48 m grid,
+8 m roads, 18 x 18 m lots and 18–48 m buildings produce a smaller, predominantly
+residential mountain neighborhood. Invalid links are removed, only the largest
+connected component remains, and lots must have street access and clear all
+other roads/lots. Shared square junctions and square dead-end caps avoid
+overlapping pavement interiors. Tree exclusion includes crown radii and a 2 m
+margin; it happens after consuming the old random sequence.
+
+[`CitySurface.js`](../../src/environment/CitySurface.js) clips each north road
+polygon at **every rendered terrain triangle edge**, then lifts it 0.12 m. This
+keeps triangle interiors, not just vertices, against the ground. Roads are visual
+overlays, not new driveable contact surfaces. No terrain height, normal-query,
+landing-gear, force or integration model is changed. Existing analytical/render
+surface disagreement is bounded for placement, not globally corrected.
+
+Each horizontal building starts above the maximum of both sampled surfaces; a
+solid box plinth extends below their minimum and acts as the exposed retaining
+wall. No detached retaining wall is introduced. Near facade+plinth and far box
+share one collision envelope. A world AABB indexes broadphase cells and the
+local rotated footprint rejects empty AABB corners. The existing GLB kit,
+fallback and day/night materials serve both districts; foundation capacity now
+includes all accepted north lots.
+
+Run `node --test tests/northCityDistrict.test.js tests/cityBuildings.test.js
+tests/foliage.test.js tests/collision.test.js` and see
+[north evidence and reproduction](../../review-artifacts/north-city/README.md)
+for paired screenshots, browser sequences and measured performance. Screenshots
+and a city-only timing harness do not substitute for full-flight acceptance.
+
 ## Assets and placement
 
 The selected building kit is original to Flight3d: three modular silhouettes

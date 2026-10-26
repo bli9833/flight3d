@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { districtSurfaceHeight } from './CitySurface.js';
+export { districtSurfaceHeight } from './CitySurface.js';
 
 export const DISTRICT = { x: 900, z: 950, spacing: 60, columns: 11, rows: 10 };
 export function districtLot(index) {
@@ -12,20 +14,6 @@ export function inDistrict(x, z) {
   const d = DISTRICT;
   return Math.abs(x - d.x) < d.columns * d.spacing / 2 + 12 &&
     Math.abs(z - d.z) < d.rows * d.spacing / 2 + 12;
-}
-// Interpolate the rendered terrain triangles, which are coarser than getHeight.
-// Road overlays must follow those triangles to avoid disappearing into hills.
-export function districtSurfaceHeight(terrain, x, z) {
-  const { size, segments, geometry } = terrain;
-  if (!geometry || !size || !segments) return terrain.getHeight(x, z);
-  const u = (x / size + .5) * segments, v = (z / size + .5) * segments;
-  const col = Math.floor(u), row = Math.floor(v);
-  if (col < 0 || row < 0 || col >= segments || row >= segments) return terrain.getHeight(x, z);
-  const p = geometry.attributes.position, a = row * (segments + 1) + col;
-  const h00 = p.getY(a), h10 = p.getY(a + 1), h01 = p.getY(a + segments + 1), h11 = p.getY(a + segments + 2);
-  const fx = u - col, fz = v - row;
-  return fx + fz <= 1 ? h00 + (h10 - h00) * fx + (h01 - h00) * fz :
-    h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz);
 }
 export function createDistrictRoads(terrain) {
   const d = DISTRICT, pieces = [];

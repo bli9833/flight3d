@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { createTreeGeometry, TREE_SPECIES, TREE_LOD_DISTANCE, TREE_LOD_HYSTERESIS } from './TreeModels.js';
 import { DISTRICT, districtLot, inDistrict, createDistrictRoads, loadDistrictKit } from './CityDistrict.js';
 import { cityWindowIntensity, createCityBuildingAssets } from './CityBuildingAssets.js';
+import { planNorthDistrict } from './NorthCityDistrict.js';
+import { surfaceGeometry } from './CitySurface.js';
 
 /** Instanced vegetation and cities; collision metadata is independent of visual LOD. */
 export class FoliageAndCities {
@@ -12,10 +14,22 @@ export class FoliageAndCities {
 
     this.treeData = [];
     this.buildingData = [];
+    this.northDistrict = planNorthDistrict(terrain);
 
     this.initFoliage();
     this.initCities();
+    // Filter after consuming the original foliage/city random sequence so other
+    // districts keep their positions, dimensions, colors and archetypes.
+    const keep = this.treeData.map(t => !this.northDistrict.excludesTree(t.x, t.z, t.radius));
+    this.treeInstances = this.treeInstances.filter((_, i) => keep[i]);
+    this.treeData = this.treeData.filter((_, i) => keep[i]);
+    this.lastTreeCamera.set(Infinity, Infinity, Infinity);
+    this.update(new THREE.Vector3());
     this.group.add(createDistrictRoads(terrain));
+    const roads = new THREE.Mesh(surfaceGeometry(terrain, this.northDistrict.polygons),
+      new THREE.MeshStandardMaterial({ color: 0x444a4c, roughness: .95 }));
+    roads.name = 'north-district-roads'; roads.receiveShadow = true;
+    this.group.add(roads);
     this.districtReady = typeof window === 'undefined' ? Promise.resolve(false) :
       loadDistrictKit().then(meshes => {
         meshes.forEach((mesh, i) => {
@@ -206,6 +220,10 @@ export class FoliageAndCities {
         // Check the full rotated footprint, not only its center.
         if (Math.abs(x) < 2200 + worldWidth / 2 && Math.abs(z) < 420 + worldDepth / 2) continue;
 
+        // Consume the legacy north draw sequence, but replace its unsafe random
+        // buildings with terrain-planned lots after generating the south cluster.
+        if (clusterIndex === 1) { placed++; continue; }
+
         let visualY = groundY;
         if (lot) {
           const samples = [-1, 0, 1].flatMap(sx => [-1, 0, 1].map(sz =>
@@ -230,6 +248,7 @@ export class FoliageAndCities {
           localWidth: width,
           localDepth: depth,
           rotationY,
+          district: lot ? 'south' : 'east',
           archetype
         });
 
@@ -248,10 +267,29 @@ export class FoliageAndCities {
       }
     });
 
+    for (const lot of this.northDistrict.lots) {
+      const { x, z, width, depth, rotationY, groundY, visualY, height } = lot;
+      const c = Math.abs(Math.cos(rotationY)), s = Math.abs(Math.sin(rotationY));
+      const archetype = 3 + lot.archetype;
+      dummy.position.set(x, visualY, z); dummy.rotation.y = rotationY;
+      dummy.scale.set(width, height, depth); dummy.updateMatrix();
+      const matrix = dummy.matrix.clone();
+      dummy.position.y = groundY; dummy.scale.y = height + visualY - groundY; dummy.updateMatrix();
+      const farMatrix = dummy.matrix.clone();
+      dummy.scale.y = visualY - groundY; dummy.updateMatrix();
+      this.buildingData.push({ x, y: groundY, z, width: c * width + s * depth,
+        depth: s * width + c * depth, height: height + visualY - groundY,
+        visualY, localWidth: width, localDepth: depth, rotationY, archetype, district: 'north' });
+      this.cityArchetypes[archetype].records.push({ x, y: groundY, z,
+        height: height + visualY - groundY, matrix, farMatrix,
+        foundationMatrix: dummy.matrix.clone(), color: new THREE.Color(0xe2e8f0) });
+    }
+
     const foundationGeometry = new THREE.BoxGeometry(1, 1, 1);
     foundationGeometry.translate(0, .5, 0);
     this.cityFoundations = new THREE.InstancedMesh(foundationGeometry,
-      new THREE.MeshStandardMaterial({ color: 0x7d817e, roughness: .95 }), 110);
+      new THREE.MeshStandardMaterial({ color: 0x7d817e, roughness: .95 }),
+      DISTRICT.columns * DISTRICT.rows + this.northDistrict.lots.length);
     this.cityFoundations.frustumCulled = false;
     this.cityFoundations.name = 'district-foundations';
     this.group.add(this.cityFoundations);
