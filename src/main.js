@@ -613,6 +613,7 @@ class FlightSimulator {
     const groundClearance = this.gear?.cgGroundHeightM ?? 3.5;
 
     if (this.activeAirport === 'incheon') {
+      this.currentAirport.resetTraffic();
       const spawn = incheonSpawn(type, groundClearance, this.currentAircraftId);
       this.position.set(spawn.x, spawn.y, spawn.z);
       this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
@@ -1563,7 +1564,9 @@ class FlightSimulator {
       if (this.activeAirport === 'coastal') this.ships.update(frameDelta, this.totalSimTime);
     }
     if (this.currentAirport) {
-      this.currentAirport.update(frameDelta, this.position, this.totalSimTime);
+      this.currentAirport.update(frameDelta, this.position, this.totalSimTime, {
+        cameraPosition: this.camera.position, quality: this.renderQuality, paused: this.gameFlow.isPhysicsFrozen(),
+      });
     }
     this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(frameDelta);
