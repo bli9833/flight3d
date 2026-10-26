@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { loadIncheonTerrain } from '../geospatial/IncheonTerrain.js';
 import { drapeSurface, placeBuilding, terrainGeometry } from './incheonGeometry.js';
+import { generatePlanting, roadWidth } from '../geospatial/incheonDressing.js';
+import { createCityGround, createBuildingMaterials, createTexturedBuildings, createPlantingInstances, GROUND_TEXTURE_SIZE } from './incheonCityAssets.js';
 
 const canvas = document.querySelector('#scene');
 const status = document.querySelector('#status');
@@ -10,15 +12,6 @@ const status = document.querySelector('#status');
 function footprint(points) {
   // Shape XY becomes world XZ after rotation: shape Y = -world Z.
   return new THREE.Shape(points.slice(0, -1).map(([x, z]) => new THREE.Vector2(x, -z)));
-}
-
-function roadWidth(feature) {
-  const explicit = Number(feature.width);
-  if (explicit > 0 && explicit <= 100) return explicit;
-  if (feature.kind === 'runway') return 45;
-  if (feature.kind === 'taxiway') return 18;
-  return { motorway: 15, motorway_link: 8, trunk: 13, primary: 12, secondary: 10,
-    tertiary: 8, residential: 6, service: 4, footway: 2, path: 2, steps: 2 }[feature.highway] ?? 5;
 }
 
 function ribbon(points, width, y) {
@@ -52,10 +45,16 @@ async function start() {
   if (data.schemaVersion !== 1 || !data.features?.length) throw new Error('지도 데이터 형식을 확인해 주세요.');
   const assetBase = `${import.meta.env.BASE_URL}scenery/incheon/`;
   const terrain = await loadIncheonTerrain(assetBase);
+  const dressingResponse = await fetch(`${assetBase}dressing.json`);
+  if (!dressingResponse.ok) throw new Error(`주차장 데이터 요청 실패 (${dressingResponse.status})`);
+  const dressing = await dressingResponse.json();
+  if (dressing.schemaVersion!==1 || !Array.isArray(dressing.areas)) throw new Error('Invalid city dressing data');
+  const trees = generatePlanting(data,dressing);
   const landMask = await new THREE.TextureLoader().loadAsync(`${assetBase}land-mask.png`);
   landMask.colorSpace = THREE.NoColorSpace;
   const getHeight = (x, z) => terrain.getHeight(x, z);
   let naturalMode = false;
+  let cityMode = true;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   renderer.setClearColor(0xd9e1df);
@@ -74,12 +73,14 @@ async function start() {
   scene.add(sun);
   const groundMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, alphaMap: landMask, alphaTest: 0.5 });
   const grounds = [terrainGeometry(12000, 240, getHeight, true), terrainGeometry(2000, 160, getHeight)];
+  const groundMeshes = [];
   for (const geometry of grounds) {
     const positions = geometry.attributes.position;
     const uv = geometry.attributes.uv;
     for (let i = 0; i < positions.count; i++) uv.setXY(i, positions.getX(i)/12000 + 0.5, 0.5 - positions.getZ(i)/12000);
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(positions.count * 3), 3));
-    scene.add(new THREE.Mesh(geometry, groundMaterial));
+    const mesh = new THREE.Mesh(geometry, groundMaterial);
+    groundMeshes.push(mesh);scene.add(mesh);
   }
   const lowColor = new THREE.Color(0xbcc5a6);
   const highColor = new THREE.Color(0x557d54);
@@ -99,6 +100,14 @@ async function start() {
     }
   }
   updateGround();
+  const cityGroundGeometry = grounds[1].clone();
+  const cityUV=cityGroundGeometry.attributes.uv;
+  for (let i=0;i<cityUV.count;i++) cityUV.setXY(i,cityGroundGeometry.attributes.position.getX(i)/2000+.5,
+    .5-cityGroundGeometry.attributes.position.getZ(i)/2000);
+  let cityTexture=createCityGround(data,dressing,trees);
+  const cityGroundMaterial=new THREE.MeshLambertMaterial({map:cityTexture});
+  const cityGround = new THREE.Mesh(cityGroundGeometry,cityGroundMaterial);
+  scene.add(cityGround);
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000), new THREE.MeshLambertMaterial({ color: 0x83afbd, depthWrite: false }));
   sea.rotation.x = -Math.PI / 2;
   sea.renderOrder = -1; // Background water must not fight zero-height inland DSM pixels.
@@ -115,11 +124,12 @@ async function start() {
   const patchBorder = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(borderPoints), new THREE.LineBasicMaterial({ color: 0xc78638 }));
   scene.add(patchBorder);
 
-  const layers = Object.fromEntries(['roads', 'surfaces', 'buildings'].map(name => [name, new THREE.Group()]));
+  const layers = Object.fromEntries(['roads', 'surfaces', 'buildings','vegetation'].map(name => [name, new THREE.Group()]));
   Object.values(layers).forEach(layer => scene.add(layer));
   const batches = new Map();
   const counts = {};
   const buildingFloors = [];
+  const buildingRecords = [];
   function batch(layer, color, geometry) {
     if (!geometry) return;
     const key = `${layer}:${color}`;
@@ -138,6 +148,7 @@ async function start() {
         geometry.rotateX(-Math.PI / 2);
         const placed = placeBuilding(geometry, getHeight, feature.height.meters);
         buildingFloors.push({ id: feature.id, floorM: placed.floor });
+        buildingRecords.push({feature,geometry:geometry.clone(),floor:placed.floor});
         batch('buildings', feature.height.source === 'placeholder' ? 0xc9aa79 : 0x659cb7, geometry);
       } else if (feature.area) {
         const geometry = new THREE.ShapeGeometry(footprint(points));
@@ -162,6 +173,11 @@ async function start() {
       polygonOffset: layer !== 'buildings', polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
     geometries.forEach(g => g.dispose());
   }
+  const decoratedBuildings=createTexturedBuildings(buildingRecords,createBuildingMaterials());
+  buildingRecords.forEach(record=>record.geometry.dispose());
+  scene.add(decoratedBuildings);
+  const planting=createPlantingInstances(trees,getHeight);
+  layers.vegetation.add(planting);
   const labels = new THREE.Group();
   scene.add(labels);
   const terminal = data.features.find(f => f.id === 'relation/3917466');
@@ -190,6 +206,9 @@ async function start() {
     renderer.render(scene, camera);
     document.querySelector('#render-info').textContent = `${renderer.info.render.calls} draw calls · ${renderer.info.render.triangles.toLocaleString()} triangles · 조작할 때만 렌더링`;
     window.incheonPreview = { ready: true, counts, render: { ...renderer.info.render },
+      city: { enabled:cityMode, trees:trees.length, parkingAreas:dressing.areas.filter(a=>a.kind==='parking').length,
+        groundTextureSize:GROUND_TEXTURE_SIZE, groundTextureBytesRGBA8:Math.round(GROUND_TEXTURE_SIZE**2*4*4/3),
+        memory:{...renderer.info.memory} },
       terrain: { naturalMode, worldSize: 12000, origin: terrain.metadata.origin,
         minM: terrain.metadata.grids['regional-natural'].minM, maxM: terrain.metadata.grids['regional-natural'].maxM,
         changedSamples: terrain.metadata.grading.changedSamples,
@@ -211,27 +230,66 @@ async function start() {
   document.querySelector('#top').addEventListener('click', () => view(true));
   document.querySelector('#oblique').addEventListener('click', () => view(false));
   document.querySelector('#regional').addEventListener('click', () => view(false, true));
+  document.querySelector('#close').addEventListener('click',()=>{
+    controls.target.set(100,12,650);camera.position.set(650,190,1200);controls.update();invalidate();
+  });
+  const checked = layer=>document.querySelector(`[data-layer="${layer}"]`).checked;
+  function updateVisibility() {
+    for (const input of document.querySelectorAll('[data-layer]')) {
+      input.disabled=naturalMode || (input.dataset.layer==='vegetation' && !cityMode);
+      layers[input.dataset.layer].visible=!naturalMode && input.checked && (input.dataset.layer==='vegetation' ? cityMode : !cityMode);
+    }
+    decoratedBuildings.visible=!naturalMode && cityMode && checked('buildings');
+    cityGround.visible=!naturalMode && cityMode;
+    groundMeshes[1].visible=naturalMode || !cityMode;
+    document.querySelector('#height-legend').hidden=naturalMode || cityMode;
+  }
+  document.querySelector('#city-mode').addEventListener('change',event=>{
+    cityMode=event.target.checked;updateVisibility();invalidate();
+  });
   document.querySelector('#natural-dsm').addEventListener('change', event => {
     naturalMode = event.target.checked;
-    for (const input of document.querySelectorAll('[data-layer]')) {
-      input.disabled = naturalMode;
-      layers[input.dataset.layer].visible = !naturalMode && input.checked;
-    }
+    updateVisibility();
     labels.visible = !naturalMode;
     patchBorder.visible = !naturalMode;
     updateGround(); invalidate();
   });
   for (const input of document.querySelectorAll('[data-layer]')) {
-    input.addEventListener('change', () => { layers[input.dataset.layer].visible = input.checked; invalidate(); });
+    input.addEventListener('change', () => {
+      const old=cityTexture;
+      cityTexture=createCityGround(data,dressing,trees,Object.fromEntries([...document.querySelectorAll('[data-layer]')].map(i=>[i.dataset.layer,i.checked])));
+      cityGroundMaterial.map=cityTexture;old.dispose();
+      updateVisibility();invalidate();
+    });
   }
   const levels = data.features.filter(f => f.height?.source === 'levels-estimate').length;
-  for (const [name, value] of [['주변 지형', '12 × 12 km'], ['도로·건물 상세', '2 × 2 km'], ['원본 지형 해상도', '약 30 m'], ['도로 객체', counts.road], ['건물 객체', counts.building], ['층수 기반 추정', `${levels}개`], ['높이 미상', `${counts.building - levels}개`]]) {
+  for (const [name, value] of [['주변 지형', '12 × 12 km'], ['도시 상세', '2 × 2 km'], ['도로 객체', counts.road], ['건물 객체', counts.building],
+    ['주차장 윤곽',dressing.areas.filter(a=>a.kind==='parking').length],['모형 식재',`${trees.length}그루`], ['높이 미상', `${counts.building - levels}개`]]) {
     const dt = document.createElement('dt'); dt.textContent = name;
     const dd = document.createElement('dd'); dd.textContent = value;
     document.querySelector('#counts').append(dt, dd);
   }
   document.querySelector('#coverage').textContent = `구멍이 있거나 불완전한 복합 도형 ${data.stats.excludedRelations}개는 제외했습니다. 원본 데이터와 한계는 문서에 기록했습니다.`;
-  status.textContent = '실제 표면고도와 해안선을 불러왔습니다. 주황 테두리 안에 기존 도로·건물 상세를 표시합니다.';
+  status.textContent = '실제 배치에 지면·외벽·식재 표현을 더했습니다. 도시 표현을 끄면 이전 단계와 비교할 수 있습니다.';
+  updateVisibility();
+  // Review-only sampling measures isolated draw work at the exact current camera.
+  window.incheonReview={groundSignature:()=>{
+    const pixels=cityTexture.image.getContext('2d').getImageData(0,0,GROUND_TEXTURE_SIZE,GROUND_TEXTURE_SIZE).data;
+    let hash=2166136261;
+    for(let i=0;i<pixels.length;i+=13) hash=Math.imul(hash^pixels[i],16777619)>>>0;
+    return hash;
+  },measure:async(count=40)=>{
+    if (!Number.isInteger(count)||count<10||count>100) throw new Error('Invalid sample count');
+    const gl=renderer.getContext(),samples=[];
+    for(let i=0;i<5;i++){renderer.render(scene,camera);gl.finish();}
+    for(let i=0;i<count;i++){
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+      const start=performance.now();renderer.render(scene,camera);gl.finish();samples.push(performance.now()-start);
+    }
+    render();
+    return {samplesMs:samples,render:{...renderer.info.render},memory:{...renderer.info.memory},
+      camera:camera.position.toArray(),target:controls.target.toArray(),viewport:[canvas.width,canvas.height]};
+  }};
   view(false, true);
 }
 
