@@ -109,25 +109,13 @@ class FlightSimulator {
       this.isfdCanvas,
       this.cduCanvas
     );
+    this.aircraftInstances = new Map([['B738', this.aircraft]]);
     this.scene.add(this.aircraft.group);
     this.cockpitOcclusion = new CockpitOcclusion(this.scene, this.camera, this.aircraft.cockpit);
     try {
       this.cockpitOcclusion.enabled = localStorage.getItem('flight3d.cockpitQuality') !== 'performance';
     } catch { /* Use detailed cockpit shading. */ }
-    this.aircraft.cockpit.onModelReady = () => {
-      const cockpit = this.aircraft.cockpit;
-      const visible = cockpit.group.visible;
-      // Include cabin lights even if the user is currently in an exterior view.
-      // compileAsync gathers lights synchronously, then polls program readiness.
-      cockpit.group.visible = true;
-      try {
-        cockpit.shaderWarmup = this.renderer.compileAsync(
-          cockpit.gltfCockpitGroup, this.camera, this.scene
-        ).catch(error => console.warn('Cockpit shader warmup failed:', error));
-      } finally {
-        cockpit.group.visible = visible;
-      }
-    };
+    this.warmCockpitShaders(this.aircraft);
 
     // 3b. Boeing 737 2D Real-Photo Cockpit Overlay
     this.cockpitPhotoOverlay = new CockpitPhotoOverlay(
@@ -456,7 +444,7 @@ class FlightSimulator {
 
   /** Leave the lobby: stop the cinematic and spawn the player at their choice. */
   fly() {
-    if (this.airportLoading) return;
+    if (this.airportLoading || this.lobbySelectionPending) return;
     this.devRunner.stop();
     this.shadowDemo.stop();
     const wantsDemo = this.lobby.preset === 'demo';
@@ -520,6 +508,53 @@ class FlightSimulator {
     if (this.collisionDetector?.loadAircraftConfig) this.collisionDetector.loadAircraftConfig(config);
   }
 
+  /**
+   * Compile the flight-deck programs while the interior is off-screen so the first
+   * cockpit view of that model does not pay for them. Bound to the instance because
+   * models persist across selections.
+   */
+  warmCockpitShaders(aircraft) {
+    const cockpit = aircraft.cockpit;
+    if (!cockpit || !cockpit.gltfCockpitGroup) return;
+    cockpit.onModelReady = () => {
+      const visible = cockpit.group.visible;
+      // Include cabin lights even if the user is currently in an exterior view.
+      // compileAsync gathers lights synchronously, then polls program readiness.
+      cockpit.group.visible = true;
+      try {
+        cockpit.shaderWarmup = this.renderer.compileAsync(
+          cockpit.gltfCockpitGroup, this.camera, this.scene
+        ).catch(error => console.warn('Cockpit shader warmup failed:', error));
+      } finally {
+        cockpit.group.visible = visible;
+      }
+    };
+  }
+
+  /**
+   * A lobby selection rebuilds scene state and uploads new GPU programs, so the work
+   * runs after the menu has painted the new choice: the click task stays short and the
+   * progress line is visible instead of the menu appearing frozen. A newer choice
+   * supersedes one that has not started yet.
+   */
+  queueLobbySelection(work) {
+    const token = (this.lobbySelectionToken || 0) + 1;
+    this.lobbySelectionToken = token;
+    this.lobbySelectionPending = true;
+    this.lobbyScreen?.setSelectionBusy(true);
+    const nextPaint = () => new Promise(resolve => document.hidden
+      ? setTimeout(resolve, 0)
+      : requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    nextPaint().then(() => {
+      if (token !== this.lobbySelectionToken) return;
+      return Promise.resolve().then(work).catch(error => console.warn('Lobby selection failed:', error));
+    }).finally(() => {
+      if (token !== this.lobbySelectionToken) return;
+      this.lobbySelectionPending = false;
+      this.lobbyScreen?.setSelectionBusy(false);
+    });
+  }
+
   setAircraft(aircraftId = 'B738') {
     const config = AIRCRAFT_REGISTRY[aircraftId];
     if (!config) return;
@@ -529,29 +564,42 @@ class FlightSimulator {
       this.demoDirector.stop(() => t('manual.control.engaged'));
     }
 
-    if (this.aircraft?.group) {
-      this.scene.remove(this.aircraft.group);
-    }
-
     this.currentAircraftId = aircraftId;
     if (this.lobby) {
       this.lobby.aircraft = aircraftId;
     }
 
-    if (aircraftId === 'C172') {
-      this.aircraft = new Cessna172(this.pfdCanvas, this.ndCanvas);
-    } else {
-      this.aircraft = new Boeing737(
-        this.pfdCanvas,
-        this.ndCanvas,
-        this.eicasCanvas,
-        this.mcpCanvas,
-        this.isfdCanvas,
-        this.cduCanvas
-      );
+    // Each model is built once per session: re-constructing the 737 (geometry, cockpit
+    // boolean cuts, per-vertex light-transfer binding, instrument canvases) on every
+    // toggle was the bulk of the stall behind a menu click. An interior that failed to
+    // load is dropped, so re-selecting the aircraft still retries the asset.
+    let instance = this.aircraftInstances.get(aircraftId);
+    if (instance?.cockpit?.cockpitModelFailed) {
+      this.scene.remove(instance.group);
+      this.aircraftInstances.delete(aircraftId);
+      instance = null;
     }
-
-    this.scene.add(this.aircraft.group);
+    if (!instance) {
+      instance = aircraftId === 'C172'
+        ? new Cessna172(this.pfdCanvas, this.ndCanvas)
+        : new Boeing737(
+          this.pfdCanvas,
+          this.ndCanvas,
+          this.eicasCanvas,
+          this.mcpCanvas,
+          this.isfdCanvas,
+          this.cduCanvas
+        );
+      this.aircraftInstances.set(aircraftId, instance);
+      this.warmCockpitShaders(instance);
+    }
+    if (this.aircraft && this.aircraft !== instance) {
+      this.scene.remove(this.aircraft.group);
+    }
+    this.aircraft = instance;
+    if (instance.group.parent !== this.scene) {
+      this.scene.add(instance.group);
+    }
     this.loadAircraftConfig(config);
 
     if (this.cockpitOcclusion && this.aircraft.cockpit) {
@@ -887,7 +935,12 @@ class FlightSimulator {
       } catch (error) {
         this.incheonLoad = null;
         console.warn('Incheon loading failed:', error);
-        if (request === this.airportRequest) this.showToast(() => t('incheon.load.failed'));
+        if (request === this.airportRequest) {
+          this.showToast(() => t('incheon.load.failed'));
+          // The menu already shows this airport as chosen; put the selection back.
+          this.lobby.airport = this.activeAirport;
+          this.lobbyScreen?.refresh();
+        }
         return;
       } finally {
         if (request === this.airportRequest) {
@@ -1908,7 +1961,12 @@ class FlightSimulator {
       getAircraft: () => this.lobby.aircraft || this.currentAircraftId || 'B738',
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
-      onAirport: id => this.setAirport(id),
+      onAirport: id => {
+        if (this.activeAirport === id) return;
+        this.lobby.airport = id;
+        this.lobbyScreen?.refresh();
+        this.queueLobbySelection(() => this.setAirport(id));
+      },
       onPreset: type => {
         this.lobby.preset = type;
         this.lobbyScreen.refresh();
@@ -1916,7 +1974,8 @@ class FlightSimulator {
       onTime: hours => this.setTimeOfDay(hours),
       onAircraft: id => {
         this.lobby.aircraft = id;
-        this.setAircraft(id);
+        this.lobbyScreen?.refresh();
+        this.queueLobbySelection(() => this.setAircraft(id));
       },
       onFly: () => this.fly(),
     });

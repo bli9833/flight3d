@@ -252,3 +252,22 @@ test('CollisionDetector (Multi-Obstacle & Crash Detection System)', async (t) =>
     assert.equal(result.type, 'TERRAIN');
   });
 });
+
+test('airport switches reuse the spatial grids of an unchanged foliage source', () => {
+  const foliage = {
+    treeData: [{ x: 1000, y: 25.0, z: 1500, height: 12.0, radius: 4.0 }],
+    buildingData: []
+  };
+  const detector = new CollisionDetector(null, null, foliage, null, null);
+
+  detector.setEnvironment(null, null, foliage, null, null);
+  foliage.treeData.push({ x: -1000, y: 25.0, z: -1500, height: 10.0, radius: 3.5 });
+  detector.setEnvironment(null, null, foliage, null, null);
+  assert.equal(detector.treeGrid.size, 1, 'the grid of the same foliage is not re-binned');
+
+  detector.setEnvironment(null, null, null, null, null);
+  assert.equal(detector.treeGrid.size, 0, 'an airport without foliage needs no grid');
+
+  detector.setEnvironment(null, null, foliage, null, null);
+  assert.equal(detector.treeGrid.size, 2, 'returning to the foliage rebuilds the grid');
+});
