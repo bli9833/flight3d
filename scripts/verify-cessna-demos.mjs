@@ -58,14 +58,14 @@ try {
   })()`);
   await new Promise(resolve => setTimeout(resolve, 2500));
   await capture('menu-desktop');
-  assert.equal(await evaluate(`document.getElementById('lobby-demo-select').options.length`), 2);
+  assert.equal(await evaluate(`document.getElementById('lobby-demo-select').options.length`), 3);
   await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await new Promise(resolve => setTimeout(resolve, 250));
   await evaluate(`document.getElementById('lobby-demo-options').scrollIntoView({block:'nearest'})`);
   await capture('menu-mobile');
   assert.ok(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'no horizontal overflow');
   await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-  for (const [airport, profile] of [['coastal', 'scenic'], ['coastal', 'maneuvers'], ['lukla', 'scenic'], ['lukla', 'maneuvers']]) {
+  for (const [airport, profile] of [['coastal', 'scenic'], ['coastal', 'maneuvers'], ['coastal', 'proximity'], ['lukla', 'scenic'], ['lukla', 'maneuvers']]) {
     if (process.env.ONLY && `${airport}-${profile}` !== process.env.ONLY) continue;
     console.log('Starting', airport, profile);
     await evaluate(`(() => {
@@ -88,7 +88,7 @@ try {
         sim.stepSimulation(1);
         return { active: sim.demoDirector.isActive, stage: sim.demoDirector.currentStage,
           aircraft: sim.currentAircraftId, camera: sim.cameraSystem.mode, crashed: sim.isCrashed,
-          result: sim.demoDirector.cessnaScenario.result, position: sim.position.toArray(),
+          result: sim.demoDirector.getActiveScenario().result, position: sim.position.toArray(),
           ias: sim.telemetry.iasKnots, roll: sim.telemetry.rollDeg, pitch: sim.telemetry.pitchDeg,
           stalled: sim.telemetry.isStalled, throttle: sim.controls.throttle, alpha: sim.aero.alpha, beta: sim.aero.beta,
           angular: sim.angularVelocity.toArray(), vz: sim.linearVelocity.y, elevator: sim.controls.elevator, command: sim.controls.virtualElevator, route: sim.demoDirector.cessnaScenario.route };
@@ -110,9 +110,16 @@ try {
     fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ errors, results }, null, 2));
     assert.equal(last.result.status, 'completed', `${airport} ${profile} completed`);
     assert.ok(samples.every(s => !s.crashed && !s.stalled && s.position.every(Number.isFinite) && s.aircraft === 'C172'), 'physical flight without crashes, stalls or aircraft substitution');
-    assert.ok(last.result.minClearanceM > 25, 'terrain clearance');
+    if (profile === 'proximity') {
+      // The montage's lake skim is intentionally metres above the water, and its
+      // cinematic shots come from the custom view updater, not camera mode cuts.
+      assert.equal(last.result.stagesCompleted, 5, 'all five proximity scenes flown');
+      assert.ok(last.result.minClearanceM > 0, 'terrain clearance');
+    } else {
+      assert.ok(last.result.minClearanceM > 25, 'terrain clearance');
+      assert.ok(cameras.size >= 2, 'cinematic shots');
+    }
     assert.ok(last.throttle > 0, 'powered handoff');
-    assert.ok(cameras.size >= 2, 'cinematic shots');
     if (profile === 'maneuvers') assert.ok(last.result.maxBankDeg > 35 && last.result.maxBankDeg < 65, 'demonstrated steep turns');
   }
   // Exercise real keyboard camera override, cancellation and restart after a

@@ -1083,7 +1083,7 @@ export class CameraSystem {
         planeQuat,
         aircraftMesh,
         flightState,
-        queryGroundHeight: this.queryGroundHeight
+        queryGroundHeight: (x, z) => this.queryGroundHeight(x, z)
       });
       if (handled) return;
     }

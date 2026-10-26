@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { CessnaProximityScenario } from '../src/director/scenarios/CessnaProximityScenario.js';
+import { buildingClearance } from '../src/director/scenarios/cessnaRoutes.js';
 import { CESSNA_172 } from '../src/config/aircraftConfigs.js';
 import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { EngineModel } from '../src/physics/EngineModel.js';
@@ -193,6 +194,47 @@ describe('Cessna Proximity Buzz Montage Scenario', () => {
     director.stop();
     assert.equal(director.isActive, false);
     assert.equal(director.cessnaProximityScenario.result.status, 'cancelled');
+  });
+
+  it('places the building weave inside a corridor that clears the actual generated city', () => {
+    const sim = createProximitySimulator();
+    const buildings = [];
+    // Skyscraper wall across the legacy fixed weave address (2340, 95, 1230).
+    for (let x = 2200; x <= 2500; x += 40) {
+      for (let z = 900; z <= 1400; z += 40) {
+        buildings.push({ x, z, y: 25, width: 30, depth: 30, height: 90 });
+      }
+    }
+    // Sparse downtown blocks the corridor selection can thread between.
+    for (let x = 2000; x <= 3600; x += 200) {
+      for (let z = 600; z <= 2200; z += 200) {
+        buildings.push({ x, z, y: 25, width: 30, depth: 30, height: 90 });
+      }
+    }
+    sim.foliage.buildingData = buildings;
+    sim.currentTerrain = { getHeight: () => 25, isLoaded: true };
+    const director = new DemoFlightDirector(sim);
+    director.start();
+    director.stageTimer = 7.5;
+    director.update(0.05);
+    assert.equal(director.currentStage, CessnaProximityScenario.STAGES.BUILDING_WEAVE);
+
+    const config = director.cessnaProximityScenario.activeConfig;
+    assert.ok(config.altitude >= 75, 'flight altitude clears flat terrain by the corridor floor');
+    const distanceFlown = config.speedKnots * 0.514444 * 7.5;
+    const clearance = buildingClearance(
+      { x: sim.position.x, z: sim.position.z },
+      config.direction,
+      distanceFlown,
+      config.altitude,
+      buildings);
+    assert.ok(clearance >= 40, `building clearance along the weave path: ${clearance.toFixed(1)}`);
+    for (const b of buildings) {
+      const top = b.y + b.height;
+      if (top < config.altitude - 18) continue;
+      const distance = Math.hypot(b.x - sim.position.x, b.z - sim.position.z);
+      assert.ok(distance > 60, 'spawn is not inside a tower taller than the flight deck');
+    }
   });
 
   it('records failure and description when crash occurs', () => {

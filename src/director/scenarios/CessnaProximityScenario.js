@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { t } from '../../i18n/index.js';
 import { Atmosphere } from '../../physics/Atmosphere.js';
 import { flyBank, alphaGuarded } from '../PilotControlLaws.js';
+import { cityRoute } from './cessnaRoutes.js';
 
 const clamp = THREE.MathUtils.clamp;
 
@@ -169,9 +170,10 @@ export class CessnaProximityScenario {
 
   enterStage(stage) {
     const sim = this.sim;
-    const config = SCENE_CONFIGS[stage];
+    let config = SCENE_CONFIGS[stage];
 
     if (config) {
+      if (stage === STAGES.BUILDING_WEAVE) config = this.cityWeaveConfig(config);
       this.activeConfig = config;
       if (stage === STAGES.SHIP_BUZZ) {
         this.result = { status: 'running', minClearanceM: Infinity, stagesCompleted: 0 };
@@ -227,6 +229,54 @@ export class CessnaProximityScenario {
       sim.cameraSystem?.setCustomViewUpdater?.(null);
       this.director.stop(() => t('demo.c172.proximity.complete'), false, { preserveThrottle: true });
     }
+  }
+
+  /** Place the weave inside a corridor through the actual generated city; never move buildings. */
+  cityWeaveConfig(config) {
+    const buildings = this.sim.foliage?.buildingData ?? [];
+    const route = cityRoute(this.sim.currentTerrain, buildings);
+    const direction = route.direction;
+    const pointAlong = (distance) => ({
+      x: route.start.x + direction.x * distance,
+      z: route.start.z + direction.z * distance
+    });
+    const pathSpeed = config.speedKnots * 0.514444;
+    const along = Math.max(0, (route.length - pathSpeed * SCENE_DURATION) / 2);
+
+    // Shot 1 perches on the tallest skyscraper flanking the first half of the pass.
+    let ledge = null;
+    for (const b of buildings) {
+      const top = b.y + b.height;
+      if (top < route.altitude + 6 || top > route.altitude + 120) continue;
+      const dx = b.x - route.start.x, dz = b.z - route.start.z;
+      const bAlong = dx * direction.x + dz * direction.z;
+      const bCross = dx * direction.z - dz * direction.x;
+      if (bAlong < along + 40 || bAlong > along + pathSpeed * SHOT_SPLIT || Math.abs(bCross) > 160) continue;
+      if (!ledge || top > ledge.top) ledge = { b, top, bAlong };
+    }
+    const chaseShot = config.getShot;
+
+    return {
+      ...config,
+      start: { ...pointAlong(along), y: route.altitude },
+      direction,
+      heading: Math.atan2(direction.x, -direction.z) * 180 / Math.PI,
+      altitude: route.altitude,
+      getShot: (time, planePos, planeQuat, forward, right, up) => {
+        if (ledge && time < SHOT_SPLIT) {
+          const b = ledge.b;
+          const pathPoint = pointAlong(ledge.bAlong);
+          const toPath = { x: pathPoint.x - b.x, z: pathPoint.z - b.z };
+          const distance = Math.hypot(toPath.x, toPath.z) || 1;
+          const edge = Math.hypot(b.width, b.depth) / 2 + 3;
+          const pos = new THREE.Vector3(b.x + toPath.x / distance * edge, ledge.top - 6, b.z + toPath.z / distance * edge);
+          return { pos, look: planePos.clone().add(new THREE.Vector3(0, 0.2, 0)), fov: 46, up: new THREE.Vector3(0, 1, 0) };
+        }
+        // Without a flanking skyscraper the whole scene plays on the chase shot;
+        // the stock shot 1 references the old fixed-address ledge.
+        return chaseShot(Math.max(time, SHOT_SPLIT + 0.01), planePos, planeQuat, forward, right, up);
+      }
+    };
   }
 
   setupCameraUpdater(config) {
