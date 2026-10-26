@@ -1,0 +1,11 @@
+{
+  "url": "https://api.openstreetmap.org/api/0.6/map.json?bbox=126.442,37.438,126.468,37.458",
+  "retrievedAt": "2026-10-26T00:17:00Z",
+  "retrievalTimePrecision": "minute",
+  "sha256": "b6a2d19af8387f5afc19e6dfc302b531fde4877a9356bed81b21ce1e7d1a6c71",
+  "rawBytes": 2667298,
+  "license": "ODbL-1.0",
+  "licenseUrl": "https://www.openstreetmap.org/copyright",
+  "attribution": "© OpenStreetMap contributors",
+  "note": "Fixed public map API snapshot; object timestamps differ. No single upstream database timestamp supplied."
+}
