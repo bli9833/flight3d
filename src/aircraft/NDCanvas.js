@@ -1,3 +1,4 @@
+import { APPROACH_DATA } from '../config/approachData.js';
 import * as THREE from 'three';
 
 /**
@@ -195,7 +196,18 @@ export class NDCanvas {
 
     let rwyStart, rwyEnd, extStart, extEnd, activeWpt, threshPos, vor1, vor2, fixes;
 
-    if (isLukla) {
+    if (this.airportId === 'incheon') {
+      const a = APPROACH_DATA.incheon, h = a.headingDeg*Math.PI/180;
+      const at = distance => ({ x:a.threshold.x+Math.sin(h)*distance, z:a.threshold.z-Math.cos(h)*distance });
+      activeWpt = 'RW15R';
+      threshPos = a.threshold;
+      rwyStart = projectToScreen(threshPos.x,threshPos.z);
+      rwyEnd = projectToScreen(a.end.x,a.end.z);
+      const before=at(-6000),after=at(4500);
+      extStart=projectToScreen(before.x,before.z);extEnd=projectToScreen(after.x,after.z);
+      vor1='RKSI  RW15R';vor2='MODEL APPROACH';
+      fixes=[{name:'FINAL',...at(-1500)},{name:'RW15R',...threshPos}];
+    } else if (isLukla) {
       activeWpt = 'RW06';
       threshPos = { x: -223.5, z: 139.6 };
       rwyStart = projectToScreen(-223.5, 139.6);
@@ -242,7 +254,10 @@ export class NDCanvas {
     // 1 NM tick marks along final approach course
     for (let nm = 1; nm <= 5; nm++) {
       let tickPos;
-      if (isLukla) {
+      if (this.airportId === 'incheon') {
+        const a=APPROACH_DATA.incheon,h=a.headingDeg*Math.PI/180;
+        tickPos=projectToScreen(a.threshold.x-Math.sin(h)*nm*1852,a.threshold.z+Math.cos(h)*nm*1852);
+      } else if (isLukla) {
         const sTick = -263.5 - nm * 1852;
         tickPos = projectToScreen(sTick * sin58, -sTick * cos58);
       } else {

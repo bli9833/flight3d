@@ -1,4 +1,12 @@
 export default {
+  "incheon.airport": "인천공항 (RKSI)",
+  "incheon.runway": "15R 이륙 준비",
+  "incheon.approach": "15R 최종 접근 · 1.5 km",
+  "incheon.cruise": "영종도 순항 · 750 m",
+  "incheon.loading": "인천 지형·공항을 불러오는 중…",
+  "incheon.load.failed": "인천 데이터를 불러오지 못했습니다. 다시 선택해 주세요.",
+  "incheon.limitations": "12 × 12 km 실험 구역 · 2 × 2 km 도시 상세 · 공항 표면 7m 근사 · 자동 데모 미제공",
+
   "demo.route": "데모 코스",
   "demo.watch": "데모 감상 시작",
   "demo.b738.classic": "보잉 737 · 공항 시네마틱 비행",

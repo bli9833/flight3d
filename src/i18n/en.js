@@ -1,4 +1,12 @@
 export default {
+  "incheon.airport": "Incheon Airport (RKSI)",
+  "incheon.runway": "Runway 15R · Ready for takeoff",
+  "incheon.approach": "Runway 15R · 1.5 km final",
+  "incheon.cruise": "Yeongjong cruise · 750 m",
+  "incheon.loading": "Loading Incheon terrain and airport…",
+  "incheon.load.failed": "Incheon assets failed to load. Select the airport to retry.",
+  "incheon.limitations": "12 × 12 km experimental area · 2 × 2 km city detail · modeled 7 m pavement · manual flight",
+
   "demo.route": "Demo route",
   "demo.watch": "Watch demo flight",
   "demo.b738.classic": "Boeing 737 · Airport cinematic flight",

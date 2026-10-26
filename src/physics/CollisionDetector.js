@@ -265,6 +265,8 @@ export class CollisionDetector {
   checkAirportBuildings(aircraftPos, worldProbes) {
     if (!this.airport) return null;
 
+    if (this.airport.checkBuildingCollision) return this.airport.checkBuildingCollision(worldProbes);
+
     // Check terminal concourse box
     const term = this.airport.terminalData;
     if (term) {

@@ -31,6 +31,7 @@ export class GameFlowController {
     this.isDemoWaiting = isDemoWaiting;
     this.onStateChange = onStateChange;
 
+    this.cinematicAvailable = true;
     this.state = FLOW.LOBBY;
     this.resumableFlight = false;  // LOBBY is holding a live flight, not the cinematic
     this._countdown = null;        // seconds until restart fires; null = not armed
@@ -47,7 +48,13 @@ export class GameFlowController {
   }
 
   isPhysicsFrozen() {
-    return this.state === FLOW.PAUSED || (this.state === FLOW.LOBBY && this.resumableFlight);
+    return this.state === FLOW.PAUSED || (this.state === FLOW.LOBBY && (this.resumableFlight || !this.cinematicAvailable));
+  }
+
+  setCinematicAvailable(available) {
+    this.cinematicAvailable = available;
+    this._disarmRestart();
+    if (available && this.state === FLOW.LOBBY && !this.resumableFlight) this._armRestart();
   }
 
   enterLobby() {
@@ -111,7 +118,7 @@ export class GameFlowController {
 
   update(dt) {
     this._elapsed += dt;
-    if (this.state !== FLOW.LOBBY || this.resumableFlight) return;
+    if (this.state !== FLOW.LOBBY || this.resumableFlight || !this.cinematicAvailable) return;
 
     if (this.isDemoActive() || this.isDemoWaiting()) {
       this._demoWasActive = true;

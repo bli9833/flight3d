@@ -1,3 +1,4 @@
+import incheon from './incheonAirfield.json' with { type: 'json' };
 /**
  * Final-approach geometry per airport, derived from the flight presets in
  * src/main.js (threshold world position, runway heading, glideslope angle,
@@ -8,6 +9,7 @@
  * and "right of course" is (cos, sin).
  */
 export const APPROACH_DATA = {
+  incheon: incheon.approach,
   lukla: {
     // Lukla Runway 06 (Tenzing-Hillary), 11.7% uphill runway; approach slope 4.28°.
     threshold: { x: -223.5, z: 139.6 },

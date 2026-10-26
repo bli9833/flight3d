@@ -38,3 +38,9 @@ https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contrib
 
 The natural source grids remain separate from the model grading. Neither
 the building pads nor the airport reference are surveyed pavement data.
+
+`src/config/incheonAirfield.json` is an ODbL derivative of the same frozen OSM
+response, retaining complete runway/taxiway/apron ways instead of the 2km crop.
+Rebuild with `node scripts/scenery/build-incheon-airfield.mjs`. Its source checksum
+is recorded in the file. Runway markings and the constant 7m pavement profile are
+illustrative model approximations, not surveyed or operational navigation data.

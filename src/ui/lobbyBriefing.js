@@ -3,6 +3,7 @@ import { APPROACH_DATA } from '../config/approachData.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable } from '../config/scenarioRegistry.js';
 
 const AIRPORT_NAME_KEYS = {
+  incheon: 'incheon.airport',
   coastal: 'coastal.airport',
   lukla: 'lukla.vnlk',
 };
@@ -19,13 +20,14 @@ export function lobbyBriefing(airportKey, presetType) {
   const lines = [
     t(AIRPORT_NAME_KEYS[airportKey]),
     t('lobby.briefing.runway', {
-      heading: String(data.headingDeg).padStart(3, '0'),
-      elevationFt: data.elevationFt,
+      heading: String(Math.round(data.headingDeg)).padStart(3, '0'),
+      elevationFt: Math.round(data.elevationFt),
       gsAngle: data.gsAngleDeg,
     }),
   ];
   if (isScenarioAvailable(airportKey, presetType)) {
     lines.push(t(SPAWN_SCENARIOS[presetType].briefingKey));
   }
+  if (airportKey === 'incheon') lines.push(t('incheon.limitations'));
   return lines;
 }

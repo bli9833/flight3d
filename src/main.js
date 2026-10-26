@@ -26,6 +26,8 @@ import { Cessna172 } from './aircraft/Cessna172.js';
 import { Terrain } from './environment/Terrain.js';
 import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality } from './config/renderQuality.js';
 import { WaterOcean } from './environment/WaterOcean.js';
+import { loadIncheonAirport } from './environment/IncheonAirport.js';
+import { incheonSpawn } from './geospatial/IncheonFlightSurface.js';
 import { Airport } from './environment/Airport.js';
 import { FoliageAndCities } from './environment/FoliageAndCities.js';
 import { Ships } from './environment/Ships.js';
@@ -169,7 +171,7 @@ class FlightSimulator {
     this.luklaAirport.group.visible = false;
     this.scene.add(this.luklaAirport.group);
 
-    this.activeAirport = 'lukla'; // 'coastal' | 'lukla'; initControls flips to coastal below
+    this.activeAirport = 'lukla'; // 'coastal' | 'lukla' | 'incheon'; initControls flips to coastal below
     this.currentTerrain = this.terrain;
     this.currentAirport = this.airport;
 
@@ -454,6 +456,7 @@ class FlightSimulator {
 
   /** Leave the lobby: stop the cinematic and spawn the player at their choice. */
   fly() {
+    if (this.airportLoading) return;
     this.devRunner.stop();
     this.shadowDemo.stop();
     const wantsDemo = this.lobby.preset === 'demo';
@@ -609,7 +612,24 @@ class FlightSimulator {
 
     const groundClearance = this.gear?.cgGroundHeightM ?? 3.5;
 
-    if (this.activeAirport === 'lukla') {
+    if (this.activeAirport === 'incheon') {
+      const spawn = incheonSpawn(type, groundClearance, this.currentAircraftId);
+      this.position.set(spawn.x, spawn.y, spawn.z);
+      this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
+      this.angularVelocity.set(0, 0, 0);
+      this.quaternion.setFromEuler(new THREE.Euler(type === 'approach' ? .04 : 0, spawn.yaw, 0, 'YXZ'));
+      const airborne = type !== 'runway';
+      this.controls.throttle = airborne ? .5 : 0;
+      this.engines.setThrottle(this.controls.throttle);
+      this.engines.setReverser(false, true);
+      this.gear.setGearTarget(type !== 'cruise');
+      this.gear.gearState = this.gear.isFixed || type !== 'cruise' ? 1 : 0;
+      this.aero.setFlapPosition(type === 'approach' ? 5 : type === 'runway' ? 2 : 0);
+      this.aero.spoilers = 0;
+      this.controls.pitchTrim = this.aero.pitchTrim = 4.5;
+      const label = { runway: 'incheon.runway', approach: 'incheon.approach', cruise: 'incheon.cruise' }[type];
+      this.showToast(() => t(label));
+    } else if (this.activeAirport === 'lukla') {
       const sin58 = 0.848048;
       const cos58 = 0.529919;
 
@@ -828,29 +848,64 @@ class FlightSimulator {
   }
 
   /**
-   * Switch Active Airport Environment (Coastal International vs Nepal Lukla)
+   * Switch the active airport; Incheon assets are loaded before committing the selection.
    */
-  setAirport(id) {
+  async setAirport(id) {
+    if (!['coastal', 'lukla', 'incheon'].includes(id)) return;
+    const request = this.airportRequest = (this.airportRequest || 0) + 1;
+    this.airportLoading = false;
+    document.getElementById('btn-fly').disabled = false;
+    if (id === 'incheon' && !this.incheonAirport) {
+      this.airportLoading = true;
+      document.getElementById('btn-fly').disabled = true;
+      this.showToast(() => t('incheon.loading'));
+      try {
+        this.incheonLoad ??= loadIncheonAirport(`${import.meta.env.BASE_URL}scenery/incheon/`).then(airport => {
+          this.incheonAirport = airport;
+          airport.group.visible = airport.terrain.mesh.visible = false;
+          this.scene.add(airport.group, airport.terrain.mesh);
+          return airport;
+        });
+        await this.incheonLoad;
+      } catch (error) {
+        this.incheonLoad = null;
+        console.warn('Incheon loading failed:', error);
+        if (request === this.airportRequest) this.showToast(() => t('incheon.load.failed'));
+        return;
+      } finally {
+        if (request === this.airportRequest) {
+          this.airportLoading = false;
+          document.getElementById('btn-fly').disabled = false;
+        }
+      }
+      if (request !== this.airportRequest) return;
+    }
     this.devRunner?.stop();
     if (this.activeAirport === id) return;
     this.activeAirport = id;
     const isLukla = id === 'lukla';
+    const isIncheon = id === 'incheon';
+    const isCoastal = id === 'coastal';
+    document.getElementById('incheon-attribution').hidden = !isIncheon;
 
     // Toggle 3D mesh visibility
-    this.terrain.mesh.visible = !isLukla;
-    this.airport.group.visible = !isLukla;
+    this.terrain.mesh.visible = isCoastal;
+    this.airport.group.visible = isCoastal;
     this.water.mesh.visible = !isLukla;
-    this.ships.group.visible = !isLukla;
-    this.foliage.group.visible = !isLukla;
+    this.ships.group.visible = isCoastal;
+    this.foliage.group.visible = isCoastal;
 
     this.luklaTerrain.mesh.visible = isLukla;
     this.luklaAirport.group.visible = isLukla;
 
-    this.currentTerrain = isLukla ? this.luklaTerrain : this.terrain;
-    this.currentAirport = isLukla ? this.luklaAirport : this.airport;
+    if (this.incheonAirport) this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = isIncheon;
+    this.currentTerrain = isIncheon ? this.incheonAirport.terrain : isLukla ? this.luklaTerrain : this.terrain;
+    this.currentAirport = isIncheon ? this.incheonAirport : isLukla ? this.luklaAirport : this.airport;
 
     if (this.collisionDetector) {
-      if (isLukla) {
+      if (isIncheon) {
+        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
+      } else if (isLukla) {
         this.collisionDetector.setEnvironment(this.luklaTerrain, this.luklaAirport, null, null, null);
       } else {
         this.collisionDetector.setEnvironment(this.terrain, this.currentAirport, this.foliage, this.ships, this.water);
@@ -868,7 +923,9 @@ class FlightSimulator {
     // Relocate tower camera position and update active terrain for the active airport environment
     if (this.cameraSystem) {
       this.cameraSystem.setTerrain(this.currentTerrain);
-      if (isLukla) {
+      if (isIncheon) {
+        this.cameraSystem.towerPos.set(-300, 85, -500);
+      } else if (isLukla) {
         const t = this.luklaAirport.controlTowerData;
         this.cameraSystem.towerPos.set(t.x, t.y + t.height - 1.5, t.z);
       } else {
@@ -894,6 +951,7 @@ class FlightSimulator {
     // A new airport re-spawns the aircraft below, so any flight held behind the
     // menu is no longer the one to return to: release it and let the cinematic back.
     this.gameFlow.abandonResumableFlight();
+    this.gameFlow.setCinematicAvailable(!isIncheon);
     this.lobbyScreen?.refresh();
 
     if (this.demoDirector && this.demoDirector.isActive) {
@@ -902,7 +960,7 @@ class FlightSimulator {
 
     this.setPreset('runway');
 
-    const airportKey = isLukla
+    const airportKey = isIncheon ? 'incheon.airport' : isLukla
       ? 'tenzing.hillary.airport.nepal.vnlk.runway.24'
       : 'pacific.coastal.international.airport.runway.09l.elevation';
     this.showToast(() => t('airport.changed.value', { value: t(airportKey) }));
@@ -1466,7 +1524,7 @@ class FlightSimulator {
     // Keep the lobby backdrop alive: re-arm the demo after it ends.
     this.gameFlow.update(frameDelta);
     if (this.gameFlow.consumeDemoRestart()) {
-      this.demoDirector.start(this.activeAirport);
+      if (isScenarioAvailable(this.activeAirport, 'demo')) this.demoDirector.start(this.activeAirport);
       if (this.lobbyScreen) {
         this.lobbyScreen.setWaitingForTerrain(this.demoDirector.waitingForTerrain === true);
       }
@@ -1485,7 +1543,7 @@ class FlightSimulator {
     // 3. Update Environment Animations & Explosion Particles
     if (this.activeAirport !== 'lukla') {
       this.water.update(frameDelta, this.camera ? this.camera.position : this.position);
-      this.ships.update(frameDelta, this.totalSimTime);
+      if (this.activeAirport === 'coastal') this.ships.update(frameDelta, this.totalSimTime);
     }
     if (this.currentAirport) {
       this.currentAirport.update(frameDelta, this.position, this.totalSimTime);

@@ -1,0 +1,93 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
+import { IncheonFlightSurface, INCHEON_AIRFIELD as field, incheonSpawn } from '../src/geospatial/IncheonFlightSurface.js';
+import { IncheonTerrain } from '../src/geospatial/IncheonTerrain.js';
+import { projectToLocal } from '../src/geospatial/incheon.js';
+import { approachDeviation } from '../src/config/approachData.js';
+import { scenariosForAirport } from '../src/config/scenarioRegistry.js';
+import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
+import { terrainGeometry } from '../src/previews/incheonGeometry.js';
+import { GameFlowController } from '../src/ui/GameFlowController.js';
+const base=new URL('../public/scenery/incheon/',import.meta.url);
+const metadata=JSON.parse(readFileSync(new URL('terrain-metadata.json',base)));
+const grids=Object.fromEntries(Object.entries(metadata.grids).map(([key,d])=>{
+  const b=readFileSync(new URL(d.file,base));return [key,Float32Array.from({length:b.length/4},(_,i)=>b.readFloatLE(i*4))];
+}));
+const surface=new IncheonFlightSurface(new IncheonTerrain(metadata,grids,JSON.parse(readFileSync(new URL('coastline.json',base)))));
+
+test('full runways retain frozen source endpoints and fit the loaded terrain',()=>{
+  const bytes=gunzipSync(readFileSync(new URL('source.osm.json.gz',base)));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),field.sourceSha256);
+  const raw=JSON.parse(bytes),nodes=new Map(raw.elements.filter(e=>e.type==='node').map(n=>[n.id,n]));
+  for(const runway of field.surfaces.filter(s=>s.kind==='runway')) {
+    const way=raw.elements.find(e=>`way/${e.id}`===runway.id);
+    assert.deepEqual(runway.points,way.nodes.map(id=>{const n=nodes.get(id);return projectToLocal(n.lat,n.lon);}));
+    const a=runway.points[0],b=runway.points.at(-1);
+    assert.ok(Math.abs(Math.hypot(b[0]-a[0],b[1]-a[1])-3750)<20);
+    for(let i=0;i<=100;i++) {
+      const x=a[0]+(b[0]-a[0])*i/100,z=a[1]+(b[1]-a[1])*i/100;
+      assert.ok(surface.isOnRunway(x,z));assert.equal(surface.getHeight(x,z),7);
+      assert.ok(surface.getNormal(x,z).y>.999);
+    }
+  }
+});
+
+test('pavement mask follows real shapes and only nearby terrain is graded',()=>{
+  for(const s of field.surfaces) for(const [x,z] of s.points) {
+    assert.ok(surface.isOnRunway(x,z),s.id);
+    assert.equal(surface.getHeight(x,z),7,s.id);
+  }
+  assert.equal(surface.isOnRunway(3000,3000),false);
+  assert.equal(surface.getHeight(7000,0),0);
+  assert.equal(surface.getHeight(-4800,-4800),0);
+  assert.equal(surface.getHeight(3000,-3000),surface.source.getHeight(3000,-3000));
+});
+
+test('runway and approach spawns align with navigation for both aircraft',()=>{
+  for(const id of ['B738','C172']) {
+    const ground=incheonSpawn('runway',3.5,id),air=incheonSpawn('approach',3.5,id);
+    assert.ok(surface.isOnRunway(ground.x,ground.z));assert.equal(ground.y,10.5);
+    const deviation=approachDeviation('incheon',{...air,altitudeFt:(air.y-3.5)/.3048});
+    assert.ok(Math.abs(deviation.crossTrackM)<1e-9);
+    assert.ok(Math.abs(deviation.distanceToThresholdM-1500)<1e-9);
+    assert.ok(Math.abs(deviation.glideslopeErrorFt)<1e-9);
+    assert.ok(Math.abs(air.vy/Math.hypot(air.vx,air.vz)+Math.tan(Math.PI/60))<1e-10);
+    assert.ok(air.y>surface.getHeight(air.x,air.z)+50);
+  }
+  assert.deepEqual(scenariosForAirport('incheon'),['runway','approach','cruise']);
+});
+
+test('manual airport lobby freezes and never starts an unrelated demo; switching restores cinematic',()=>{
+  const flow=new GameFlowController();
+  flow.setCinematicAvailable(false);
+  for(let i=0;i<20;i++){flow.update(1);assert.equal(flow.consumeDemoRestart(),false);assert.equal(flow.isPhysicsFrozen(),true);}
+  assert.equal(flow.canResumeFromLobby(),false);
+  flow.enterFlight();assert.equal(flow.isPhysicsFrozen(),false);
+  flow.returnToLobby(true);assert.equal(flow.canResumeFromLobby(),true);
+  flow.enterFlight();flow.pause();assert.equal(flow.isPhysicsFrozen(),true);flow.resume();
+  flow.returnToLobby();flow.setCinematicAvailable(true);flow.update(2);
+  assert.equal(flow.consumeDemoRestart(),true);
+});
+
+test('physics height agrees with the rendered triangle plane, including local mesh subdivisions',()=>{
+  for(const [size,segments,omit] of [[12000,480,true],[2000,160,false]]) {
+    const geometry=terrainGeometry(size,segments,(x,z)=>surface.getHeight(x,z),omit);
+    const p=geometry.attributes.position,indices=geometry.index.array;
+    for(let i=0;i<indices.length;i+=3*97) {
+      const [a,b,c]=Array.from(indices.slice(i,i+3));
+      const x=(p.getX(a)+p.getX(b)+p.getX(c))/3,z=(p.getZ(a)+p.getZ(b)+p.getZ(c))/3;
+      const y=(p.getY(a)+p.getY(b)+p.getY(c))/3;
+      if (!surface.source.isLand(x,z)) { assert.equal(surface.getHeight(x,z),0); continue; }
+      assert.ok(Math.abs(surface.getHeight(x,z)-y)<.0001,`${size}: ${x},${z}`);
+    }
+    geometry.dispose();
+  }
+});
+
+test('P-key demo entry cannot run the coastal route at Incheon',()=>{
+  const director={sim:{activeAirport:'incheon'}};
+  assert.equal(DemoFlightDirector.prototype.start.call(director),false);
+});
