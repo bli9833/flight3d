@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>인천·영종도 — 1단계 배치 검토 | Flight3d</title>
+  <link rel="stylesheet" href="/src/previews/incheon.css">
+</head>
+<body>
+  <header>
+    <div><span class="eyebrow">FLIGHT3D · INCHEON / YEONGJONG</span><h1>실제 배치부터, 작게 시작합니다.</h1>
+      <p>1단계 · 1터미널 주변 2 × 2 km 도로·건물 데이터 검토</p></div>
+    <a href="./">비행 시뮬레이터로</a>
+  </header>
+  <main>
+    <section class="viewport" aria-label="인천공항 주변 3D 배치 미리보기">
+      <canvas id="scene" aria-label="실제 도로·건물 윤곽의 3D 모형. 마우스로 회전·확대할 수 있습니다."></canvas>
+      <div class="view-buttons"><button id="oblique" type="button">항공 시점</button><button id="top" type="button">위에서 보기 · 북쪽 위</button></div>
+      <div class="orientation">100 m 격자 <span>북쪽은 평면 시점에서 위쪽</span></div>
+      <div class="map-attribution"><a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></div>
+      <div class="caption">실제 지형 미적용 · 높이는 모두 추정/임시값 · 차량 미포함</div>
+    </section>
+    <aside>
+      <span class="eyebrow">DATA CHECK / 01</span><h2>1터미널과 주변 도로</h2>
+      <p id="status" role="status">고정된 지도 데이터를 불러오는 중…</p>
+      <dl id="counts"></dl>
+      <fieldset><legend>레이어</legend>
+        <label><input type="checkbox" data-layer="buildings" checked> 건물 윤곽과 추정 높이</label>
+        <label><input type="checkbox" data-layer="roads" checked> 도로 · 활주로 · 유도로</label>
+        <label><input type="checkbox" data-layer="surfaces" checked> 녹지 · 토지 이용</label>
+      </fieldset>
+      <div class="legend"><span><i class="estimated"></i>층수 × 3 m 추정</span><span><i class="placeholder"></i>높이 미상 · 임시 8 m</span></div>
+      <p class="note">도로·건물 윤곽은 OpenStreetMap 기준입니다. 지형은 평면이며, 고가·지하 도로도 같은 높이에 표시합니다. 터미널 외관과 항공용 시설 정밀도는 아직 구현하지 않았습니다.</p>
+      <p class="note" id="coverage"></p>
+      <p class="note">드래그: 회전 · 휠/핀치: 확대 · 오른쪽 드래그: 이동<br>키보드: 캔버스를 누른 뒤 방향키로 이동, 버튼으로 시점 복원</p>
+      <div class="render-info" id="render-info"></div>
+    </aside>
+  </main>
+  <footer><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors · ODbL</a><span>배치 확인용 모형 · 비행/FPS 벤치마크 아님</span></footer>
+  <script type="module" src="/src/previews/incheon.js"></script>
+</body>
+</html>

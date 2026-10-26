@@ -9,6 +9,11 @@ const { version } = JSON.parse(readFileSync(new URL('./package.json', import.met
 export default defineConfig({
   define: { __BUILD_INFO__: JSON.stringify({ version, revision, builtAt: new Date().toISOString() }) },
   base: process.env.VITE_BASE_PATH || "/",
+  build: {
+    rolldownOptions: {
+      input: { main: 'index.html', incheon: 'incheon.html' }
+    }
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,
