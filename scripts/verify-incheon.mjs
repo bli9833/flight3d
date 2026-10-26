@@ -7,7 +7,7 @@ import path from 'node:path';
 if (process.env.CHROME_PROJECT !== 'flight3d') throw new Error('Run with chrome-session --project flight3d');
 const port = process.env.CHROME_DEBUG_PORT ?? '9225';
 const url = process.env.APP_URL ?? 'http://127.0.0.1:5186/incheon.html';
-const artifacts = process.env.ARTIFACT_DIR ?? path.join(process.cwd(), 'review-artifacts/incheon-stage1');
+const artifacts = process.env.ARTIFACT_DIR ?? path.join(process.cwd(), 'review-artifacts/incheon-stage2');
 const target = await fetch(`http://127.0.0.1:${port}/json/new?${encodeURIComponent('about:blank')}`, { method: 'PUT' }).then(r => r.json());
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
@@ -17,7 +17,7 @@ let id = 0;
 ws.onmessage = event => {
   const message = JSON.parse(event.data);
   if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.text);
-  if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') errors.push(message.params.entry.text);
+  if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') errors.push(`${message.params.entry.text} ${message.params.entry.url ?? ''}`.trim());
   const request = pending.get(message.id);
   if (!request) return;
   pending.delete(message.id);
@@ -71,7 +71,14 @@ try {
   assert.equal(initial.counts.road, 553);
   assert.ok(initial.render.calls > 0 && initial.render.calls < 40, 'bounded batching draw calls');
   assert.ok(initial.render.triangles > 1000);
+  assert.equal(initial.terrain.worldSize, 12000);
+  assert.ok(initial.terrain.maxM > 200, 'regional DSM includes surrounding hills');
+  assert.ok(initial.terrain.outsideUnmodified, 'outside the local patch retains source height');
+  assert.ok(initial.terrain.changedSamples > 0);
+  assert.ok(initial.terrain.coastlineChecks.every(p => p.observed === p.land), 'land/sea classification matches independent checkpoints');
   const gpu = await evaluate(`(() => { const gl=document.querySelector('canvas').getContext('webgl2'); const ext=gl.getExtension('WEBGL_debug_renderer_info'); return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unavailable'; })()`);
+  await capture('regional');
+  await click('#oblique');
   await capture('oblique');
   await click('[data-layer="buildings"]');
   const hidden = await evaluate('window.incheonPreview.render');
@@ -80,6 +87,15 @@ try {
   assert.equal(await evaluate('window.incheonPreview.render.triangles'), initial.render.triangles);
   await click('#top');
   await capture('top');
+  for (let i = 0; i < 3; i++) {
+    await click('#natural-dsm');
+    assert.equal(await evaluate('window.incheonPreview.terrain.naturalMode'), true);
+    assert.ok(await evaluate('document.querySelector("[data-layer=buildings]").disabled'));
+    if (i === 0) await capture('natural-dsm');
+    await click('#natural-dsm');
+    assert.equal(await evaluate('window.incheonPreview.terrain.naturalMode'), false);
+  }
+  assert.equal(await evaluate('window.incheonPreview.terrain.geometryCount'), initial.terrain.geometryCount, 'comparison cycles reuse terrain geometry');
   // Drive actual canvas pointer gestures; rendered on demand after controls change.
   const canvas = await evaluate(`(() => { const r=document.querySelector('canvas').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
   await send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...canvas, deltaX: 0, deltaY: -150 });
@@ -89,11 +105,18 @@ try {
   await settle();
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'), 'mobile page has no horizontal overflow');
   assert.ok(await evaluate('document.querySelector("canvas").clientHeight > 300'));
+  assert.ok(await evaluate(`(() => {
+    const orientation = document.querySelector('.orientation').getBoundingClientRect();
+    const attribution = document.querySelector('.map-attribution').getBoundingClientRect();
+    const caption = document.querySelector('.caption').getBoundingClientRect();
+    return orientation.bottom <= attribution.top && attribution.bottom <= caption.top;
+  })()`), 'mobile attribution and captions must not overlap');
   await capture('mobile');
   assert.deepEqual(errors, [], 'no runtime or resource errors');
   const result = { url, gpu, initial, buildingsHidden: hidden, errors,
-    checks: ['loaded real snapshot', 'batched geometry', 'layer checkbox hide/restore', 'view buttons', 'wheel input', '390px layout'],
-    limitation: 'Standalone flat layout preview; no flight-loop FPS measurement or terrain acceptance.' };
+    checks: ['loaded real snapshot and DSM', 'land/sea checkpoints', 'unmodified regional source', 'batched geometry',
+      'layer checkbox hide/restore', 'view buttons', 'DSM comparison cycles without geometry growth', 'wheel input', '390px layout'],
+    limitation: 'Standalone DSM/coast preview with approximate local grading; no flight-loop FPS, surveyed pavement, bridge clearances or collision integration.' };
   await writeFile(path.join(artifacts, 'results.json'), `${JSON.stringify(result, null, 2)}\n`);
   console.log(JSON.stringify(result, null, 2));
 } finally {
