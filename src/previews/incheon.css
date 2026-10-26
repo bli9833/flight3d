@@ -34,4 +34,4 @@ input { accent-color: #236956; }
 .note { font-size: 11px; line-height: 1.8; color: #69766f; margin: 17px 0 0; }
 .render-info { font-size: 11px; color: #53695c; margin-top: 16px; }
 footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 20px; background: #fff; padding: 12px 25px; border-top: 1px solid #d9e0db; font-size: 11px; color: #69766f; }
-@media (max-width: 760px) { header { padding: 18px; align-items: flex-start; } header a { max-width: 75px; } main { grid-template-columns: 1fr; } .viewport { min-height: 55dvh; } aside { border-left: 0; padding: 22px; } .view-buttons { top: 12px; left: 12px; } .orientation span { display: none; } footer { padding: 12px 18px; } }
+@media (max-width: 760px) { header { padding: 18px; align-items: flex-start; } header a { max-width: 75px; } main { grid-template-columns: 1fr; } .viewport { min-height: 55dvh; } aside { border-left: 0; padding: 22px; } .view-buttons { top: 12px; left: 12px; } .orientation { bottom: 100px; } .orientation span { display: none; } .map-attribution { bottom: 74px; left: 18px; right: auto; max-width: calc(100% - 36px); } footer { padding: 12px 18px; } }
