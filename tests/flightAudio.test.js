@@ -381,3 +381,47 @@ it('keeps continuous buses silent when audio is first enabled after a crash', ()
     if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
   }
 });
+
+describe('Exterior camera distance attenuation in the audio graph', () => {
+  const jetState = { engine1: { n1: 100 }, iasKnots: 140, groundSpeedKnots: 140, onGround: true };
+
+  it('routes the cockpit-filtered mix through the distance stage and keeps cockpit view unattenuated', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      assert.ok(audio.cockpitFilter.connectedTo.includes(audio.distanceGain), 'cockpit filter should feed the distance stage');
+      assert.ok(audio.distanceGain.connectedTo.includes(audio.masterGain), 'distance stage should feed master gain');
+
+      audio.update(0.016, jetState, true, 140);
+      assert.strictEqual(audio.distanceGain.gain.value, 1, 'cockpit view ignores camera distance');
+      assert.strictEqual(audio.cockpitFilter.frequency.value, 2700);
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('shrinks and dulls the exterior mix as the camera backs away', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      const levels = [];
+      for (const meters of [20, 55, 140, 600]) {
+        audio.update(0.016, jetState, false, meters);
+        levels.push({ gain: audio.distanceGain.gain.value, cutoff: audio.cockpitFilter.frequency.value });
+      }
+      for (let i = 1; i < levels.length; i++) {
+        assert.ok(levels[i].gain < levels[i - 1].gain, `gain should drop beyond ${[20, 55, 140, 600][i]}m`);
+        assert.ok(levels[i].cutoff < levels[i - 1].cutoff, `cutoff should drop beyond ${[20, 55, 140, 600][i]}m`);
+      }
+      assert.ok(levels[3].gain >= 0.08, 'distant flyby should not vanish entirely');
+      // Per-engine gains stay at full level; attenuation happens once at the distance stage.
+      assert.ok(audio.engineGain.gain.value >= 1.0);
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+});
