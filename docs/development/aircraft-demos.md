@@ -53,3 +53,29 @@ views, demonstrated bank angles and powered handoff. It captures menu layouts at
 to the assertions. ONLY=coastal-scenic (or the other airport/profile pair) runs
 one route for diagnosis. This harness does not verify audio or a complete
 manual-input flight after handoff.
+
+## Incheon C172 circuit
+
+Select **Incheon → Cessna 172 → Demo flight**. The Incheon close-up circuit
+starts on 15R, flies the mapped concourse, T1 / transport centre and international
+business district, then circles back to 15R for a physical landing and braked stop.
+This route is C172-only; Incheon still has no Boeing demo. P restarts it and Esc
+hands control back. The airport's lobby background remains stationary.
+
+`IncheonCessnaScenario` resets the runway preset only once. Waypoint guidance,
+rotation, descent, flare and rollout use normal virtual pilot inputs, with terrain
+and building collision enabled. Close-pass altitudes are measured in world metres
+against the current modeled scenery, not surveyed obstacle clearance. The scene
+covers the currently mapped airport patch rather than all Yeongjong landmarks.
+A landing completes only after wheel contact and a runway stop, retaining the
+parking brake. Crashes and guidance timeouts do not count as completion.
+
+```sh
+npm run dev -- --host 127.0.0.1 --port 5189
+APP_URL=http://127.0.0.1:5189/ ARTIFACT_DIR=.cache/incheon-demo \
+  chrome-session --project flight3d node scripts/verify-incheon-demo.mjs
+```
+
+[Browser acceptance evidence](../../review-artifacts/incheon-cessna-demo/README.md)
+records two complete 476.63-second circuits, intact gear and the runway stop,
+plus mobile menu, restart, camera override and cancellation checks.

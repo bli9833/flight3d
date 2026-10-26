@@ -1,4 +1,18 @@
 export default {
+  "demo.incheon.name": "인천공항 초근접 순환 비행",
+  "demo.incheon.briefing": "세스나로 15R 이륙 → 탑승동 → 제1터미널·교통센터 → 국제업무단지 → 선회 접근·착륙. 중간 이동 없는 연속 비행입니다.",
+  "demo.incheon.stage.takeoff": "[1/5] 인천 15R 이륙",
+  "demo.incheon.desc.takeoff": "활주로에서 가속하고 공항 건물 위로 상승합니다.",
+  "demo.incheon.stage.tour": "[2/5] 주요 시설 초근접 비행",
+  "demo.incheon.desc.tour": "탑승동, 제1터미널·교통센터, 국제업무단지를 낮게 둘러봅니다.",
+  "demo.incheon.stage.circuit": "[3/5] 공항 선회",
+  "demo.incheon.desc.circuit": "고도를 확보하고 15R 최종 접근 경로로 돌아갑니다.",
+  "demo.incheon.stage.final": "[4/5] 15R 최종 접근",
+  "demo.incheon.desc.final": "활주로 중심선에 정렬한 뒤 강하·플레어합니다.",
+  "demo.incheon.stage.rollout": "[5/5] 착륙·정지",
+  "demo.incheon.desc.rollout": "바퀴 접촉을 확인하고 활주로에서 제동합니다.",
+  "demo.incheon.complete": "인천공항 순환 비행 완료 — 주기 브레이크 설정",
+
   "incheon.repaired": "기체 수리 완료: 활주로 15R에서 재시작되었습니다.",
   "incheon.airport": "인천공항 (RKSI)",
   "incheon.runway": "15R 이륙 준비",

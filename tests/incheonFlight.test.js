@@ -57,7 +57,7 @@ test('runway and approach spawns align with navigation for both aircraft',()=>{
     assert.ok(Math.abs(air.vy/Math.hypot(air.vx,air.vz)+Math.tan(Math.PI/60))<1e-10);
     assert.ok(air.y>surface.getHeight(air.x,air.z)+50);
   }
-  assert.deepEqual(scenariosForAirport('incheon'),['runway','approach','cruise']);
+  assert.deepEqual(scenariosForAirport('incheon'),['runway','approach','cruise','demo']);
 });
 
 test('manual airport lobby freezes and never starts an unrelated demo; switching restores cinematic',()=>{
