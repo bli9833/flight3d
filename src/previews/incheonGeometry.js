@@ -56,12 +56,44 @@ export function terrainGeometry(size, segments, getHeight, omitCenter = false) {
   if (omitCenter) {
     const filtered = [];
     const index = geometry.index.array;
+    const stitchedPositions = Array.from(positions.array);
+    const stitchedUV = Array.from(geometry.attributes.uv.array);
     for (let i = 0; i < index.length; i += 3) {
       const cx = (positions.getX(index[i]) + positions.getX(index[i+1]) + positions.getX(index[i+2])) / 3;
       const cz = (positions.getZ(index[i]) + positions.getZ(index[i+1]) + positions.getZ(index[i+2])) / 3;
       if (Math.abs(cx) < 1000 && Math.abs(cz) < 1000) continue;
-      filtered.push(index[i], index[i+1], index[i+2]);
+      let stitched = false;
+      for (let edge = 0; edge < 3; edge++) {
+        const a = index[i+edge], b = index[i+(edge+1)%3], apex = index[i+(edge+2)%3];
+        const ax = positions.getX(a), az = positions.getZ(a);
+        const bx = positions.getX(b), bz = positions.getZ(b);
+        const seamX = Math.abs(ax)===1000 && ax===bx && Math.abs(az)<=1000 && Math.abs(bz)<=1000;
+        const seamZ = Math.abs(az)===1000 && az===bz && Math.abs(ax)<=1000 && Math.abs(bx)<=1000;
+        if (!seamX && !seamZ) continue;
+        // The local 2km/160-segment mesh has an edge vertex every 12.5m.
+        // Split only the regional triangle's seam edge, keeping its winding.
+        const subdivisions = Math.hypot(bx-ax,bz-az)/12.5;
+        if (!Number.isInteger(subdivisions) || subdivisions<1) throw new Error('Regional seam must align with local 12.5m grid');
+        let previous = a;
+        for (let step = 1; step <= subdivisions; step++) {
+          let next = b;
+          if (step < subdivisions) {
+            const x = ax+(bx-ax)*step/subdivisions, z = az+(bz-az)*step/subdivisions;
+            next = stitchedPositions.length/3;
+            stitchedPositions.push(x,getHeight(x,z),z);
+            stitchedUV.push(x/size+.5,.5-z/size);
+          }
+          filtered.push(previous,next,apex);
+          previous = next;
+        }
+        stitched = true;
+        break;
+      }
+      if (!stitched) filtered.push(index[i], index[i+1], index[i+2]);
     }
+    geometry.setAttribute('position',new THREE.Float32BufferAttribute(stitchedPositions,3));
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(stitchedUV,2));
+    geometry.deleteAttribute('normal'); // Vertex count grew; recompute a matching buffer below.
     geometry.setIndex(filtered);
   }
   geometry.computeVertexNormals();

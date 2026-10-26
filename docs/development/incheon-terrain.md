@@ -85,7 +85,10 @@ OSM 자료는 ODbL이며 Copernicus 표고에는 해당 제품 이용허락·출
 ## 렌더링과 검증
 
 주변 지형은 50 m 메시, 중심은 12.5 m 메시로 그립니다. 주변 메시에서 중심 부분을 빼서
-겹침을 피하고 경계 높이는 같은 sampler로 계산합니다. 도로/면도 12.5 m 이하로 세분화한 후
+겹침을 피합니다. 접합부의 주변 삼각형만 분할해 상세 메시와 동일한 12.5 m 간격의 경계
+꼭짓점·높이를 사용합니다. 공통 50 m 꼭짓점 높이만 맞추면 중간 꼭짓점에서 틈이 남으므로
+원본/보정 모드 모두 실제 경계 edge 집합이 일치하는지 검사합니다. 추가 비용은 꼭짓점 480개와
+삼각형 480개이며 주변 전체를 고밀도로 바꾸지 않습니다. 도로/면도 12.5 m 이하로 세분화한 후
 지형을 샘플링합니다. 수면은 배경으로 먼저 그려 낮은 육지와 깊이 버퍼가 충돌하지 않게 합니다.
 높이 과장·추가 사진 텍스처·물리 연동은 없습니다.
 
@@ -103,6 +106,8 @@ APP_URL=http://127.0.0.1:5191/flight3d/incheon.html chrome-session --project fli
 [원본 DSM](../../review-artifacts/incheon-stage2/natural-dsm.png),
 [390px 화면](../../review-artifacts/incheon-stage2/mobile.png).
 
-Intel ADL-N / ANGLE Vulkan에서 최초 독립 장면은 **17 draw calls / 307,180 triangles**입니다.
+초기 증거는 Intel ADL-N / ANGLE Vulkan에서 **17 draw calls / 307,180 triangles**였습니다.
+PR #219 리뷰 수정 후에는 **17 draw calls / 307,660 triangles**입니다.
+[경계 수정 검증 기록](../../review-artifacts/arc-219/README.md).
 이는 1단계의 평면 패치보다 큰 12 km 지형을 포함하므로 동일 장면 FPS 비교가 아닙니다.
 전체 비행 루프의 프레임 시간·충돌·고가도로 여유고·실제 공항 접지는 아직 검증하지 않았습니다.
