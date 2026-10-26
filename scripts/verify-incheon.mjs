@@ -7,7 +7,7 @@ import path from 'node:path';
 if (process.env.CHROME_PROJECT !== 'flight3d') throw new Error('Run with chrome-session --project flight3d');
 const port = process.env.CHROME_DEBUG_PORT ?? '9225';
 const url = process.env.APP_URL ?? 'http://127.0.0.1:5186/incheon.html';
-const artifacts = process.env.ARTIFACT_DIR ?? path.join(process.cwd(), 'review-artifacts/incheon-stage2');
+const artifacts = process.env.ARTIFACT_DIR ?? path.join(process.cwd(), 'review-artifacts/incheon-stage3');
 const target = await fetch(`http://127.0.0.1:${port}/json/new?${encodeURIComponent('about:blank')}`, { method: 'PUT' }).then(r => r.json());
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
@@ -76,15 +76,44 @@ try {
   assert.ok(initial.terrain.outsideUnmodified, 'outside the local patch retains source height');
   assert.ok(initial.terrain.changedSamples > 0);
   assert.ok(initial.terrain.coastlineChecks.every(p => p.observed === p.land), 'land/sea classification matches independent checkpoints');
+  assert.ok(initial.city.enabled && initial.city.trees>0 && initial.city.trees<=320);
+  assert.equal(initial.city.parkingAreas,26);
   const gpu = await evaluate(`(() => { const gl=document.querySelector('canvas').getContext('webgl2'); const ext=gl.getExtension('WEBGL_debug_renderer_info'); return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unavailable'; })()`);
   await capture('regional');
   await click('#oblique');
   await capture('oblique');
+  const currentTriangles=await evaluate('window.incheonPreview.render.triangles');
   await click('[data-layer="buildings"]');
   const hidden = await evaluate('window.incheonPreview.render');
-  assert.ok(hidden.triangles < initial.render.triangles, 'real checkbox removes building draw work');
+  assert.ok(hidden.triangles < currentTriangles, 'real checkbox removes building draw work');
   await click('[data-layer="buildings"]');
-  assert.equal(await evaluate('window.incheonPreview.render.triangles'), initial.render.triangles);
+  assert.equal(await evaluate('window.incheonPreview.render.triangles'), currentTriangles);
+  const signature=await evaluate('window.incheonReview.groundSignature()');
+  await click('[data-layer="roads"]');
+  assert.notEqual(await evaluate('window.incheonReview.groundSignature()'),signature,'road checkbox changes baked ground pixels');
+  await click('[data-layer="roads"]');
+  assert.equal(await evaluate('window.incheonReview.groundSignature()'),signature,'road restoration reproduces atlas');
+  await click('#city-mode');await capture('oblique-before');
+  const baselineRender=await evaluate('window.incheonPreview.render');
+  await click('#city-mode');
+  assert.ok(currentTriangles<baselineRender.triangles,'baked ground reduces visible triangles versus prior stage');
+  const comparison=[];
+  let mode=true;
+  for(const [view,selector] of [['oblique','#oblique'],['close','#close']]){
+    await click(selector);
+    const viewSamples=[];
+    for(const desired of [false,true,true,false]){
+      if(mode!==desired){await click('#city-mode');mode=desired;}
+      const sample=await evaluate('window.incheonReview.measure(40)');
+      const sorted=sample.samplesMs.slice().sort((a,b)=>a-b);
+      viewSamples.push({view,mode:desired?'city':'stage2',...sample,medianMs:sorted[20],p95Ms:sorted[37]});
+      if(view==='close') await capture(desired?'close':'close-before');
+    }
+    for(const sample of viewSamples){assert.deepEqual(sample.camera,viewSamples[0].camera);assert.deepEqual(sample.viewport,viewSamples[0].viewport);}
+    comparison.push(...viewSamples);
+  }
+  if(!mode) await click('#city-mode');
+  const warmedGeometry=await evaluate('window.incheonPreview.terrain.geometryCount');
   await click('#top');
   await capture('top');
   for (let i = 0; i < 3; i++) {
@@ -95,7 +124,10 @@ try {
     await click('#natural-dsm');
     assert.equal(await evaluate('window.incheonPreview.terrain.naturalMode'), false);
   }
-  assert.equal(await evaluate('window.incheonPreview.terrain.geometryCount'), initial.terrain.geometryCount, 'comparison cycles reuse terrain geometry');
+  assert.equal(await evaluate('window.incheonPreview.terrain.geometryCount'), warmedGeometry, 'comparison cycles reuse terrain geometry');
+  const memory=await evaluate('window.incheonPreview.city.memory');
+  for(let i=0;i<3;i++){await click('[data-layer="vegetation"]');await click('[data-layer="vegetation"]');}
+  assert.deepEqual(await evaluate('window.incheonPreview.city.memory'),memory,'layer rebuilds release replaced atlas textures');
   // Drive actual canvas pointer gestures; rendered on demand after controls change.
   const canvas = await evaluate(`(() => { const r=document.querySelector('canvas').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
   await send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...canvas, deltaX: 0, deltaY: -150 });
@@ -113,10 +145,11 @@ try {
   })()`), 'mobile attribution and captions must not overlap');
   await capture('mobile');
   assert.deepEqual(errors, [], 'no runtime or resource errors');
-  const result = { url, gpu, initial, buildingsHidden: hidden, errors,
+  const result = { url, gpu, initial, buildingsHidden: hidden, comparison, errors,
     checks: ['loaded real snapshot and DSM', 'land/sea checkpoints', 'unmodified regional source', 'batched geometry',
-      'layer checkbox hide/restore', 'view buttons', 'DSM comparison cycles without geometry growth', 'wheel input', '390px layout'],
-    limitation: 'Standalone DSM/coast preview with approximate local grading; no flight-loop FPS, surveyed pavement, bridge clearances or collision integration.' };
+      'layer checkbox hide/restore and ground pixel hashes', 'same-camera ABBA isolated render timings', 'view buttons',
+      'DSM comparison cycles without geometry growth', 'atlas replacements without texture growth', 'wheel input', '390px layout'],
+    limitation: 'Isolated rendering plus gl.finish wall times after 5 warmups, 40 samples per pass; not full-flight FPS or GPU timer queries. Parking rows/facades/trees are illustrative.' };
   await writeFile(path.join(artifacts, 'results.json'), `${JSON.stringify(result, null, 2)}\n`);
   console.log(JSON.stringify(result, null, 2));
 } finally {

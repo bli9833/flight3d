@@ -17,6 +17,13 @@ OpenStreetMap-derived data under ODbL 1.0, with the same attribution above.
 The source requests, original response hashes and extract hash are in the
 compressed coastline source and `terrain-metadata.json`.
 
+`dressing.json` extracts additional parking outlines and an airport-boundary
+planting exclusion from the same frozen OSM source. It is ODbL data as well.
+Parking markings, facade patterns and tree placements are illustrative, not
+surveyed features. The generated ground image retains OSM attribution.
+Facade pattern code is original Flight3d code; the existing original MIT tree
+geometry is reused from `src/environment/TreeModels.js`.
+
 `regional-natural.bin` and `local-natural.bin` are resampled Copernicus DEM
 GLO-30 surface heights. `local-graded.bin` additionally uses OSM footprints
 for approximate model grading; preserve both sources' notices. These data
