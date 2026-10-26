@@ -541,24 +541,35 @@ class FlightSimulator {
   /**
    * A lobby selection rebuilds scene state and uploads new GPU programs, so the work
    * runs after the menu has painted the new choice: the click task stays short and the
-   * progress line is visible instead of the menu appearing frozen. A newer choice
-   * supersedes one that has not started yet.
+   * progress line is visible instead of the menu appearing frozen. The lobby holds the
+   * wanted airport and aircraft, so a choice made while work is running is applied by the
+   * next pass instead of cancelling the earlier one — a newer click replaces the pending
+   * work rather than dropping it, and the drain stops once the scene matches the menu.
    */
-  queueLobbySelection(work) {
-    const token = (this.lobbySelectionToken || 0) + 1;
-    this.lobbySelectionToken = token;
+  queueLobbySelection() {
     this.lobbySelectionPending = true;
     this.lobbyScreen?.setSelectionBusy(true);
+    if (this.lobbySelectionDraining) return;
+    this.lobbySelectionDraining = true;
     const nextPaint = () => new Promise(resolve => document.hidden
       ? setTimeout(resolve, 0)
       : requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    nextPaint().then(() => {
-      if (token !== this.lobbySelectionToken) return;
-      return Promise.resolve().then(work).catch(error => console.warn('Lobby selection failed:', error));
-    }).finally(() => {
-      if (token !== this.lobbySelectionToken) return;
-      this.lobbySelectionPending = false;
-      this.lobbyScreen?.setSelectionBusy(false);
+    nextPaint().then(async () => {
+      try {
+        while (this.lobby.airport !== this.activeAirport || this.lobby.aircraft !== this.currentAircraftId) {
+          const applied = `${this.activeAirport}|${this.currentAircraftId}`;
+          if (this.lobby.airport !== this.activeAirport) await this.setAirport(this.lobby.airport);
+          else this.setAircraft(this.lobby.aircraft);
+          // A refused choice (unknown id, failed scenery load) must not spin the drain.
+          if (`${this.activeAirport}|${this.currentAircraftId}` === applied) break;
+        }
+      } catch (error) {
+        console.warn('Lobby selection failed:', error);
+      } finally {
+        this.lobbySelectionDraining = false;
+        this.lobbySelectionPending = false;
+        this.lobbyScreen?.setSelectionBusy(false);
+      }
     });
   }
 
@@ -1970,10 +1981,9 @@ class FlightSimulator {
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
       onAirport: id => {
-        if (this.activeAirport === id) return;
         this.lobby.airport = id;
         this.lobbyScreen?.refresh();
-        this.queueLobbySelection(() => this.setAirport(id));
+        this.queueLobbySelection();
       },
       onPreset: type => {
         this.lobby.preset = type;
@@ -1983,7 +1993,7 @@ class FlightSimulator {
       onAircraft: id => {
         this.lobby.aircraft = id;
         this.lobbyScreen?.refresh();
-        this.queueLobbySelection(() => this.setAircraft(id));
+        this.queueLobbySelection();
       },
       onFly: () => this.fly(),
     });
