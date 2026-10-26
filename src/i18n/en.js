@@ -1,4 +1,18 @@
 export default {
+  "demo.incheon.name": "Incheon close-up circuit",
+  "demo.incheon.briefing": "Cessna 15R takeoff → concourse → T1 / transport centre → business district → circuit and landing. One continuous physical flight.",
+  "demo.incheon.stage.takeoff": "[1/5] Incheon 15R takeoff",
+  "demo.incheon.desc.takeoff": "Accelerate on the runway and climb above the airport.",
+  "demo.incheon.stage.tour": "[2/5] Airport close passes",
+  "demo.incheon.desc.tour": "Fly low over the concourse, T1 / transport centre and business district.",
+  "demo.incheon.stage.circuit": "[3/5] Airport circuit",
+  "demo.incheon.desc.circuit": "Climb and circle back to the 15R approach.",
+  "demo.incheon.stage.final": "[4/5] 15R final approach",
+  "demo.incheon.desc.final": "Align with the centreline, descend and flare.",
+  "demo.incheon.stage.rollout": "[5/5] Landing and rollout",
+  "demo.incheon.desc.rollout": "Confirm wheel contact and brake to a runway stop.",
+  "demo.incheon.complete": "Incheon circuit complete — parking brake set",
+
   "incheon.repaired": "Aircraft repaired: restarted on runway 15R.",
   "incheon.airport": "Incheon Airport (RKSI)",
   "incheon.runway": "Runway 15R · Ready for takeoff",

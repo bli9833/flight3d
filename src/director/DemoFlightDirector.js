@@ -1,3 +1,4 @@
+import { IncheonCessnaScenario } from './scenarios/IncheonCessnaScenario.js';
 import { t, bindText } from '../i18n/index.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { LuklaCircuitScenario } from './scenarios/LuklaCircuitScenario.js';
@@ -47,6 +48,7 @@ export class DemoFlightDirector {
     // Scenarios
     this.luklaScenario = new LuklaCircuitScenario(this, simulator);
     this.coastalScenario = new CoastalDemoScenario(this, simulator);
+    this.incheonCessnaScenario = new IncheonCessnaScenario(this, simulator);
     this.cessnaScenario = new CessnaDemoScenario(this, simulator);
     this.cessnaProximityScenario = new CessnaProximityScenario(this, simulator);
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
@@ -78,6 +80,7 @@ export class DemoFlightDirector {
 
   getActiveScenario() {
     if (this.activeDemoAircraft === 'C172') {
+      if (this.activeDemoAirport === 'incheon') return this.incheonCessnaScenario;
       return this.profile === 'proximity' ? this.cessnaProximityScenario : this.cessnaScenario;
     }
     return this.activeDemoAirport === 'lukla' ? this.luklaScenario : this.coastalScenario;
@@ -166,7 +169,7 @@ export class DemoFlightDirector {
   }
 
   start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
-    if ((targetAirport || this.sim.activeAirport) === 'incheon') return false;
+    if ((targetAirport || this.sim.activeAirport) === 'incheon' && this.sim.currentAircraftId !== 'C172') return false;
     this.sim.devRunner?.stop();
     if (this.isActive) this.stop();
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
@@ -231,7 +234,9 @@ export class DemoFlightDirector {
     }
 
     if (this.activeDemoAircraft === 'C172') {
-      if (this.profile === 'proximity') {
+      if (this.activeDemoAirport === 'incheon') {
+        this.setStage(IncheonCessnaScenario.STAGES.TAKEOFF);
+      } else if (this.profile === 'proximity') {
         this.setStage(CessnaProximityScenario.STAGES.SHIP_BUZZ);
       } else {
         this.setStage(CessnaDemoScenario.STAGES.ESTABLISH);
@@ -243,7 +248,7 @@ export class DemoFlightDirector {
     }
 
     if (this.sim.showToast) {
-      const airportKey = this.activeDemoAirport === 'lukla' ? 'airport.lukla.name' : 'coastal.airport.09l';
+      const airportKey = this.activeDemoAirport === 'incheon' ? 'incheon.airport' : this.activeDemoAirport === 'lukla' ? 'airport.lukla.name' : 'coastal.airport.09l';
       this.sim.showToast(() => t('starting.value.cinematic.demo.flight', { value: t(airportKey) }));
     }
   }
