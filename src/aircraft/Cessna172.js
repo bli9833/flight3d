@@ -122,11 +122,11 @@ export class Cessna172 {
     });
 
     const glassMat = new THREE.MeshStandardMaterial({
-      color: 0x121b24,
+      color: 0x31414f,
       roughness: 0.1,
       metalness: 0.85,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.25,
       name: 'C172_Glass'
     });
 
@@ -491,6 +491,14 @@ export class Cessna172 {
               const isWindow = matName.includes('Window') ||
                 node.name.toLowerCase().includes('window') ||
                 (mat && (mat.transparent || mat.opacity < 0.95));
+
+              // Weaken the authored smoked-glass tint so cabin windows read as clear glass
+              for (const windowMat of (Array.isArray(mat) ? mat : [mat])) {
+                if (windowMat?.name === 'Window') {
+                  windowMat.color.setRGB(0.2, 0.22, 0.25);
+                  windowMat.opacity = 0.15;
+                }
+              }
 
               // Transparent cockpit and cabin windows must not cast shadows into the cockpit,
               // or they block sunlight from illuminating the instrument panel and deck through the glass.
