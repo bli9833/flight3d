@@ -73,6 +73,7 @@ describe('solveTrim steady level flight', () => {
     assert.equal(t.feasible, true);
     assert.equal(t.throttle, 0);
     assert.equal(t.reason, 'idle');
+    assert.equal(t.handsOffFeasible, false, 'idle clamp cannot supply negative thrust equilibrium');
   });
 
   it('keeps every feasible output inside surface and trim-wheel travel', () => {
@@ -103,7 +104,7 @@ describe('trim wheel hands-off authority', () => {
     { id: 'C172', config: CESSNA_172, speeds: [50, 60, 70, 85, 100, 115, 130] },
   ];
 
-  it('holds every feasible operable state on the wheel alone', () => {
+  it('reports hands-off only when wheel, surface and available thrust permit equilibrium', () => {
     for (const { id, config, speeds } of grids) {
       const aero = new Aerodynamics(config), engines = new EngineModel(config);
       for (let flapsIndex = 0; flapsIndex < aero.flapAngles.length; flapsIndex++) {
@@ -118,7 +119,9 @@ describe('trim wheel hands-off authority', () => {
                   iasKnots, altitudeMeters, flightPathAngleDeg, flapsIndex, gearState,
                 });
                 if (!t.feasible) continue;
-                assert.ok(t.handsOffFeasible,
+                const expected = t.handsOffTrimDegRaw >= -5 && t.handsOffTrimDegRaw <= 12
+                  && !t.surfaceLimited && t.reason !== 'idle';
+                assert.equal(t.handsOffFeasible, expected,
                   `${id} ${iasKnots} kt/${altitudeMeters} m/flaps${aero.flapAngles[flapsIndex]}°` +
                   `/gear${gearState}/γ${flightPathAngleDeg}° needs ` +
                   `${t.handsOffTrimDegRaw?.toFixed(2)}° of wheel`);
@@ -133,7 +136,8 @@ describe('trim wheel hands-off authority', () => {
   it('reports a wheel out of travel instead of hiding the clamp', () => {
     const { aero, engines } = trimmedAero();
     const t = solveTrim(aero, engines, {
-      iasKnots: 290, altitudeMeters: 0, flightPathAngleDeg: -3, flapsIndex: 6, gearState: 0,
+      iasKnots: 180, altitudeMeters: 0, flapsIndex: 0, gearState: 0,
+      cgBody: { x: 0, y: 0, z: 1 },
     });
     assert.equal(t.feasible, true);
     assert.equal(t.handsOffFeasible, false);
@@ -211,9 +215,7 @@ describe('solveTrim against the live force model', () => {
     assert.ok(Math.abs(r.pitchMoment) < 0.01 * r.qSc,
       `pitch moment ${r.pitchMoment} vs qSc ${r.qSc}`);
     assert.ok(Math.abs(r.alongPathN) < 0.05 * r.trim.thrustN, `along path ${r.alongPathN}`);
-    // The solver neglects the vertical component of body-axis thrust, which is
-    // largest in the high-thrust dirty configuration.
-    assert.ok(Math.abs(r.acrossPathN) < 0.10 * r.weight, `across path ${r.acrossPathN}`);
+    assert.ok(Math.abs(r.acrossPathN) < 0.02 * r.weight, `across path ${r.acrossPathN}`);
   });
 
   it('lifts the aircraft weight on the solved alpha', () => {

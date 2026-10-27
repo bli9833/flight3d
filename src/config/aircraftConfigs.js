@@ -1,3 +1,4 @@
+import { B738_MASS_DISTRIBUTION, C172_MASS_DISTRIBUTION, F16_MASS_DISTRIBUTION } from './massDistributions.js';
 import { C172_BODY_SUPPORT_POINTS } from '../physics/groundContacts.js';
 
 /**
@@ -21,6 +22,7 @@ import { C172_BODY_SUPPORT_POINTS } from '../physics/groundContacts.js';
 
 export const BOEING_737_800 = {
   id: 'B738',
+  massDistribution: B738_MASS_DISTRIBUTION,
   name: 'Boeing 737-800',
   description: 'Twin-engine narrow-body jet airliner with CFM56-7B high-bypass turbofans',
 
@@ -40,6 +42,8 @@ export const BOEING_737_800 = {
     wingspanM: 35.8,       // Span b (m)
     wingAreaM2: 124.6,     // Area S (m^2)
     meanChordM: 3.99,      // MAC c_bar (m)
+    // Calibrated game tail estimates, not manufacturer performance data.
+    tailArmM: 12, tailAreaM2: 32, tailInducedFactor: 0.10,
     oswaldEfficiency: 0.82,// Span efficiency factor e
 
     // Lift parameters
@@ -150,6 +154,7 @@ export const BOEING_737_800 = {
 
 export const F16_FALCON = {
   id: 'F16',
+  massDistribution: F16_MASS_DISTRIBUTION,
   name: 'F-16 Fighting Falcon',
   description: 'Single-engine supersonic multirole fighter aircraft with afterburning turbofan',
 
@@ -168,6 +173,8 @@ export const F16_FALCON = {
     wingspanM: 9.96,
     wingAreaM2: 27.87,
     meanChordM: 3.45,
+    // Calibrated game tail estimates, not manufacturer performance data.
+    tailArmM: 4, tailAreaM2: 6, tailInducedFactor: 0.10,
     oswaldEfficiency: 0.75,
 
     cl0Clean: 0.05,
@@ -274,6 +281,7 @@ export const F16_FALCON = {
 
 export const CESSNA_172 = {
   id: 'C172',
+  massDistribution: C172_MASS_DISTRIBUTION,
   name: 'Cessna 172 Skyhawk',
   description: 'Single-engine four-seat high-wing general aviation aircraft with piston engine',
 
@@ -292,6 +300,8 @@ export const CESSNA_172 = {
     wingspanM: 11.0,
     wingAreaM2: 16.2,
     meanChordM: 1.47,
+    // Calibrated game tail estimates, not manufacturer performance data.
+    tailArmM: 4, tailAreaM2: 4, tailInducedFactor: 0.10,
     oswaldEfficiency: 0.80,
 
     cl0Clean: 0.35,

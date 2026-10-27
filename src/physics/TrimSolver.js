@@ -1,150 +1,108 @@
 import { Atmosphere } from './Atmosphere.js';
 import { TRIM_WHEEL_AUTHORITY } from './trimWheel.js';
+import { longitudinalForces } from './longitudinalForces.js';
 
-// Constants mirroring Aerodynamics.computeAero's control-surface geometry.
-const MAX_ELEVATOR_RAD = 0.349;  // ±20° elevator travel
-const THRUST_MOMENT_ARM = 0.32;  // engine up-cant moment arm (m), nose-up per N of thrust
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const MAX_ELEVATOR_RAD = Math.PI / 9;
 
-function clamp(v, lo, hi) {
-  return Math.max(lo, Math.min(hi, v));
+// Pivoted 3x3 solve, off the physics tick (preset/LMC/AP capture).
+function solveLinear(a, b) {
+  const rows = a.map((r, i) => [...r, b[i]]);
+  for (let k = 0; k < 3; k++) {
+    let pivot = k;
+    for (let i = k + 1; i < 3; i++) if (Math.abs(rows[i][k]) > Math.abs(rows[pivot][k])) pivot = i;
+    [rows[k], rows[pivot]] = [rows[pivot], rows[k]];
+    if (Math.abs(rows[k][k]) < 1e-12) return null;
+    const divisor = rows[k][k];
+    for (let j = k; j < 4; j++) rows[k][j] /= divisor;
+    for (let i = 0; i < 3; i++) if (i !== k) {
+      const f = rows[i][k];
+      for (let j = k; j < 4; j++) rows[i][j] -= f * rows[k][j];
+    }
+  }
+  return rows.map(r => r[3]);
 }
 
-/**
- * Steady-state longitudinal trim solver (pure scalar math: no THREE, no DOM,
- * no mutation of the aero/engine instances).
- *
- * Solves the equilibrium equations that Aerodynamics.computeAero implements,
- * with rates zero and flow attached:
- *   lift   = W·cos(γ)
- *   thrust = D + W·sin(γ)
- *   q·S·c·Cm + T·arm = 0
- * for angle of attack, required thrust (then the steady engine map inverted
- * for throttle), and elevator/trim deflection.
- *
- * Assumes undamped, unsmoothed configuration: flap targets (not the lagged
- * currentFlapAngle), given gear drag state, still air, no ground effect.
- *
- * @param {object} aero     object exposing the Aerodynamics coefficient set
- *   (CL0_clean, CLa, alphaStallClean, CD0, Cm0, Cma, Cm_de, wingArea,
- *   meanChord, aspectRatio, oswaldEfficiency, mass, flapAngles, flapsIndex,
- *   tuning?.elevatorSensitivity)
- * @param {object} engines  object exposing numEngines and maxStaticThrustPerEngine
- * @param {object} state
- *   @param {number} state.iasKnots            target indicated airspeed
- *   @param {number} [state.altitudeMeters=0]
- *   @param {number} [state.flightPathAngleDeg=0]  + = climbing
- *   @param {number} [state.flapsIndex]        defaults to aero.flapsIndex
- *   @param {number} [state.gearState=0]       0..1 extended fraction
- *   @param {number} [state.spoilers=0]        0..1 deployed fraction
- *   @param {number} [state.massKg]            defaults to aero.mass
- * @returns {object} feasible trim ({feasible:true, elevator, pitchTrimDeg,
- *   throttle, thrustN, alphaDeg, ...}) or a rejection with `reason`
- *   ('airspeed', 'stall', 'thrust') and the diagnostic coefficients.
- *   Hands-off callers (presets, trim install) need `handsOffFeasible`: it says
- *   whether the wheel alone can hold this attitude inside its travel.
+/** Steady attached-flow trim using the live incremental tail and CG moments.
+ * Solves normal force, path force and pitch moment simultaneously, without
+ * changing live separation state. Still air, no ground effect, zero rates.
  */
 export function solveTrim(aero, engines, state = {}) {
-  const iasMs = Atmosphere.knotsToMs(state.iasKnots ?? 0);
-  const altitudeMeters = state.altitudeMeters ?? 0;
-  const gamma = (state.flightPathAngleDeg ?? 0) * Math.PI / 180;
-  const flapsIndex = clamp(Math.round(state.flapsIndex ?? aero.flapsIndex ?? 0),
-    0, (aero.flapAngles?.length ?? 1) - 1);
-  const gearState = clamp(state.gearState ?? 0, 0, 1);
-  const spoilers = clamp(state.spoilers ?? 0, 0, 1);
   const mass = state.massKg ?? aero.mass;
-
-  const atmos = Atmosphere.getConditions(altitudeMeters);
-  const tas = Atmosphere.iasToTas(iasMs, atmos.densityRatio);
-  if (!(tas > 1.0) || !(mass > 0)) {
-    return { feasible: false, reason: 'airspeed', tas, cl: 0, cd: 0,
-      elevator: 0, pitchTrimDeg: 0, throttle: 0, thrustN: 0 };
-  }
-
+  const atmos = Atmosphere.getConditions(state.altitudeMeters ?? 0);
+  const tas = Atmosphere.iasToTas(Atmosphere.knotsToMs(state.iasKnots ?? 0), atmos.densityRatio);
+  const reject = reason => ({ feasible: false, handsOffFeasible: false, reason,
+    elevator: 0, pitchTrimDeg: 0, throttle: 0, tas });
+  if (!(tas > 1) || !(mass > 0) || !Number.isFinite(tas + mass)) return reject('airspeed');
+  const gamma = (state.flightPathAngleDeg ?? 0) * Math.PI / 180;
+  const flapIndex = clamp(Math.round(state.flapsIndex ?? aero.flapsIndex ?? 0), 0, aero.flapAngles.length - 1);
+  const flap = state.flapAngle ?? aero.flapAngles[flapIndex];
+  const gear = state.gearState ?? 0, spoilers = state.spoilers ?? 0;
+  const q = 0.5 * atmos.density * tas * tas, qS = q * aero.wingArea;
   const weight = mass * Atmosphere.G0;
-  const q = 0.5 * atmos.density * tas * tas;
-  const qS = q * aero.wingArea;
-  const qSc = qS * aero.meanChord;
-
-  // --- Lift balance → CL required → α (linear region only) ---
-  const flapAngle = (aero.flapAngles?.[flapsIndex] ?? 0);
-  const flapFraction = flapAngle / 40.0;
-  const cl0 = aero.CL0_clean + 0.95 * flapFraction;
-  const alphaStall = aero.alphaStallClean + 2.0 * Math.PI / 180 * flapFraction;
+  const cl0 = aero.CL0_clean + 0.95 * flap / 40 - 0.38 * spoilers;
+  const alphaStall = aero.alphaStallClean + 2 * Math.PI / 180 * flap / 40;
   const clMax = cl0 + aero.CLa * alphaStall;
-
-  const clReq = (weight * Math.cos(gamma)) / qS;
-  const alpha = (clReq - cl0) / aero.CLa;
-  // Below the break, but keep a margin: the model loses ~28% of peak lift at
-  // separation onset, so a solution at 95% of linear clMax would not survive
-  // disturbances.
-  if (clReq >= 0.95 * clMax || alpha >= alphaStall) {
-    return { feasible: false, reason: 'stall', alphaDeg: alpha * 180 / Math.PI,
-      cl: clReq, clMax, cd: 0, elevator: 0, pitchTrimDeg: 0, throttle: 0, thrustN: 0 };
-  }
-
-  // --- Drag polar mirrors computeAero (attached flow, no ground effect) ---
   const mach = tas / atmos.speedOfSound;
-  let cdParasitic = aero.CD0
-    + 0.0012 * flapAngle + 0.000045 * flapAngle * flapAngle
-    + 0.024 * gearState
-    + 0.075 * spoilers;
-  if (mach > 0.78) cdParasitic += Math.pow(mach - 0.78, 3.5) * 8.0;
-  const cdInduced = (clReq * clReq) / (Math.PI * aero.aspectRatio * aero.oswaldEfficiency);
-  const cd = cdParasitic + cdInduced;
-  const drag = qS * cd;
-  const thrustReq = drag + weight * Math.sin(gamma);
-
-  // --- Steady engine map inverted for throttle command ---
-  const numEngines = Math.max(1, engines.numEngines ?? 2);
-  const altitudeLapse = Math.pow(Math.max(0.1, atmos.densityRatio), 0.75);
-  const ramLapse = Math.max(0.7, 1.0 - (tas / 300.0) * 0.25);
-  const thrustScale = numEngines * engines.maxStaticThrustPerEngine * altitudeLapse * ramLapse;
-  // Steady map: T = thrustScale · n1Norm^2.1, n1Norm = (2 + 78·throttle)/80.
-  const n1Norm = thrustScale > 0
-    ? Math.pow(Math.max(0, thrustReq) / thrustScale, 1 / 2.1) : Infinity;
-  let throttle = (n1Norm * 80.0 - 2.0) / 78.0;
-  const idleLimited = throttle < 0;
-  const thrustLimited = throttle > 1;
-  throttle = clamp(throttle, 0, 1);
-  if (thrustLimited) {
-    return { feasible: false, reason: 'thrust', alphaDeg: alpha * 180 / Math.PI,
-      cl: clReq, cd, thrustRequiredN: thrustReq, thrustAvailableN: thrustScale,
-      elevator: 0, pitchTrimDeg: 0, throttle: 1 };
+  const cd0 = aero.CD0 + 0.0012 * flap + 0.000045 * flap * flap
+    + aero.gearDrag * gear + aero.spoilerDrag * spoilers
+    + (mach > aero.transonicMachBuffet ? (mach - aero.transonicMachBuffet) ** 3.5 * 8 : 0);
+  const proxy = state.cgBody ? Object.assign(Object.create(aero), { cg: state.cgBody }) : aero;
+  const result = {};
+  function residual(x) {
+    const [alpha, elevator, thrustRatio] = x;
+    const cl = cl0 + aero.CLa * alpha;
+    const cd = cd0 + cl * cl / (Math.PI * aero.aspectRatio * aero.oswaldEfficiency);
+    const thrust = thrustRatio * qS;
+    longitudinalForces(proxy, q, alpha, cl, cd, elevator, thrust, result);
+    const sin = Math.sin(alpha), cos = Math.cos(alpha);
+    return [
+      (result.y * cos - result.z * sin + thrust * sin - weight * Math.cos(gamma)) / qS,
+      (-result.y * sin - result.z * cos + thrust * cos - weight * Math.sin(gamma)) / qS,
+      result.pitch / (qS * aero.meanChord),
+    ];
   }
-
-  // --- Pitch moment balance → elevator + trim wheel ---
-  const effectiveThrust = idleLimited ? 0 : thrustReq;
-  const cmNeeded = -(THRUST_MOMENT_ARM * effectiveThrust) / qSc;
-  const elevatorEffectiveRad = (aero.Cm0 + aero.Cma * alpha - cmNeeded) / aero.Cm_de;
-  const sensitivity = (aero.tuning?.elevatorSensitivity ?? 1.0);
-  const elevator = clamp(elevatorEffectiveRad / (MAX_ELEVATOR_RAD * sensitivity), -1, 1);
-  // Trim wheel that centers the elevator: (elevatorRad + trimRad) = elevatorEffectiveRad
-  const pitchTrimDeg = ((elevatorEffectiveRad -
-    elevator * MAX_ELEVATOR_RAD * sensitivity) / TRIM_WHEEL_AUTHORITY) * 180 / Math.PI;
-  // Full wheel setting for hands-off flight (elevator neutral); the wheel
-  // limits are Aerodynamics.setTrim's ±(−5..12). A wheel that needs to sit
-  // outside them cannot hold this attitude hands-off, so the clamped value is
-  // not an equilibrium: callers must check handsOffFeasible before trusting it.
-  const handsOffTrimDegRaw = (elevatorEffectiveRad / TRIM_WHEEL_AUTHORITY) * 180 / Math.PI;
-  const handsOffTrimDeg = clamp(handsOffTrimDegRaw, -5, 12);
-
+  const alpha0 = (weight * Math.cos(gamma) / qS - cl0) / aero.CLa;
+  let x = [alpha0, (aero.Cm0 + aero.Cma * alpha0) / aero.Cm_de,
+    cd0 + (weight / qS) ** 2 / (Math.PI * aero.aspectRatio * aero.oswaldEfficiency) + weight * Math.sin(gamma) / qS];
+  let error;
+  for (let i = 0; i < 24; i++) {
+    error = residual(x);
+    if (Math.max(...error.map(Math.abs)) < 1e-9) break;
+    const jac = [[], [], []];
+    for (let j = 0; j < 3; j++) {
+      const trial = [...x]; trial[j] += 1e-5;
+      const shifted = residual(trial);
+      for (let k = 0; k < 3; k++) jac[k][j] = (shifted[k] - error[k]) / 1e-5;
+    }
+    const step = solveLinear(jac, error.map(v => -v));
+    if (!step) return reject('convergence');
+    x = x.map((v, j) => v + clamp(step[j], -0.5, 0.5));
+  }
+  error = residual(x);
+  if (!x.every(Number.isFinite) || Math.max(...error.map(Math.abs)) > 1e-6) return reject('convergence');
+  const [alpha, elevatorEffective, thrustRatio] = x;
+  const cl = cl0 + aero.CLa * alpha;
+  if (alpha >= alphaStall || cl >= 0.95 * clMax || alpha <= -alphaStall) return reject('stall');
+  const thrustRequired = thrustRatio * qS;
+  const scale = Math.max(1, engines.numEngines ?? 2) * engines.maxStaticThrustPerEngine
+    * Math.max(0.1, atmos.densityRatio) ** 0.75 * Math.max(0.7, 1 - tas / 300 * 0.25);
+  const idleN1 = engines.idleN1 ?? 22, maxN1 = engines.togaN1 ?? 100;
+  const n1 = 20 + 80 * (Math.max(0, thrustRequired) / scale) ** (1 / 2.1);
+  const rawThrottle = (n1 - idleN1) / (maxN1 - idleN1);
+  if (rawThrottle > 1) return { ...reject('thrust'), throttle: 1, thrustRequiredN: thrustRequired };
+  const sensitivity = aero.tuning?.elevatorSensitivity ?? 1;
+  const elevator = clamp(elevatorEffective / (MAX_ELEVATOR_RAD * sensitivity), -1, 1);
+  const pitchTrimDeg = (elevatorEffective - elevator * MAX_ELEVATOR_RAD * sensitivity) / TRIM_WHEEL_AUTHORITY * 180 / Math.PI;
+  const handsOffTrimDegRaw = elevatorEffective / TRIM_WHEEL_AUTHORITY * 180 / Math.PI;
+  const surfaceLimited = Math.abs(elevatorEffective) > MAX_ELEVATOR_RAD * sensitivity;
   return {
-    feasible: true,
-    reason: idleLimited ? 'idle' : undefined,
-    alphaDeg: alpha * 180 / Math.PI,
-    cl: clReq,
-    clMax,
-    cd,
-    elevator,
-    pitchTrimDeg: clamp(pitchTrimDeg, -5, 12), // Aerodynamics.setTrim wheel limits
-    handsOffTrimDeg,
-    handsOffTrimDegRaw,
-    handsOffFeasible: handsOffTrimDegRaw >= -5 && handsOffTrimDegRaw <= 12,
-    surfaceLimited: Math.abs(elevatorEffectiveRad) > MAX_ELEVATOR_RAD * sensitivity,
-    throttle,
-    thrustN: effectiveThrust,
-    tas,
-    mach,
-    qDyn: q,
+    feasible: true, reason: rawThrottle < 0 ? 'idle' : undefined,
+    alphaDeg: alpha * 180 / Math.PI, cl, clMax,
+    cd: result.drag / qS, elevator, pitchTrimDeg: clamp(pitchTrimDeg, -5, 12),
+    handsOffTrimDegRaw, handsOffTrimDeg: clamp(handsOffTrimDegRaw, -5, 12),
+    handsOffFeasible: handsOffTrimDegRaw >= -5 && handsOffTrimDegRaw <= 12 && !surfaceLimited && rawThrottle >= 0,
+    surfaceLimited, throttle: clamp(rawThrottle, 0, 1), thrustN: Math.max(0, thrustRequired),
+    tas, mach, qDyn: q, residual: error, tailForce: result.tailForce, tailDragDelta: result.tailDragDelta,
   };
 }

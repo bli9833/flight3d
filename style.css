@@ -2380,3 +2380,10 @@ body[data-flow="lobby"] #incheon-attribution { z-index: 81; bottom: 4px; }
 #render-trials output { display: block; white-space: pre-wrap; line-height: 1.7; font-variant-numeric: tabular-nums; }
 .render-trial-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 #render-trials .render-trial-actions .btn { flex: 1; min-width: 88px; padding: 6px; }
+.loading-panel { position: fixed; z-index: 2200; right: 18px; top: 12vh; width: min(420px, calc(100vw - 36px)); max-height: 75vh; overflow: auto; padding: 20px; border: 1px solid #56738a; border-radius: 12px; background: #101d2bf5; color: #eef6ff; font: 14px/1.5 system-ui; box-sizing: border-box; }
+.loading-panel[hidden] { display: none; }
+.loading-panel h2 { font-size: 18px; margin: 0 0 12px; }
+.loading-fields label { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 10px 0; }
+.loading-fields input { width: 110px; padding: 6px; color: #eef6ff; background: #172b40; border: 1px solid #56738a; border-radius: 5px; }
+.loading-panel [data-summary] { white-space: pre-line; color: #bce3ff; }
+.loading-panel output { display: block; margin-top: 10px; }
