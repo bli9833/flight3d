@@ -5,7 +5,9 @@ import path from 'node:path';
 // Run under chrome-session --project flight3d with Vite already serving APP_URL.
 const endpoint = `http://127.0.0.1:${process.env.CHROME_DEBUG_PORT || 9225}`;
 const url = process.env.APP_URL || 'http://127.0.0.1:5173/';
-const dir = process.env.ARTIFACT_DIR || '.cache/cockpit-flood-performance';
+const experiment = process.env.EXPERIMENT || 'floods';
+assert.ok(['floods', 'direct'].includes(experiment), 'EXPERIMENT must be floods or direct');
+const dir = process.env.ARTIFACT_DIR || `.cache/cockpit-light-performance-${experiment}`;
 fs.mkdirSync(dir, { recursive: true });
 const target = await (await fetch(`${endpoint}/json/new?${encodeURIComponent(url)}`, { method: 'PUT' })).json();
 const ws = new WebSocket(target.webSocketDebuggerUrl);
@@ -16,6 +18,7 @@ ws.addEventListener('message', event => {
   const message = JSON.parse(event.data);
   if (message.id) pending.get(message.id)?.(message);
   if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
+  if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') errors.push(message.params.args);
 });
 const call = (method, params = {}) => new Promise((resolve, reject) => {
   const id = ++sequence;
@@ -39,7 +42,31 @@ const waitForCockpit = async () => {
   }
   throw Error('Cockpit did not load');
 };
-const report = { visuals: [], timings: [] };
+const configureTrial = () => evaluate(`(() => {
+  const c = window.simulator.aircraft.cockpit, materials = new Map();
+  c.gltfCockpitGroup.traverse(node => {
+    if (!node.isMesh) return;
+    for (const material of (Array.isArray(node.material) ? node.material : [node.material])) {
+      if (material.isMeshStandardMaterial && !materials.has(material)) {
+        materials.set(material, { compile: material.onBeforeCompile, key: material.customProgramCacheKey });
+      }
+    }
+  });
+  window.__setLightingTrial = baseline => {
+    if ('${experiment}' === 'floods') { c.floods.forEach(light => { light.visible = baseline; }); return; }
+    for (const [material, original] of materials) {
+      material.onBeforeCompile = function(shader, renderer) {
+        original.compile.call(this, shader, renderer);
+        if (baseline) shader.fragmentShader = shader.fragmentShader.replaceAll(
+          'if ( directLight.visible ) RE_Direct(', 'RE_Direct('
+        );
+      };
+      material.customProgramCacheKey = () => original.key.call(material) + ':trial-baseline-' + baseline;
+      material.needsUpdate = true;
+    }
+  };
+})()`);
+const report = { experiment, visuals: [], timings: [] };
 const save = () => fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify(report, null, 2));
 try {
   await call('Runtime.enable');
@@ -64,6 +91,7 @@ try {
   assert.equal(report.setup.bake, 'ready');
   assert.ok(report.setup.floods.every(light => !light.visible && light.intensity === 0));
   await sleep(500); // Let the already-scheduled animation callback retire.
+  await configureTrial();
 
   for (const hour of [12, 23]) for (const yaw of [0, Math.PI]) {
     const row = await evaluate(`(async () => {
@@ -72,14 +100,14 @@ try {
       s.stepSimulation(0); c.syncLighting(s.sky, s.quaternion, 10);
       const shots = [], pixels = [];
       for (const visible of [true, true, false, false]) {
-        c.floods.forEach(light => { light.visible = visible; });
+        window.__setLightingTrial(visible);
         s.renderScene();
         const data = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
         gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, data);
         pixels.push(data); shots.push(s.renderer.domElement.toDataURL('image/png').split(',')[1]);
       }
       let changed = 0, changedPixels = 0, maxDifference = 0, squaredError = 0;
-      let beforeDrift = 0, afterDrift = 0;
+      let beforeDrift = 0, afterDrift = 0, beforeError = 0, afterError = 0;
       const locations = [];
       for (let i = 0; i < pixels[0].length; i += 4) {
         let pixelChanged = false;
@@ -90,6 +118,8 @@ try {
           maxDifference = Math.max(maxDifference, difference);
           if (pixels[0][k] !== pixels[1][k]) beforeDrift++;
           if (pixels[2][k] !== pixels[3][k]) afterDrift++;
+          beforeError += (pixels[0][k] - pixels[1][k]) ** 2;
+          afterError += (pixels[2][k] - pixels[3][k]) ** 2;
         }
         if (pixelChanged) {
           changedPixels++;
@@ -98,6 +128,7 @@ try {
       }
       return { hour: ${hour}, yaw: ${yaw}, changed, changedPixels, maxDifference, beforeDrift, afterDrift, locations,
         channels: pixels[0].length, changedFraction: changedPixels / (pixels[0].length / 4), rmse: Math.sqrt(squaredError / pixels[0].length),
+        beforeRmse: Math.sqrt(beforeError / pixels[0].length), afterRmse: Math.sqrt(afterError / pixels[0].length),
         shots: [shots[1], shots[3]], glError: gl.getError() };
     })()`);
     for (let i = 0; i < row.shots.length; i++) {
@@ -108,7 +139,8 @@ try {
     assert.ok(row.beforeDrift / row.channels < .0001, 'Baseline frames must be stable');
     assert.ok(row.afterDrift / row.channels < .0001, 'Optimized frames must be stable');
     // Shader variants can change subpixel raster/depth ties on fine model lettering.
-    assert.ok(row.changedFraction < .0001 && row.rmse < .1, 'Flood removal must preserve cockpit lighting');
+    const rasterNoise = Math.max(.1, 2 * row.beforeRmse, 2 * row.afterRmse);
+    assert.ok(row.changedFraction < .0001 && row.rmse <= rasterNoise, 'Optimization must preserve cockpit lighting');
   }
 
   if (report.setup.gpuTimers) for (const yaw of [0, Math.PI]) for (const visible of [true, false, false, true]) {
@@ -116,7 +148,7 @@ try {
       const s = window.simulator, c = s.aircraft.cockpit, gl = s.renderer.getContext();
       const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
       s.sky.setTimeOfDay(12); s.cameraSystem.lookYaw = ${yaw}; s.stepSimulation(0);
-      c.syncLighting(s.sky, s.quaternion, 10); c.floods.forEach(light => { light.visible = ${visible}; });
+      c.syncLighting(s.sky, s.quaternion, 10); window.__setLightingTrial(${visible});
       s.renderScene(); gl.finish(); // Complete cold pipeline compilation outside timing.
       const queries = [], times = [], frames = []; let previous;
       const poll = () => {
@@ -140,7 +172,7 @@ try {
       while (queries.length && performance.now() < deadline) { await new Promise(requestAnimationFrame); poll(); }
       const pending = queries.length; queries.forEach(query => gl.deleteQuery(query));
       times.sort((a,b) => a-b);
-      return { yaw: ${yaw}, oldFloodsVisible: ${visible}, samples: times.length, pending,
+      return { yaw: ${yaw}, baseline: ${visible}, samples: times.length, pending,
         gpuMedianMs: times[Math.floor(times.length / 2)],
         fps: 1000 * frames.length / frames.reduce((a,b) => a+b,0), contextLost: gl.isContextLost() };
     })()`);
@@ -154,6 +186,7 @@ try {
   await call('Network.setBlockedURLs', { urls: ['*lighting/cockpit-*.json*'] });
   await call('Page.reload', { ignoreCache: true });
   await waitForCockpit();
+  await configureTrial();
   report.fallback = await evaluate(`(() => {
     const s = window.simulator, c = s.aircraft.cockpit;
     s.animate = () => {}; s.demoDirector.stop(); s.gameFlow.enterFlight();
@@ -162,6 +195,32 @@ try {
   })()`);
   assert.equal(report.fallback.bake, 'fallback');
   assert.ok(report.fallback.floods.every(light => light.visible && light.intensity === light.expected));
+  if (experiment === 'direct') {
+    await sleep(500);
+    report.fallback.comparison = await evaluate(`(() => {
+      const s = window.simulator, gl = s.renderer.getContext(), pixels = [];
+      for (const baseline of [true, true, false, false]) {
+        window.__setLightingTrial(baseline); s.renderScene();
+        const data = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+        gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, data);
+        pixels.push(data);
+      }
+      let squaredError = 0, beforeError = 0, afterError = 0, changed = 0;
+      for (let i = 0; i < pixels[0].length; i++) {
+        squaredError += (pixels[1][i] - pixels[3][i]) ** 2;
+        beforeError += (pixels[0][i] - pixels[1][i]) ** 2;
+        afterError += (pixels[2][i] - pixels[3][i]) ** 2;
+        if (pixels[1][i] !== pixels[3][i]) changed++;
+      }
+      return { rmse: Math.sqrt(squaredError / pixels[0].length),
+        beforeRmse: Math.sqrt(beforeError / pixels[0].length), afterRmse: Math.sqrt(afterError / pixels[0].length),
+        changedFraction: changed / pixels[0].length, glError: gl.getError() };
+    })()`);
+    const comparison = report.fallback.comparison;
+    assert.ok(comparison.changedFraction < .0001 && comparison.rmse <= Math.max(.1, 2 * comparison.beforeRmse, 2 * comparison.afterRmse),
+      'Active fallback floods must retain their lighting');
+    assert.equal(report.fallback.comparison.glError, 0);
+  }
   assert.deepEqual(errors, []); report.status = 'PASS';
 } catch (error) {
   report.failure = error.stack; process.exitCode = 1; console.error(error);

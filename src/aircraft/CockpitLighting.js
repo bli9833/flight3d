@@ -1,3 +1,11 @@
+import { ShaderChunk } from 'three';
+
+// Three still evaluates the BRDF for lights with zero attenuated colour. Keep
+// its range/cone/falloff calculations, but skip their zero-energy contribution.
+const activeDirectLighting = ShaderChunk.lights_fragment_begin.replaceAll(
+  'RE_Direct( directLight,', 'if ( directLight.visible ) RE_Direct( directLight,'
+);
+
 /** Keep the closed exterior skin out of the deck sun, but in the exterior sun. */
 export function excludeFromDeckShadow(mesh) {
   const before = mesh.onBeforeShadow;
@@ -41,6 +49,8 @@ export function shadeCockpitMaterial(material, transfer = null) {
         varying vec4 deckBackIrradiance;\n` + shader.fragmentShader;
     }
     shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <lights_fragment_begin>', activeDirectLighting
+    ).replace(
       '#include <lights_fragment_end>',
       `irradiance = ${transfer
     ? 'PI * (gl_FrontFacing ? deckFrontIrradiance.rgb : deckBackIrradiance.rgb) +'
@@ -52,7 +62,7 @@ export function shadeCockpitMaterial(material, transfer = null) {
     : '0.0'};`
     );
   };
-  material.customProgramCacheKey = () => transfer ? 'cockpit-baked-transfer-v1' : 'cockpit-transfer-fallback-v1';
+  material.customProgramCacheKey = () => transfer ? 'cockpit-baked-transfer-v2' : 'cockpit-transfer-fallback-v2';
   material.needsUpdate = true;
 }
 
