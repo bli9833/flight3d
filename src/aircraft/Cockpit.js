@@ -219,7 +219,8 @@ export class Cockpit {
               }
             });
             // Flood irradiance, including visibility and bounce, is in the bake.
-            this.floods.forEach(flood => { flood.intensity = 0; });
+            // Zero-intensity lights still add shader work, so exclude their nodes too.
+            this.floods.forEach(flood => { flood.intensity = 0; flood.visible = false; });
             this.lightingBakeStatus = 'ready';
           } catch (error) {
             transfer?.dispose();

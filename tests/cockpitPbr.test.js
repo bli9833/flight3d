@@ -171,7 +171,31 @@ describe('Cockpit GLTF Interior System', () => {
       assert.equal(cockpit.lightingBakeStatus, 'fallback');
       assert.equal(cockpit.gltfCockpitLoaded, true);
       assert.equal(cockpit.cockpitModelLoading, false);
-      cockpit.floods.forEach((light, i) => assert.equal(light.intensity, cockpit.floodBaseIntensity[i]));
+      cockpit.floods.forEach((light, i) => {
+        assert.equal(light.intensity, cockpit.floodBaseIntensity[i]);
+        assert.equal(light.visible, true, 'Fallback floods must remain real lights');
+      });
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    }
+  });
+
+  it('excludes redundant flood lights after the baked lighting binds successfully', async (t) => {
+    const cockpit = new Cockpit(...createCanvases());
+    let loaded;
+    t.mock.method(GLTFLoader.prototype, 'load', (_url, onLoad) => { loaded = onLoad; });
+    const transfer = { bind() {} };
+    t.mock.method(CockpitLightTransfer, 'load', async () => transfer);
+    const previousWindow = globalThis.window;
+    globalThis.window = {};
+    try {
+      cockpit.loadCockpitModel();
+      await loaded({ scene: new THREE.Group() });
+      assert.equal(cockpit.lightingBakeStatus, 'ready');
+      assert.equal(cockpit.lightTransfer, transfer);
+      assert.equal(cockpit.gltfCockpitLoaded, true);
+      assert.ok(cockpit.floods.every(light => light.intensity === 0 && !light.visible));
     } finally {
       if (previousWindow === undefined) delete globalThis.window;
       else globalThis.window = previousWindow;
