@@ -125,13 +125,17 @@ export class CockpitOcclusion {
     }
   }
 
+  canWarm(quality) {
+    return !this.pass && this.enabled && quality !== 'performance' && this.cockpit.gltfCockpitLoaded;
+  }
+
   // Photo mode looking forward never runs render(), so a lazy init() would land
   // its construction, shader compilation and target sizing on the first
   // look-away frame (~100ms hitch). Pay that cost here instead: one screen
   // beauty pass with the interior forced visible and unculled, then both AO
   // scale tiers. The normal renderScene later in the frame redraws the screen.
   warm(renderer, quality) {
-    if (this.pass || !this.enabled || quality === 'performance' || !this.cockpit.gltfCockpitLoaded) return;
+    if (!this.canWarm(quality)) return;
     const deck = this.cockpit.gltfCockpitGroup;
     // Photo mode hides the whole cockpit.group ancestor; un-hide it too or the
     // warm draw stays invisible and compiles nothing.

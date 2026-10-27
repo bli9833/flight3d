@@ -1825,7 +1825,7 @@ class FlightSimulator {
     // cockpit sun state makes warm compile the shadow-receiving deck variants
     // and caster depth programs that a photo frame would never present; the
     // regular updateCockpitSun call below restores the real state this frame.
-    if (isCockpit && this.cameraSystem.photoCockpit && !this.cockpitOcclusion.pass) {
+    if (isCockpit && this.cameraSystem.photoCockpit && this.cockpitOcclusion.canWarm(this.renderQuality)) {
       this.sky.updateCockpitSun({
         position: this.aircraft.group.position,
         quaternion: this.aircraft.group.quaternion,
