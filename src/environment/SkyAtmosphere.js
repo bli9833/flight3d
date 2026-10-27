@@ -3,6 +3,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { CloudLayer } from './CloudLayer.js';
 import { CockpitSunShadow } from './CockpitSunShadow.js';
+import { SunShadowRefresh } from './SunShadowRefresh.js';
 
 const OVERCAST_GREY = new THREE.Color(0.55, 0.57, 0.60);
 
@@ -51,6 +52,10 @@ export class SkyAtmosphere {
     this.sunLight.shadow.camera.top = sCam;
     this.sunLight.shadow.camera.bottom = -sCam;
     this.sunLight.shadow.camera.updateProjectionMatrix();
+    // Reused until its inputs change, on SunShadowRefresh's word from prepareRender, so a
+    // deck that is only turning its head does not redraw the whole map behind the cockpit.
+    this.sunLight.shadow.autoUpdate = false;
+    this.sunShadowRefresh = new SunShadowRefresh(this.sunLight);
     this.scene.add(this.sunLight);
     this.scene.add(this.sunLight.target);
 
@@ -332,6 +337,7 @@ export class SkyAtmosphere {
     }
     this.sunLight.target.position.copy(aircraftPosition);
     this.sunLight.position.copy(aircraftPosition).addScaledVector(this.sunPosition, 600);
+    this.sunShadowRefresh.beforeRender(this.scene, camera);
     // Sort before renderer.render uploads instance buffers, including camera cuts.
     this.cloudLayer.sortForCamera(camera);
   }
