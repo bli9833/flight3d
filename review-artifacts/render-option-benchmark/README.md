@@ -54,11 +54,12 @@ the cockpit view even after PR #239 landed.
 options are actually removing in the forward pose:
 
 - 26 lights in the scene, 18 visible. **14 of the 18 visible lights are farther
-  from the eye than their own attenuation range** — they illuminate nothing and
-  are still compiled into every material's light loop. 3 visible lights have zero
+  from the eye than their own attenuation range**. This eye-distance statistic
+  does not establish that visible surfaces are outside their ranges; it cannot
+  justify removing those lights. They remain in compiled light loops. 3 visible lights have zero
   intensity. The B737 keeps 8 exterior `PointLight`s (range 8–15 m) plus two
   landing `SpotLight`s parented to the airframe; the pilot seat is outside their
-  reach.
+   reach, but surfaces seen from that seat can still receive their light.
 - The aircraft group submits 1.83 M triangles, of which 1.82 M (99.5%) come from
   double-sided materials and 1.83 M are shadow casters. `src/aircraft/Cockpit.js:143`
   forces `side = DoubleSide` on every material of the imported cockpit model.
@@ -68,13 +69,17 @@ options are actually removing in the forward pose:
 ## Optimization points, ranked
 
 1. **Scope the compiled light set** (`lights/noLocal` −47%, `lights/noExterior`
-   −29%). Out-of-range lights cannot change a pixel, so gating them is a
-   no-visual-change win, unlike PR #239's per-fragment skip which still pays the
-   loop, uniform upload and register cost. Light count is part of the program
+   −29%). Removing lights requires proving they do not affect visible receivers,
+   rather than comparing their range with camera distance. PR #242 checks a
+   narrower nav/strobe-only set; broader removal changes day/night images.
+   PR #239's per-fragment skip still pays the loop, uniform upload and register
+   cost. Light count is part of the program
    key, so gate with hysteresis and rounded buckets (the pattern already used in
    `src/environment/Airport.js:370`) to avoid recompile stutter.
-2. **Use projection depth for cockpit-scoped materials** (−28%). The forward
-   capture is indistinguishable from the baseline. `useProjectionDepth` already
+2. **Investigate depth cost** (−28% in the scene-wide trial). The forward
+   capture showed no obvious difference. This trial changes all scanned scene
+   materials, so it does not measure a cockpit-only implementation.
+   `useProjectionDepth` already
    exists in `src/aircraft/CockpitDepth.js` for shadow and AO materials; the open
    question is whether near-field cockpit surfaces keep resolving against the
    45 km logarithmic exterior. Needs side-window and pillar edge validation.
@@ -85,17 +90,26 @@ options are actually removing in the forward pose:
    `shadowSide` for the depth pass.
 4. **Trim shadow casters** (−17%): 99.98% of aircraft triangles cast shadows,
    including interior meshes that cannot shade anything visible.
-5. **Do not prioritize new spatial culling.** Disabling existing frustum culling
+5. **Existing frustum culling is useful.** Disabling existing frustum culling
    made frames 2.7–19.8% *slower* while adding only 6.9% triangles, so the
-   current culling already pays off and batch partitioning has little fragment
-   budget left to recover. This supersedes the hypothesis recorded while
-   reviewing PR #239.
-6. **AO is cheap** (−8.5% while removing 31% of submitted triangles); it is not
-   the cause of the cockpit stutter.
+   current culling already pays off. This does not measure finer batch
+   partitioning or occlusion culling, or bound their potential benefit.
+6. **AO steady cost in this sweep is −8.5%** when disabled, while removing 31%
+   of submitted triangles. Samples exclude initial compilation, so this cannot
+   rule out AO initialization hitches or a larger cost in other look-back runs.
 7. **Pixel ratio is a linear quality tradeoff**, not a free win: −32% for 0.56×
    pixels, with softer instruments. Keep it as a dynamic fallback only.
 
 ## Limits
+
+- The [look-back follow-up](https://github.com/stlim0727/flight3d/pull/241#issuecomment-6436493407)
+  reports a first-use AO hitch and larger unpaced rAF aft-view cost. Its timings
+  use a different harness/pacing and are not interchangeable with these GPU
+  queries. The scripts/raw evidence were uncommitted when reported, so the new
+  numerical claims have not been independently reproduced here. Source confirms
+  AO is initialized lazily. The copy shader's depth early-out does not skip
+  SSAOPass's earlier normal, SSAO and blur passes, so it alone does not explain
+  the difference between forward and aft costs.
 
 - One GPU (Intel Arc ADL-N under ANGLE Vulkan), one aircraft, one airport, one
   daytime pose, parked. Ratios will differ on other hardware and at night, where
