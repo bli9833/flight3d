@@ -131,11 +131,12 @@ export class CockpitOcclusion {
   // beauty pass with the interior forced visible and unculled, then both AO
   // scale tiers. The normal renderScene later in the frame redraws the screen.
   warm(renderer, quality) {
-    if (this.pass || !this.enabled || !this.cockpit.gltfCockpitLoaded) return;
+    if (this.pass || !this.enabled || quality === 'performance' || !this.cockpit.gltfCockpitLoaded) return;
     const deck = this.cockpit.gltfCockpitGroup;
     // Photo mode hides the whole cockpit.group ancestor; un-hide it too or the
     // warm draw stays invisible and compiles nothing.
-    const wasVisible = deck.visible && this.cockpit.group.visible;
+    const deckWasVisible = deck.visible;
+    const groupWasVisible = this.cockpit.group.visible;
     deck.visible = true;
     this.cockpit.group.visible = true;
     const previous = renderer.getRenderTarget();
@@ -167,8 +168,8 @@ export class CockpitOcclusion {
         camera.layers.mask = layers;
       }
     } finally {
-      deck.visible = wasVisible;
-      this.cockpit.group.visible = wasVisible;
+      deck.visible = deckWasVisible;
+      this.cockpit.group.visible = groupWasVisible;
       renderer.setRenderTarget(previous);
       scratch.dispose();
     }
