@@ -322,7 +322,7 @@ export class SkyAtmosphere {
     }
     this.sunLight.target.position.copy(aircraftPosition);
     this.sunLight.position.copy(aircraftPosition).addScaledVector(this.sunPosition, 600);
-    this.sunShadowRefresh.beforeRender(this.scene);
+    this.sunShadowRefresh.beforeRender(this.scene, camera);
     // Sort before renderer.render uploads instance buffers, including camera cuts.
     this.cloudLayer.sortForCamera(camera);
   }

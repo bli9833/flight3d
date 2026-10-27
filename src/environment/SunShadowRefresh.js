@@ -8,9 +8,10 @@
  * comparing the map's inputs against the ones it was built from.
  *
  * The inputs covered are what this scene actually moves casters with: world transforms,
- * geometry swaps, visibility, shadow layers, instanced batch sizes, and the light and its
- * box. Bone poses, morph weights and material settings are not read, so changing one of
- * those on a caster has to call `invalidate()`.
+ * geometry swaps, visibility, shadow layers, the view camera's own layer mask (three tests
+ * casters against it), instanced batch sizes, and the light and its box. Bone poses, morph
+ * weights, material settings and vertices edited inside a geometry are not read, so changing
+ * one of those on a caster has to call `invalidate()`.
  */
 
 /** A tenth of a millimetre of slack, and only for metres: a three-hundredth of a shadow
@@ -92,29 +93,33 @@ export class SunShadowRefresh {
 
   /**
    * Ask whether the pass has to run for this frame, and mark `shadow.needsUpdate` when it
-   * does. Call after the light and its box are set, immediately before `renderer.render`.
+   * does. Call after the light and its box are set, immediately before `renderer.render`,
+   * with the camera that render is about to use.
    */
-  beforeRender(scene) {
+  beforeRender(scene, camera) {
     const shadow = this.light.shadow;
     // With autoUpdate on, three refreshes the pass whatever is in it, and an unallocated
     // target has nothing to reuse. Neither is worth a scene walk to find out.
     const reusable = !shadow.autoUpdate && !!shadow.map;
     // The header tracks the aircraft, so a frame in motion — which is every frame of
-    // flight — is settled by nineteen comparisons instead of traversing the scene.
-    const holds = reusable && !this.readHeader() && !this.readCasters(scene);
+    // flight — is settled by twenty comparisons instead of traversing the scene.
+    const holds = reusable && !this.readHeader(camera) && !this.readCasters(scene);
     if (!reusable) this.casters.forget(); // the pass just ran on poses nobody recorded
     if (!holds) shadow.needsUpdate = true;
     return !holds;
   }
 
-  /** Light transform, target, enabled state, and the shadow camera's box. */
-  readHeader() {
-    const light = this.light, shadow = light.shadow, camera = shadow.camera, row = this.header;
+  /** Light transform, target, enabled state, the shadow camera's box, and the view camera. */
+  readHeader(camera) {
+    const light = this.light, shadow = light.shadow, box = shadow.camera, row = this.header;
     const metres = [light.position.x, light.position.y, light.position.z,
       light.target.position.x, light.target.position.y, light.target.position.z,
-      camera.near, camera.far, camera.left, camera.right, camera.bottom, camera.top];
+      box.near, box.far, box.left, box.right, box.top, box.bottom];
+    // three draws a caster into this map only if the camera being rendered with can see its
+    // layers, so the mask belongs to the pass's inputs even though the box does not move.
     const settings = [light.castShadow ? 1 : 0, light.visible ? 1 : 0,
-      shadow.mapSize.width, shadow.mapSize.height, shadow.bias, shadow.normalBias, shadow.radius];
+      shadow.mapSize.width, shadow.mapSize.height, shadow.bias, shadow.normalBias, shadow.radius,
+      camera.layers.mask];
     row.begin();
     for (const value of metres) row.put(value, REBUILD_TOLERANCE);
     for (const value of settings) row.put(value);

@@ -63,7 +63,7 @@ const measure = (hour, pose, level, move = false) => evaluate(`(async () => {
   let passes = 0;
   const original = refresh.beforeRender;
   const wrapped = refresh.beforeRender.bind(refresh);
-  refresh.beforeRender = scene => { const needed = wrapped(scene); if (needed) passes++; return needed; };
+  refresh.beforeRender = (scene, camera) => { const needed = wrapped(scene, camera); if (needed) passes++; return needed; };
   const queries = [], times = [], marks = []; let previous, frames = 0;
   const poll = () => {
     for (let i = queries.length - 1; i >= 0; i--) if (gl.getQueryParameter(queries[i], gl.QUERY_RESULT_AVAILABLE)) {

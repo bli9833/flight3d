@@ -11,54 +11,38 @@
           "frames": 19,
           "passes": 1,
           "samples": 19,
-          "gpuMedianMs": 164.284214,
-          "gpuP95Ms": 172.611714,
+          "gpuMedianMs": 165.564214,
+          "gpuP95Ms": 172.805516,
           "wallMedianMs": 166.6999999999989,
           "contextLost": false,
-          "deltaGpuPct": -5.9
+          "deltaGpuPct": -4.4
         },
         {
           "level": "before",
-          "frames": 19,
-          "passes": 19,
-          "samples": 19,
-          "gpuMedianMs": 174.573693,
-          "gpuP95Ms": 177.605256,
+          "frames": 18,
+          "passes": 18,
+          "samples": 18,
+          "gpuMedianMs": 173.252547,
+          "gpuP95Ms": 175.752495,
           "wallMedianMs": 183.29999999999927,
           "contextLost": false,
           "pair": "before vs ship",
-          "changedFraction": 0.000004861111111111111,
-          "rmse": 0.06600320909706672,
-          "max": 55,
+          "changedFraction": 0.000001388888888888889,
+          "rmse": 0.031088471425201263,
+          "max": 46,
           "spots": [
             [
-              1475,
-              106
+              1461,
+              103
             ],
             [
-              1475,
-              107
-            ],
-            [
-              756,
-              255
-            ],
-            [
-              1498,
-              352
-            ],
-            [
-              1517,
-              355
-            ],
-            [
-              1517,
-              356
+              1083,
+              360
             ]
           ],
           "glError": 0,
-          "noiseFraction": 0.00000625,
-          "noiseMax": 96,
+          "noiseFraction": 0.000004166666666666667,
+          "noiseMax": 46,
           "noiseSpots": [
             [
               1475,
@@ -69,16 +53,20 @@
               107
             ],
             [
-              1517,
-              355
-            ],
-            [
-              1517,
-              356
+              1394,
+              240
             ],
             [
               1083,
               360
+            ],
+            [
+              1091,
+              470
+            ],
+            [
+              1091,
+              472
             ]
           ]
         },
@@ -86,12 +74,12 @@
           "level": "ship",
           "frames": 20,
           "passes": 0,
-          "samples": 20,
-          "gpuMedianMs": 164.25161,
-          "gpuP95Ms": 164.701245,
-          "wallMedianMs": 166.6999999999971,
+          "samples": 19,
+          "gpuMedianMs": 165.313902,
+          "gpuP95Ms": 167.2151,
+          "wallMedianMs": 166.70000000000073,
           "contextLost": false,
-          "driftPct": 0
+          "driftPct": -0.2
         }
       ]
     },
@@ -101,23 +89,23 @@
       "cases": [
         {
           "level": "ship",
-          "frames": 33,
+          "frames": 31,
           "passes": 0,
-          "samples": 33,
-          "gpuMedianMs": 82.873591,
-          "gpuP95Ms": 83.808487,
+          "samples": 31,
+          "gpuMedianMs": 85.981977,
+          "gpuP95Ms": 86.912654,
           "wallMedianMs": 100,
           "contextLost": false,
-          "deltaGpuPct": -6.7
+          "deltaGpuPct": -6
         },
         {
           "level": "before",
-          "frames": 32,
-          "passes": 32,
-          "samples": 32,
-          "gpuMedianMs": 88.860258,
-          "gpuP95Ms": 89.278539,
-          "wallMedianMs": 100,
+          "frames": 29,
+          "passes": 29,
+          "samples": 29,
+          "gpuMedianMs": 91.491351,
+          "gpuP95Ms": 92.648956,
+          "wallMedianMs": 116.59999999999854,
           "contextLost": false,
           "pair": "before vs ship",
           "changedFraction": 0,
@@ -134,11 +122,11 @@
           "frames": 33,
           "passes": 0,
           "samples": 33,
-          "gpuMedianMs": 82.890466,
-          "gpuP95Ms": 83.61906,
+          "gpuMedianMs": 84.861404,
+          "gpuP95Ms": 85.751768,
           "wallMedianMs": 100,
           "contextLost": false,
-          "driftPct": 0
+          "driftPct": -1.3
         }
       ]
     },
@@ -151,19 +139,19 @@
           "frames": 20,
           "passes": 0,
           "samples": 20,
-          "gpuMedianMs": 158.3051,
-          "gpuP95Ms": 158.711194,
-          "wallMedianMs": 166.6999999999971,
+          "gpuMedianMs": 160.516975,
+          "gpuP95Ms": 161.590881,
+          "wallMedianMs": 166.70000000000437,
           "contextLost": false,
-          "deltaGpuPct": -3.7
+          "deltaGpuPct": -3.4
         },
         {
           "level": "before",
-          "frames": 20,
-          "passes": 20,
-          "samples": 20,
-          "gpuMedianMs": 164.374891,
-          "gpuP95Ms": 164.73036,
+          "frames": 19,
+          "passes": 19,
+          "samples": 19,
+          "gpuMedianMs": 166.20786,
+          "gpuP95Ms": 167.659943,
           "wallMedianMs": 183.29999999999563,
           "contextLost": false,
           "pair": "before vs ship",
@@ -181,11 +169,11 @@
           "frames": 20,
           "passes": 0,
           "samples": 20,
-          "gpuMedianMs": 158.339214,
-          "gpuP95Ms": 159.108121,
+          "gpuMedianMs": 159.094423,
+          "gpuP95Ms": 159.573589,
           "wallMedianMs": 166.6999999999971,
           "contextLost": false,
-          "driftPct": 0
+          "driftPct": -0.9
         }
       ]
     },
@@ -195,23 +183,23 @@
       "cases": [
         {
           "level": "ship",
-          "frames": 25,
+          "frames": 24,
           "passes": 0,
-          "samples": 25,
-          "gpuMedianMs": 123.042653,
-          "gpuP95Ms": 123.678799,
-          "wallMedianMs": 133.3000000000029,
+          "samples": 24,
+          "gpuMedianMs": 123.403903,
+          "gpuP95Ms": 124.04208,
+          "wallMedianMs": 133.39999999999418,
           "contextLost": false,
-          "deltaGpuPct": -4.7
+          "deltaGpuPct": -4.6
         },
         {
           "level": "before",
-          "frames": 24,
-          "passes": 24,
-          "samples": 24,
-          "gpuMedianMs": 129.142236,
-          "gpuP95Ms": 132.054423,
-          "wallMedianMs": 133.3000000000029,
+          "frames": 23,
+          "passes": 23,
+          "samples": 23,
+          "gpuMedianMs": 129.400205,
+          "gpuP95Ms": 129.880153,
+          "wallMedianMs": 150,
           "contextLost": false,
           "pair": "before vs ship",
           "changedFraction": 0,
@@ -225,14 +213,14 @@
         },
         {
           "level": "ship",
-          "frames": 25,
+          "frames": 24,
           "passes": 0,
-          "samples": 25,
-          "gpuMedianMs": 123.055257,
-          "gpuP95Ms": 123.545049,
+          "samples": 24,
+          "gpuMedianMs": 123.248278,
+          "gpuP95Ms": 126.354892,
           "wallMedianMs": 133.3000000000029,
           "contextLost": false,
-          "driftPct": 0
+          "driftPct": -0.1
         }
       ]
     },
@@ -245,9 +233,9 @@
           "frames": 20,
           "passes": 0,
           "samples": 20,
-          "gpuMedianMs": 157.15411,
-          "gpuP95Ms": 157.881089,
-          "wallMedianMs": 166.60000000000582,
+          "gpuMedianMs": 157.311141,
+          "gpuP95Ms": 161.620256,
+          "wallMedianMs": 166.59999999999127,
           "contextLost": false,
           "deltaGpuPct": -6.2
         },
@@ -256,31 +244,63 @@
           "frames": 20,
           "passes": 20,
           "samples": 20,
-          "gpuMedianMs": 167.56385,
-          "gpuP95Ms": 170.767547,
+          "gpuMedianMs": 167.68411,
+          "gpuP95Ms": 171.388797,
           "wallMedianMs": 166.6999999999971,
           "contextLost": false,
           "pair": "before vs ship",
-          "changedFraction": 6.944444444444445e-7,
-          "rmse": 0.0007216878364870322,
-          "max": 1,
+          "changedFraction": 0.000004861111111111111,
+          "rmse": 0.03932150245801342,
+          "max": 44,
           "spots": [
             [
-              1083,
-              360
+              1475,
+              106
+            ],
+            [
+              1475,
+              107
+            ],
+            [
+              1323,
+              378
+            ],
+            [
+              1323,
+              379
+            ],
+            [
+              1070,
+              381
+            ],
+            [
+              1070,
+              382
             ]
           ],
           "glError": 0,
-          "noiseFraction": 0.000006944444444444445,
-          "noiseMax": 48,
+          "noiseFraction": 0.0000034722222222222224,
+          "noiseMax": 46,
           "noiseSpots": [
             [
               1461,
               103
             ],
             [
-              1498,
-              352
+              1475,
+              107
+            ],
+            [
+              1323,
+              378
+            ],
+            [
+              1323,
+              379
+            ],
+            [
+              1283,
+              393
             ]
           ]
         },
@@ -289,11 +309,11 @@
           "frames": 21,
           "passes": 0,
           "samples": 21,
-          "gpuMedianMs": 157.133954,
-          "gpuP95Ms": 160.042339,
-          "wallMedianMs": 166.6999999999971,
+          "gpuMedianMs": 157.626506,
+          "gpuP95Ms": 157.861402,
+          "wallMedianMs": 166.60000000000582,
           "contextLost": false,
-          "driftPct": 0
+          "driftPct": 0.2
         }
       ]
     },
@@ -303,22 +323,22 @@
       "cases": [
         {
           "level": "ship",
-          "frames": 34,
+          "frames": 33,
           "passes": 0,
-          "samples": 34,
-          "gpuMedianMs": 81.263175,
-          "gpuP95Ms": 81.918175,
-          "wallMedianMs": 99.90000000000873,
+          "samples": 33,
+          "gpuMedianMs": 81.489998,
+          "gpuP95Ms": 82.306456,
+          "wallMedianMs": 100,
           "contextLost": false,
-          "deltaGpuPct": -6.9
+          "deltaGpuPct": -7
         },
         {
           "level": "before",
-          "frames": 33,
-          "passes": 33,
-          "samples": 33,
-          "gpuMedianMs": 87.266664,
-          "gpuP95Ms": 88.043279,
+          "frames": 32,
+          "passes": 32,
+          "samples": 32,
+          "gpuMedianMs": 87.670049,
+          "gpuP95Ms": 88.172133,
           "wallMedianMs": 100,
           "contextLost": false,
           "pair": "before vs ship",
@@ -336,11 +356,11 @@
           "frames": 34,
           "passes": 0,
           "samples": 34,
-          "gpuMedianMs": 81.287654,
-          "gpuP95Ms": 81.53505,
-          "wallMedianMs": 99.89999999999418,
+          "gpuMedianMs": 81.746716,
+          "gpuP95Ms": 83.646925,
+          "wallMedianMs": 99.90000000000873,
           "contextLost": false,
-          "driftPct": 0
+          "driftPct": 0.3
         }
       ]
     },
@@ -353,19 +373,19 @@
           "frames": 21,
           "passes": 0,
           "samples": 21,
-          "gpuMedianMs": 150.894944,
-          "gpuP95Ms": 151.302756,
+          "gpuMedianMs": 151.264944,
+          "gpuP95Ms": 151.685256,
           "wallMedianMs": 166.60000000000582,
           "contextLost": false,
-          "deltaGpuPct": -3.8
+          "deltaGpuPct": -3.7
         },
         {
           "level": "before",
           "frames": 20,
           "passes": 20,
           "samples": 20,
-          "gpuMedianMs": 156.8351,
-          "gpuP95Ms": 157.449996,
+          "gpuMedianMs": 157.124787,
+          "gpuP95Ms": 157.553902,
           "wallMedianMs": 166.6999999999971,
           "contextLost": false,
           "pair": "before vs ship",
@@ -383,11 +403,11 @@
           "frames": 21,
           "passes": 0,
           "samples": 21,
-          "gpuMedianMs": 150.830152,
-          "gpuP95Ms": 151.928746,
+          "gpuMedianMs": 151.000881,
+          "gpuP95Ms": 151.425777,
           "wallMedianMs": 166.60000000000582,
           "contextLost": false,
-          "driftPct": 0
+          "driftPct": -0.2
         }
       ]
     },
@@ -400,8 +420,8 @@
           "frames": 25,
           "passes": 0,
           "samples": 25,
-          "gpuMedianMs": 116.38359,
-          "gpuP95Ms": 116.919059,
+          "gpuMedianMs": 116.514424,
+          "gpuP95Ms": 116.975205,
           "wallMedianMs": 133.3000000000029,
           "contextLost": false,
           "deltaGpuPct": -4.9
@@ -411,8 +431,8 @@
           "frames": 25,
           "passes": 25,
           "samples": 25,
-          "gpuMedianMs": 122.387028,
-          "gpuP95Ms": 122.597653,
+          "gpuMedianMs": 122.557444,
+          "gpuP95Ms": 123.280257,
           "wallMedianMs": 133.3000000000029,
           "contextLost": false,
           "pair": "before vs ship",
@@ -421,22 +441,17 @@
           "max": 0,
           "spots": [],
           "glError": 0,
-          "noiseFraction": 6.944444444444445e-7,
-          "noiseMax": 11,
-          "noiseSpots": [
-            [
-              1317,
-              127
-            ]
-          ]
+          "noiseFraction": 0,
+          "noiseMax": 0,
+          "noiseSpots": []
         },
         {
           "level": "ship",
-          "frames": 26,
+          "frames": 25,
           "passes": 0,
-          "samples": 26,
-          "gpuMedianMs": 116.395309,
-          "gpuP95Ms": 116.724892,
+          "samples": 25,
+          "gpuMedianMs": 116.517132,
+          "gpuP95Ms": 117.031195,
           "wallMedianMs": 133.3000000000029,
           "contextLost": false,
           "driftPct": 0
@@ -451,12 +466,12 @@
       "nudge": 0.5,
       "ship": {
         "level": "ship",
-        "frames": 23,
-        "passes": 23,
-        "samples": 23,
-        "gpuMedianMs": 101.798487,
-        "gpuP95Ms": 244.912598,
-        "wallMedianMs": 100.10000000000582,
+        "frames": 22,
+        "passes": 22,
+        "samples": 22,
+        "gpuMedianMs": 105.397549,
+        "gpuP95Ms": 239.268796,
+        "wallMedianMs": 100.09999999999127,
         "contextLost": false
       },
       "before": {
@@ -464,13 +479,13 @@
         "frames": 23,
         "passes": 23,
         "samples": 23,
-        "gpuMedianMs": 101.939737,
-        "gpuP95Ms": 244.299889,
-        "wallMedianMs": 100,
+        "gpuMedianMs": 107.426716,
+        "gpuP95Ms": 250.012337,
+        "wallMedianMs": 116.69999999999709,
         "contextLost": false
       },
-      "deltaGpuPct": -0.1,
-      "deltaFramesPct": 0
+      "deltaGpuPct": -1.9,
+      "deltaFramesPct": -4.3
     }
   ],
   "errors": [],

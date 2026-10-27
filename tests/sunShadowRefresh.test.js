@@ -10,6 +10,7 @@ import { SunShadowRefresh } from '../src/environment/SunShadowRefresh.js';
  */
 function rig() {
   const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera();
   const light = new THREE.DirectionalLight(0xffffff, 1);
   light.castShadow = true;
   light.position.set(0, 600, 0);
@@ -24,11 +25,11 @@ function rig() {
   light.shadow.map = { dispose() {} };
   const rebuild = () => {
     light.shadow.needsUpdate = false;
-    const needed = refresh.beforeRender(scene);
+    const needed = refresh.beforeRender(scene, camera);
     assert.equal(light.shadow.needsUpdate, needed, 'The flag must match the answer');
     return needed;
   };
-  return { scene, light, caster, refresh, rebuild };
+  return { scene, camera, light, caster, refresh, rebuild };
 }
 
 describe('SunShadowRefresh', () => {
@@ -179,7 +180,7 @@ describe('SunShadowRefresh', () => {
   });
 
   it('settles a frame in motion from the light alone', () => {
-    const { scene, light, caster, refresh, rebuild } = rig();
+    const { scene, camera, light, caster, refresh, rebuild } = rig();
     rebuild();
     rebuild();
     rebuild();
@@ -188,7 +189,21 @@ describe('SunShadowRefresh', () => {
     scene.traverse = visit => { walks++; return traverse(visit); };
     light.position.set(0, 600, 20);
     caster.position.set(9, 9, 9);
-    assert.equal(refresh.beforeRender(scene), true, 'A moving light means a new map');
+    assert.equal(refresh.beforeRender(scene, camera), true, 'A moving light means a new map');
     assert.equal(walks, 0, 'The header settles flight without walking the scene graph');
+  });
+
+  it('rebuilds when the view camera stops seeing a caster', () => {
+    const { camera, rebuild } = rig();
+    rebuild();
+    rebuild();
+    // three gates the sun pass on the camera being rendered with, not on the shadow box, so
+    // a camera that starts or stops seeing a layer changes which casters are in the map
+    // without moving the light, the box, or a single mesh.
+    camera.layers.set(5);
+    assert.equal(rebuild(), true, 'A camera that no longer sees the caster changes the pass');
+    camera.layers.enable(0);
+    assert.equal(rebuild(), true, 'And seeing it again changes it back');
+    assert.equal(rebuild(), false, 'Settling again stops the rebuilds');
   });
 });

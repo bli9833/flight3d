@@ -8,13 +8,14 @@ redrawn behind the cockpit on every frame.
 `SkyAtmosphere` sets `sunLight.shadow.autoUpdate = false` and asks a new
 [`SunShadowRefresh`](../../src/environment/SunShadowRefresh.js) immediately before each
 render. The oracle answers by comparing the pass's inputs against the inputs it was built
-from: the light's transform and target, its shadow camera's box and settings, and every
-mesh the pass would draw — identity, geometry, layers, visibility, instanced batch size and
-buffer version, and world matrix. Two flat `Float64Array` rows are kept and swapped, so a
-parked frame costs no allocation and no rebuild.
+from: the light's transform and target, its shadow camera's box and settings, the view
+camera's layer mask (three gates casters on it), and every mesh the pass would draw —
+identity, geometry, layers, visibility, instanced batch size and buffer version, and world
+matrix. Two flat `Float64Array` rows are kept and swapped, so a parked frame costs no
+allocation and no rebuild.
 
 The header is checked first and it tracks the aircraft, so every frame of flight — where the
-sun's box follows the airframe and the map is genuinely stale — settles in nineteen float
+sun's box follows the airframe and the map is genuinely stale — settles in twenty float
 comparisons and never traverses the scene. Metres are compared with a tenth-of-a-millimetre
 of slack, which is a three-hundredth of a shadow texel; identifiers and settings are exact.
 A row that matches is dropped rather than recorded, so sub-tolerance drift cannot accumulate
@@ -41,12 +42,13 @@ therefore repeating identical work, which is what this change removes.
 ## Verification (2026-10-27)
 
 - Node 22.23.2 in the worktree at `origin/main` (e71e85f): `npm run check` (266 files, 0
-  failures), `npm test` (650 tests, 0 failures), `npm run build` (clean).
-- `tests/sunShadowRefresh.test.js` — 9 cases: first frame and missing target, casters
-  appearing/hiding/swapping geometry, light and box changes, three keeping the pass while
-  `autoUpdate` is on and re-learning it on hand-back, non-casters ignored, motion hidden
-  behind an invisible ancestor, instanced repopulation, jitter absorbed and drift rebuilt,
-  and a moving frame settled by the header with zero scene traversals.
+  failures), `npm test` (651 tests, 0 failures), `npm run build` (clean).
+- `tests/sunShadowRefresh.test.js` — 10 cases: first frame and missing target, casters
+  appearing/hiding/swapping geometry, light and box changes, the view camera's layer mask,
+  three keeping the pass while `autoUpdate` is on and re-learning it on hand-back,
+  non-casters ignored, motion hidden behind an invisible ancestor, instanced repopulation,
+  jitter absorbed and drift rebuilt, and a moving frame settled by the header with zero
+  scene traversals.
 - Browser: `scripts/verify-cockpit-shadow-scope.mjs` on ANGLE Vulkan (Intel Arc ADL-N),
   local Vite on 127.0.0.1:5173, CDP, 1600×900. Each view measures the shipped build against
   `autoUpdate = true` in an A/B/A sandwich, times the GPU with
@@ -55,24 +57,27 @@ therefore repeating identical work, which is what this change removes.
 
 | view | sun map rebuilt | ship GPU | baseline GPU | Δ GPU | Δ wall | pixels changed | this view's floor |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 12h forward | 1/19 | 164.3 ms | 174.6 ms | −5.9% | −9.1% | 7 of 1.44M (max 55) | 9 px (max 96) |
-| 12h right | 0/33 | 82.9 ms | 88.9 ms | −6.7% | 0 | 0 | 0 |
-| 12h rear | 0/20 | 158.3 ms | 164.4 ms | −3.7% | −9.1% | 0 | 0 |
-| 12h overhead | 0/25 | 123.0 ms | 129.1 ms | −4.7% | 0 | 0 | 0 |
-| 23h forward | 0/20 | 157.2 ms | 167.6 ms | −6.2% | 0 | 1 px (max 1) | 10 px (max 48) |
-| 23h right | 0/34 | 81.3 ms | 87.3 ms | −6.9% | 0 | 0 | 0 |
-| 23h rear | 0/21 | 150.9 ms | 156.8 ms | −3.8% | 0 | 0 | 0 |
-| 23h overhead | 0/25 | 116.4 ms | 122.4 ms | −4.9% | 0 | 0 | 1 px (max 11) |
+| 12h forward | 1/19 | 165.6 ms | 173.3 ms | −4.4% | −9.1% | 2 (max 46) | 6 (max 46) |
+| 12h right | 0/31 | 86.0 ms | 91.5 ms | −6.0% | −14.2% | 0 | 0 |
+| 12h rear | 0/20 | 160.5 ms | 166.2 ms | −3.4% | −9.1% | 0 | 0 |
+| 12h overhead | 0/24 | 123.4 ms | 129.4 ms | −4.6% | −11.1% | 0 | 0 |
+| 23h forward | 0/20 | 157.3 ms | 167.7 ms | −6.2% | 0 | 7 (max 44) | 5 (max 46) |
+| 23h right | 0/33 | 81.5 ms | 87.7 ms | −7.0% | 0 | 0 | 0 |
+| 23h rear | 0/21 | 151.3 ms | 157.1 ms | −3.7% | 0 | 0 | 0 |
+| 23h overhead | 0/25 | 116.5 ms | 122.6 ms | −4.9% | 0 | 0 | 0 |
 
-Mean −5.35% GPU per frame, −5.21% over the whole sample, with **1 rebuild in 197 parked
+Mean **−5.02%** GPU per frame (the first commit measured −5.35%; the spread between sweeps is
+thermal, and A/B/A drift stayed within 1.3% at every view), with **1 rebuild in 193 parked
 frames**. Where the saved time crosses a display tick, the wall median drops a full 16.7 ms
-(183.3 → 166.7 ms). A/B/A drift stayed within 0.1% at every view, and no context loss or
-page exceptions were recorded.
+(183.3 → 166.7 ms, and 150.0 → 133.4 ms at 12h overhead). No context loss or page exceptions
+were recorded.
 
-In motion the check must be free and the reuse must not engage: the same harness slides the
-airframe 0.5 m per frame and the map rebuilt **23/23** frames at −0.1% GPU and 0% throughput.
+In motion the reuse must not engage: the same harness slides the airframe 0.5 m per frame and
+the map rebuilt **22/22** frames, so the oracle never claims a stale map is still good. The
+two levels then differ only by the run-to-run spread of a one-frame sample (22 against 23
+frames, −1.9% GPU median), which the gate accepts while it is under 5%.
 
-Four of the eight captured pairs — `12h-right`, `12h-overhead`, `23h-right`, `23h-rear` — are
+Six of the eight captured pairs — every view except the two that look at the sun — are
 byte-identical PNG files across the two levels, before any pixel arithmetic.
 
 ### Negative controls
@@ -122,21 +127,41 @@ that floor stays under 0.01% of pixels so a noisier harness cannot quietly widen
 ## Limits of this change
 
 - The win is parked-only. In flight the sun's box follows the airframe, so the map is stale
-  every frame and the oracle only adds nineteen comparisons to the decision. That is the
+  every frame and the oracle only adds twenty comparisons to the decision. That is the
   honest scope: looking around from a standstill, on the ramp, in the demo views, and while
   inspecting the aircraft.
-- The oracle reads transforms, geometry, visibility, layers and instanced buffers. It does
-  not read bone poses, morph weights or material settings. This scene has no `SkinnedMesh`
-  and no `morphTargetInfluences` in `src`, so nothing currently needs them; anything that
-  adds one must call `sunShadowRefresh.invalidate()` when it changes a caster.
+- The oracle reads transforms, geometry identity, visibility, layers (both the caster's and
+  the view camera's) and instanced buffers. It does **not** read bone poses, morph weights,
+  material settings, or vertices edited inside a geometry. This scene has no `SkinnedMesh`,
+  no `morphTargetInfluences`, and no caster that edits its own vertices after build (every
+  `computeBoundingSphere()` call site was checked: the instanced repopulation paths are
+  caught by the buffer version, the rest run once at build time), so nothing currently needs
+  them; anything adding one must call `sunShadowRefresh.invalidate()` when it changes a
+  caster.
 - A caster that moves by less than 1e-4 m per frame is absorbed. The tolerance is applied to
   metres only, and a matching row is discarded rather than recorded, so the absorbed amount
   cannot accumulate: the drift case in the unit test (60 frames of 1e-5) ends in a rebuild.
-- The 12h-forward and 23h-forward differences (7 and 1 px) are within the same view's own
-  floor (9 and 10 px) and are not attributed to the reuse; they are recorded as measured.
+- The two noon-astern views differ by 2 and 7 pixels against same-view floors of 6 and 5,
+  with the floor's own worst channel step (46) at least as large as the cross-level one. They
+  are recorded as measured, not attributed to the reuse.
 - Browser evidence is from headless Chrome on an Intel Arc A-series GPU through Vulkan.
   The pixel comparisons are full-drawing-buffer `readPixels`, not visual inspection alone:
   captures are in this directory as `<hour>h-<pose>-<level>.png` for both levels.
+
+## Review follow-up
+
+Self-review of the first commit (`3df8f9b`) found two inputs the oracle did not read:
+
+- three gates sun-map casters with `object.layers.test(camera.layers)` against the **view**
+  camera, not the shadow box — and `CockpitOcclusion.render` mutates the main camera's layer
+  mask every cockpit frame, restoring it in a `finally`. Nothing was wrong, because the
+  occlusion pass runs after the main render, but correctness rested on that ordering instead
+  of on the inputs the oracle claims to read. The header now compares the view camera's layer
+  mask, and `tests/sunShadowRefresh.test.js` covers a camera that stops and starts seeing a
+  caster.
+- vertices edited inside a geometry change the map without changing geometry identity. No
+  caster in `src` does this (all `computeBoundingSphere()` call sites were checked), so it is
+  recorded as a blind spot next to bones and morph weights rather than sampled.
 
 ## Reproduce
 
