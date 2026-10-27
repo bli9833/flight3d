@@ -198,20 +198,21 @@ export class SkyAtmosphere {
     let exposure = 1.05;
 
     if (this.activeAirport === 'neon') {
-      // Synthwave / Outrun Dusk: Deep purple/magenta glowing twilight sky, fiery golden sun & neon ambient
-      this.sunLight.color.setRGB(1.0, 0.52, 0.18);
-      this.sunLight.intensity = 2.4;
-      this.ambientLight.color.setRGB(0.55, 0.18, 0.68); // Rich purple-magenta skylight
-      this.ambientLight.intensity = 1.15;
+      // Soft Dreamy Lofi / Synthwave Night:
+      // Soothing deep violet-indigo sky, gentle cool silver-lavender moonlight, soft purple atmospheric haze
+      this.sunLight.color.setRGB(0.72, 0.80, 0.94); // Gentle cool silvery-lavender moonlight
+      this.sunLight.intensity = 1.05;
+      this.ambientLight.color.setRGB(0.38, 0.25, 0.52); // Gentle deep lavender-indigo ambient
+      this.ambientLight.intensity = 0.92;
 
-      this.fogColor.setRGB(0.38, 0.08, 0.42); // Dreamy neon magenta-purple haze
-      this.baseDensity = 0.00015;
-      exposure = 1.08;
+      this.fogColor.setRGB(0.20, 0.08, 0.28); // Soothing, soft purple night mist (easy on the eyes)
+      this.baseDensity = 0.00012;
+      exposure = 0.98; // Calm exposure, eliminates harsh eye strain
 
-      uniforms['turbidity'].value = 9.0;
-      uniforms['rayleigh'].value = 4.0;
-      uniforms['mieCoefficient'].value = 0.012;
-      uniforms['mieDirectionalG'].value = 0.88;
+      uniforms['turbidity'].value = 8.0;
+      uniforms['rayleigh'].value = 3.6;
+      uniforms['mieCoefficient'].value = 0.008;
+      uniforms['mieDirectionalG'].value = 0.82;
     } else if (elevation > 5.0) {
       // Daylight / Noon (elevation 5° to 65°)
       const t = Math.min(1.0, (elevation - 5.0) / 25.0);
