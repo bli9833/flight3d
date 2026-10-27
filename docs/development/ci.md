@@ -145,6 +145,21 @@ terrain high/low, sunset and night captures with shader/error checks.
 
 ### Cockpit stutter mitigation (issue #101)
 
+For the zero-intensity flood and zero-contribution direct-light optimizations,
+start Vite and run the paired GPU/pixel checks in the reusable project browser:
+
+```sh
+APP_URL=http://127.0.0.1:5173/ chrome-session --project flight3d node scripts/verify-cockpit-light-performance.mjs
+EXPERIMENT=direct APP_URL=http://127.0.0.1:5173/ chrome-session --project flight3d node scripts/verify-cockpit-light-performance.mjs
+```
+
+The default `floods` experiment toggles the baked-out flood nodes; `direct` keeps
+those nodes hidden and compares the BRDF guard independently. Both compare day/
+night forward/rear pixels and check missing-bake fallback. GPU timing requires
+EXT_disjoint_timer_query_webgl2; visual/fallback checks still run without it.
+`ARTIFACT_DIR` changes the `.cache/cockpit-light-performance-<experiment>` output.
+See [measurements and limits](../../review-artifacts/cockpit-performance/README.md).
+
 `node scripts/verify-cockpit-stutter.mjs` checks the loaded model's batch count,
 control reset/yoke visibility, alternating display redraws, dirty MCP/CDU updates,
 and forced refresh during deterministic stepping. Start Vite and open it in Chrome
