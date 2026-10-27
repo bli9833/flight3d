@@ -167,6 +167,28 @@ with CDP on port 9451 (`CDP_PORT` overrides). Set `FALLBACK=1` to block the medi
 GLB and test Draco. `ARTIFACT_DIR` overrides the capture directory. See
 [results and limitations](../../review-artifacts/issue101/README.md).
 
+### Reused sun shadow map
+
+For the on-demand sun shadow pass, start Vite and run the eight-view sweep in the
+reusable project browser. It measures the shipped build against
+`sun.shadow.autoUpdate = true` in an A/B/A sandwich, counts how often the map is
+rebuilt, compares the whole drawing buffer between levels, and repeats the pair while
+the airframe is moving.
+
+```sh
+ARTIFACT_DIR=review-artifacts/cockpit-shadow-scope MEASURE_SECONDS=3 \
+  APP_URL=http://127.0.0.1:5173/ \
+  chrome-session --project flight3d node scripts/verify-cockpit-shadow-scope.mjs
+```
+
+`VIEWS` (hours) and `POSES` (forward/right/rear/overhead) narrow the sweep. The harness
+parks the wall-clock and step-count driven animators (aircraft strobes, airport beacons,
+turbine fans, ocean phase) before it compares anything, because two identical settled
+renders otherwise differ by ~2% of pixels; the pixel gates are then measured against a
+floor taken from three same-level pairs at the same view. `scripts/probe-shadow-pass.mjs`
+and `scripts/probe-frame-movers.mjs` hold the attribution that motivated the change. See
+[measurements and limits](../../review-artifacts/cockpit-shadow-scope/README.md).
+
 ### Cockpit interior sunlight (issue #90)
 
 `CDP_PORT=9471 node scripts/verify-cockpit-shadows.mjs` stages ten deterministic
