@@ -882,6 +882,7 @@ export class CameraSystem {
   }
 
   setMode(m, isUserAction = false) {
+    if (this.crashView) return false;
     if ((this.userLookOverridden || this.userModeSelected) && !isUserAction) {
       return false;
     }
@@ -1032,7 +1033,38 @@ export class CameraSystem {
     this.chaseVibration.set(0, chaseVibeY, 0);
   }
 
+  beginCrashView(wreckage) {
+    this.preCrashMode = this.autoSwitch ? CameraSystem.MODES.AUTO : this.mode;
+    this.setMode(CameraSystem.MODES.CHASE, true);
+    this.crashView = wreckage;
+    this.crashDirection = new THREE.Vector3(1, 0.65, 1).normalize();
+    this.updateCrashView(0, true);
+  }
+
+  endCrashView() {
+    if (!this.crashView) return;
+    this.crashView = null;
+    this.setMode(this.preCrashMode, true);
+  }
+
+  updateCrashView(dt, snap = false) {
+    const { target, radius } = this.crashView;
+    const halfFov = THREE.MathUtils.degToRad(50 / 2);
+    const fit = radius / Math.sin(Math.atan(Math.tan(halfFov) * Math.min(1, this.camera.aspect)));
+    const eye = target.clone().addScaledVector(this.crashDirection, fit * 1.15);
+    if (this.getTerrainHeight) eye.y = Math.max(eye.y, this.getTerrainHeight(eye.x, eye.z) + 5);
+    this.camera.position.lerp(eye, snap ? 1 : 1 - Math.exp(-3 * dt));
+    this.camera.up.set(0, 1, 0);
+    this.camera.lookAt(target);
+    this.camera.fov = 50;
+    this.camera.updateProjectionMatrix();
+  }
+
   update(dt, aircraftMesh, flightState = {}, getTerrainHeight = null) {
+    if (this.crashView) {
+      this.updateCrashView(dt);
+      return;
+    }
     this.updateSpeedSensation(dt, flightState);
     if (getTerrainHeight) {
       this.setTerrain(getTerrainHeight);

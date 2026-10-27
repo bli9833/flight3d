@@ -1,3 +1,4 @@
+import { AircraftBreakup } from './effects/AircraftBreakup.js';
 import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
 import { cockpitCasterState } from './aircraft/CockpitLighting.js';
@@ -260,6 +261,7 @@ class FlightSimulator {
       this.water
     );
     this.explosionSystem = new ExplosionSystem(this.scene, this.currentTerrain);
+    this.aircraftBreakup = new AircraftBreakup(this.scene);
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
     this.isCrashed = false;
     this.crashResult = null;
@@ -1639,6 +1641,8 @@ class FlightSimulator {
 
     // 3. Aircraft Structural Damage Visuals
     this.aircraft.triggerCrashVisuals(crashResult.type);
+    this.aircraftBreakup.spawn(this.aircraft, impactVelocity, crashResult.type);
+    this.cameraSystem.beginCrashView(this.aircraftBreakup);
 
     // 4. Catastrophic Camera Trauma Shake
     this.cameraSystem.addTrauma(1.0);
@@ -1661,6 +1665,8 @@ class FlightSimulator {
     this.isCrashed = false;
     this.crashResult = null;
     this.explosionSystem.clear();
+    this.aircraftBreakup.clear();
+    this.cameraSystem.endCrashView();
     this.aircraft.resetCrashVisuals();
 
     const crashEl = document.getElementById('crash-overlay');
@@ -1769,6 +1775,8 @@ class FlightSimulator {
     this.aircraft.cockpit.syncLighting(this.sky, this.quaternion, simSeconds);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
+    this.aircraftBreakup.update(simSeconds, this.currentTerrain);
+    if (this.isCrashed) this.cameraSystem.updateCrashView(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
     this.touchControls.updateUI();
     this.diagnostics.update(simSeconds, this.telemetry);
@@ -1846,6 +1854,7 @@ class FlightSimulator {
     }
     this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(frameDelta);
+    this.aircraftBreakup.update(frameDelta, this.currentTerrain);
     this.tireSmokeSystem.update(frameDelta);
 
     // 4. Update Cockpit Visibility & Audio

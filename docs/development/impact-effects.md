@@ -14,7 +14,8 @@ bounded particle counts; emitted dust and fragments inherit world momentum.
   atlases are retained until system disposal. Particle counts remain bounded.
 
 These are particle effects, not fluid simulation or structural deformation.
-Aircraft crash motion, damage detection and audio are independent of this change.
+Damage detection and audio remain separate from particle emission. Aircraft
+breakup and its camera are described below.
 
 ## Verification
 
@@ -38,3 +39,23 @@ collision assertions or establish whole-scene camera acceptance. Omit
 `CRASH_SCREENSHOTS=0` for the ordinary in-flight captures as well.
 
 See [captured effects](../../review-artifacts/impact-realism/README.md).
+
+## Aircraft breakup and crash camera
+
+`AircraftBreakup` partitions the active exterior's triangles into left/right
+outboard regions and four longitudinal center sections. It retains source
+materials/UVs, including batched GLBs, and hides the intact aircraft until reset.
+Debris inherits pre-contact world velocity plus a bounded outward impulse, then
+integrates gravity, drag, rotation and damped terrain contact at 120 Hz substeps.
+Water debris sinks with drag instead of bouncing. Generated geometry is disposed
+on reset; aircraft materials and textures remain shared.
+
+The camera cuts immediately outside, fits the debris bounds (including portrait
+aspect ratios), follows its center and prevents view switches until crash reset.
+Reset restores the previous view and the intact aircraft. Node verification is
+`node --test tests/aircraftBreakup.test.js`; `test:crash` checks the exterior view,
+finite separated geometry, and captures `aircraft_breakup_exterior.png`.
+
+This is a bounded visual breakup approximation, not a structural solver: region
+boundaries have open cut faces, and debris uses approximate terrain contact radii.
+It does not simulate collisions between fragments or with buildings after impact.

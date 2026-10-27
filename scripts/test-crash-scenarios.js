@@ -117,9 +117,9 @@ async function main() {
 
     console.log('⏳ Waiting for simulator to initialize in browser DOM...');
     let simulatorReady = false;
-    for (let i = 0; i < 120; i++) {
+    for (let i = 0; i < 360; i++) {
       try {
-        const ready = await evalJs('typeof window.simulator !== "undefined" && window.simulator.aircraft !== undefined');
+        const ready = await evalJs('typeof window.simulator !== "undefined" && window.simulator.startupReady && window.simulator.aircraft !== undefined && !window.simulator.aircraft.loadingGltf && !window.simulator.aircraft.cockpit?.cockpitModelLoading');
         if (ready) { simulatorReady = true; break; }
       } catch (e) {}
       await new Promise(r => setTimeout(r, 250));
@@ -205,6 +205,19 @@ async function main() {
     const towerCrashed = await evalJs(`Boolean(window.simulator.isCrashed && window.simulator.crashResult?.type === 'TOWER')`);
     const towerTitle = await evalJs(`document.getElementById('crash-title').textContent`);
     console.log(`   Tower Collision Detected: ${towerCrashed ? 'PASS ✅' : 'FAIL ❌'} [${towerTitle}]`);
+    const breakupState = await evalJs(`(() => {
+      const sim = window.simulator;
+      return { pieces: sim.aircraftBreakup.pieces.length,
+        hidden: !sim.aircraft.group.visible,
+        exterior: sim.cameraSystem.mode === 1 && !!sim.cameraSystem.crashView,
+        finite: sim.aircraftBreakup.pieces.every(p => p.object.position.toArray().every(Number.isFinite)) };
+    })()`);
+    if (breakupState.pieces < 4 || !breakupState.hidden || !breakupState.exterior || !breakupState.finite) {
+      throw new Error(`Invalid aircraft breakup: ${JSON.stringify(breakupState)}`);
+    }
+    console.log('   Exterior crash camera and separated airframe: PASS', breakupState);
+    // Capture the whole scene even when ordinary crash screenshots are disabled.
+    await takeScreenshot('aircraft_breakup_exterior.png');
     await takeScreenshot('crash_tower_showcase.png');
 
     // =========================================================================
@@ -390,6 +403,31 @@ async function main() {
       throw new Error('Missing crash/contact-response coverage: ' + JSON.stringify(velocityChecks));
     }
     console.log('Pre-contact impact velocity:', JSON.stringify(velocityChecks));
+
+    const aircraftBreakups = await evalJs(`(() => {
+      const sim = window.simulator;
+      const results = [];
+      for (const id of ['B738', 'C172']) {
+        sim.setAircraft(id);
+        sim.setPreset('runway');
+        sim.cameraSystem.setMode(0, true);
+        sim.aircraftBreakup.spawn(sim.aircraft, new window.THREE.Vector3(35, -8, 0), 'TERRAIN');
+        sim.cameraSystem.beginCrashView(sim.aircraftBreakup);
+        sim.aircraftBreakup.update(0.6, sim.currentTerrain);
+        sim.cameraSystem.updateCrashView(0, true);
+        const pieces = sim.aircraftBreakup.pieces.length;
+        const outside = sim.cameraSystem.mode === 1;
+        sim.aircraftBreakup.clear();
+        sim.cameraSystem.endCrashView();
+        results.push({ id, pieces, outside, restored: sim.aircraft.group.visible && sim.cameraSystem.mode === 0 });
+      }
+      sim.setAircraft('B738');
+      return results;
+    })()`);
+    if (aircraftBreakups.some(r => r.pieces < 4 || !r.outside || !r.restored)) {
+      throw new Error('Aircraft breakup/reset failed: ' + JSON.stringify(aircraftBreakups));
+    }
+    console.log('Both loaded aircraft breakup/cockpit exit/reset:', JSON.stringify(aircraftBreakups));
 
     // Fixed camera and time samples expose effects without aircraft/HUD occlusion.
     await evalJs(`(async () => {
