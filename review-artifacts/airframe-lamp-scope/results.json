@@ -1,0 +1,1211 @@
+{
+  "url": "http://127.0.0.1:5173/",
+  "levels": [
+    "none",
+    "navStrobe",
+    "navStrobeBeacon",
+    "allExterior"
+  ],
+  "rows": [
+    {
+      "hour": 12,
+      "pose": "forward",
+      "cases": [
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 21,
+          "gpuMedianMs": 160.873537,
+          "gpuP95Ms": 164.801037,
+          "fps": 6.000420029402058,
+          "programs": 77,
+          "calls": 15,
+          "triangles": 71010,
+          "contextLost": false,
+          "deltaGpuPct": 0
+        },
+        {
+          "level": "navStrobe",
+          "hidden": 6,
+          "samples": 23,
+          "gpuMedianMs": 140.056298,
+          "gpuP95Ms": 143.545986,
+          "fps": 7.292978850361333,
+          "programs": 77,
+          "calls": 15,
+          "triangles": 71010,
+          "contextLost": false,
+          "deltaGpuPct": -12.9,
+          "changedFraction": 0.000005401234567901234,
+          "rmse": 0.05192661607297479,
+          "max": 51,
+          "spots": [
+            [
+              1410,
+              92
+            ],
+            [
+              1411,
+              92
+            ],
+            [
+              1312,
+              213
+            ],
+            [
+              1003,
+              360
+            ],
+            [
+              1056,
+              395
+            ],
+            [
+              1156,
+              478
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "navStrobeBeacon",
+          "hidden": 8,
+          "samples": 25,
+          "gpuMedianMs": 129.733955,
+          "gpuP95Ms": 134.061715,
+          "fps": 7.579264899729484,
+          "programs": 91,
+          "calls": 15,
+          "triangles": 71010,
+          "contextLost": false,
+          "deltaGpuPct": -19.4,
+          "changedFraction": 0.017472993827160496,
+          "rmse": 0.08497003829237343,
+          "max": 51,
+          "spots": [
+            [
+              20,
+              0
+            ],
+            [
+              41,
+              0
+            ],
+            [
+              61,
+              0
+            ],
+            [
+              80,
+              0
+            ],
+            [
+              97,
+              0
+            ],
+            [
+              113,
+              0
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "allExterior",
+          "hidden": 10,
+          "samples": 28,
+          "gpuMedianMs": 112.708226,
+          "gpuP95Ms": 114.688903,
+          "fps": 8.756851425420807,
+          "programs": 105,
+          "calls": 15,
+          "triangles": 71010,
+          "contextLost": false,
+          "deltaGpuPct": -29.9,
+          "changedFraction": 0.47813271604938273,
+          "rmse": 1.4162041728717152,
+          "max": 46,
+          "spots": [
+            [
+              19,
+              0
+            ],
+            [
+              20,
+              0
+            ],
+            [
+              29,
+              0
+            ],
+            [
+              41,
+              0
+            ],
+            [
+              43,
+              0
+            ],
+            [
+              44,
+              0
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 21,
+          "gpuMedianMs": 160.679371,
+          "gpuP95Ms": 164.513068,
+          "fps": 6.3833848153318655,
+          "programs": 105,
+          "calls": 15,
+          "triangles": 71010,
+          "contextLost": false,
+          "deltaGpuPct": -0.1,
+          "driftCheck": -0.1
+        }
+      ]
+    },
+    {
+      "hour": 12,
+      "pose": "right",
+      "cases": [
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 36,
+          "gpuMedianMs": 85.046612,
+          "gpuP95Ms": 86.558904,
+          "fps": 11.602850986242348,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": 0
+        },
+        {
+          "level": "navStrobe",
+          "hidden": 6,
+          "samples": 40,
+          "gpuMedianMs": 75.974633,
+          "gpuP95Ms": 78.167602,
+          "fps": 12.858411742169723,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -10.7,
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0
+        },
+        {
+          "level": "navStrobeBeacon",
+          "hidden": 8,
+          "samples": 42,
+          "gpuMedianMs": 72.078852,
+          "gpuP95Ms": 73.331925,
+          "fps": 13.517523325970103,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -15.2,
+          "changedFraction": 0.00045679012345679014,
+          "rmse": 0.010686324478706303,
+          "max": 1,
+          "spots": [
+            [
+              199,
+              0
+            ],
+            [
+              353,
+              0
+            ],
+            [
+              810,
+              0
+            ],
+            [
+              296,
+              2
+            ],
+            [
+              1406,
+              2
+            ],
+            [
+              395,
+              4
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "allExterior",
+          "hidden": 10,
+          "samples": 45,
+          "gpuMedianMs": 66.527654,
+          "gpuP95Ms": 67.79479,
+          "fps": 14.586441239847506,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -21.8,
+          "changedFraction": 0.06544675925925926,
+          "rmse": 0.3132783516575698,
+          "max": 6,
+          "spots": [
+            [
+              199,
+              0
+            ],
+            [
+              353,
+              0
+            ],
+            [
+              810,
+              0
+            ],
+            [
+              1067,
+              0
+            ],
+            [
+              1068,
+              0
+            ],
+            [
+              1069,
+              0
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 36,
+          "gpuMedianMs": 84.934477,
+          "gpuP95Ms": 86.174789,
+          "fps": 11.602850986242334,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -0.1,
+          "driftCheck": -0.1
+        }
+      ]
+    },
+    {
+      "hour": 12,
+      "pose": "rear",
+      "cases": [
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 21,
+          "gpuMedianMs": 159.630673,
+          "gpuP95Ms": 161.322235,
+          "fps": 6.417455478902615,
+          "programs": 105,
+          "calls": 5,
+          "triangles": 71468,
+          "contextLost": false,
+          "deltaGpuPct": 0
+        },
+        {
+          "level": "navStrobe",
+          "hidden": 6,
+          "samples": 23,
+          "gpuMedianMs": 138.645621,
+          "gpuP95Ms": 140.620673,
+          "fps": 7.333739133565384,
+          "programs": 105,
+          "calls": 5,
+          "triangles": 71468,
+          "contextLost": false,
+          "deltaGpuPct": -13.1,
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0
+        },
+        {
+          "level": "navStrobeBeacon",
+          "hidden": 8,
+          "samples": 25,
+          "gpuMedianMs": 128.69109,
+          "gpuP95Ms": 130.042028,
+          "fps": 7.8692807542968035,
+          "programs": 105,
+          "calls": 5,
+          "triangles": 71468,
+          "contextLost": false,
+          "deltaGpuPct": -19.4,
+          "changedFraction": 0.0005115740740740741,
+          "rmse": 0.011309001658790157,
+          "max": 1,
+          "spots": [
+            [
+              1310,
+              0
+            ],
+            [
+              1160,
+              1
+            ],
+            [
+              1124,
+              3
+            ],
+            [
+              1226,
+              3
+            ],
+            [
+              1206,
+              5
+            ],
+            [
+              1204,
+              8
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "allExterior",
+          "hidden": 10,
+          "samples": 28,
+          "gpuMedianMs": 111.967861,
+          "gpuP95Ms": 113.817705,
+          "fps": 9.0506838294449,
+          "programs": 105,
+          "calls": 5,
+          "triangles": 71468,
+          "contextLost": false,
+          "deltaGpuPct": -29.9,
+          "changedFraction": 0.0921466049382716,
+          "rmse": 0.19248867611394382,
+          "max": 10,
+          "spots": [
+            [
+              1310,
+              0
+            ],
+            [
+              991,
+              1
+            ],
+            [
+              1160,
+              1
+            ],
+            [
+              989,
+              2
+            ],
+            [
+              986,
+              3
+            ],
+            [
+              987,
+              3
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 21,
+          "gpuMedianMs": 158.770985,
+          "gpuP95Ms": 162.284891,
+          "fps": 6.451958395191479,
+          "programs": 105,
+          "calls": 5,
+          "triangles": 71468,
+          "contextLost": false,
+          "deltaGpuPct": -0.5,
+          "driftCheck": -0.5
+        }
+      ]
+    },
+    {
+      "hour": 12,
+      "pose": "overhead",
+      "cases": [
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 26,
+          "gpuMedianMs": 121.595465,
+          "gpuP95Ms": 124.001507,
+          "fps": 8.28778367425961,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": 0
+        },
+        {
+          "level": "navStrobe",
+          "hidden": 6,
+          "samples": 28,
+          "gpuMedianMs": 111.442393,
+          "gpuP95Ms": 113.662236,
+          "fps": 9.000300010000307,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -8.3,
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0
+        },
+        {
+          "level": "navStrobeBeacon",
+          "hidden": 8,
+          "samples": 30,
+          "gpuMedianMs": 104.324112,
+          "gpuP95Ms": 105.876716,
+          "fps": 9.560544621369456,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -14.2,
+          "changedFraction": 0.0003726851851851852,
+          "rmse": 0.009652527974385585,
+          "max": 1,
+          "spots": [
+            [
+              313,
+              2
+            ],
+            [
+              337,
+              4
+            ],
+            [
+              880,
+              22
+            ],
+            [
+              881,
+              22
+            ],
+            [
+              882,
+              22
+            ],
+            [
+              883,
+              22
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "allExterior",
+          "hidden": 10,
+          "samples": 35,
+          "gpuMedianMs": 89.164685,
+          "gpuP95Ms": 90.89781,
+          "fps": 11.027503892060208,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -26.7,
+          "changedFraction": 0.8076736111111111,
+          "rmse": 0.7321747476600863,
+          "max": 6,
+          "spots": [
+            [
+              149,
+              0
+            ],
+            [
+              150,
+              0
+            ],
+            [
+              151,
+              0
+            ],
+            [
+              152,
+              0
+            ],
+            [
+              153,
+              0
+            ],
+            [
+              154,
+              0
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 26,
+          "gpuMedianMs": 122.118747,
+          "gpuP95Ms": 124.872392,
+          "fps": 8.241848811525433,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": 0.4,
+          "driftCheck": 0.4
+        }
+      ]
+    },
+    {
+      "hour": 23,
+      "pose": "forward",
+      "cases": [
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 21,
+          "gpuMedianMs": 154.550308,
+          "gpuP95Ms": 157.791923,
+          "fps": 6.630200563567048,
+          "programs": 105,
+          "calls": 15,
+          "triangles": 71010,
+          "contextLost": false,
+          "deltaGpuPct": 0
+        },
+        {
+          "level": "navStrobe",
+          "hidden": 6,
+          "samples": 24,
+          "gpuMedianMs": 132.952184,
+          "gpuP95Ms": 136.720517,
+          "fps": 7.582750890149025,
+          "programs": 105,
+          "calls": 15,
+          "triangles": 71010,
+          "contextLost": false,
+          "deltaGpuPct": -14,
+          "changedFraction": 0.000003858024691358025,
+          "rmse": 0.03849001794597505,
+          "max": 45,
+          "spots": [
+            [
+              1109,
+              103
+            ],
+            [
+              1325,
+              237
+            ],
+            [
+              1420,
+              352
+            ],
+            [
+              1437,
+              355
+            ],
+            [
+              1437,
+              356
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "navStrobeBeacon",
+          "hidden": 8,
+          "samples": 26,
+          "gpuMedianMs": 126.34708,
+          "gpuP95Ms": 128.373694,
+          "fps": 8.064776283105921,
+          "programs": 105,
+          "calls": 15,
+          "triangles": 71010,
+          "contextLost": false,
+          "deltaGpuPct": -18.2,
+          "changedFraction": 0.00040123456790123454,
+          "rmse": 0.0522118784082088,
+          "max": 51,
+          "spots": [
+            [
+              124,
+              0
+            ],
+            [
+              383,
+              2
+            ],
+            [
+              333,
+              5
+            ],
+            [
+              851,
+              8
+            ],
+            [
+              8,
+              10
+            ],
+            [
+              375,
+              11
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "allExterior",
+          "hidden": 10,
+          "samples": 30,
+          "gpuMedianMs": 105.748799,
+          "gpuP95Ms": 108.934424,
+          "fps": 9.50882025050822,
+          "programs": 105,
+          "calls": 15,
+          "triangles": 71010,
+          "contextLost": false,
+          "deltaGpuPct": -31.6,
+          "changedFraction": 0.5072314814814814,
+          "rmse": 2.468652502372324,
+          "max": 41,
+          "spots": [
+            [
+              9,
+              0
+            ],
+            [
+              11,
+              0
+            ],
+            [
+              15,
+              0
+            ],
+            [
+              24,
+              0
+            ],
+            [
+              34,
+              0
+            ],
+            [
+              37,
+              0
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 21,
+          "gpuMedianMs": 154.494735,
+          "gpuP95Ms": 157.957027,
+          "fps": 6.593839902885914,
+          "programs": 105,
+          "calls": 15,
+          "triangles": 71010,
+          "contextLost": false,
+          "deltaGpuPct": 0,
+          "driftCheck": 0
+        }
+      ]
+    },
+    {
+      "hour": 23,
+      "pose": "right",
+      "cases": [
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 37,
+          "gpuMedianMs": 83.762914,
+          "gpuP95Ms": 86.220414,
+          "fps": 11.739768465677482,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": 0
+        },
+        {
+          "level": "navStrobe",
+          "hidden": 6,
+          "samples": 41,
+          "gpuMedianMs": 74.365935,
+          "gpuP95Ms": 76.703018,
+          "fps": 13.115467923827975,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -11.2,
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0
+        },
+        {
+          "level": "navStrobeBeacon",
+          "hidden": 8,
+          "samples": 43,
+          "gpuMedianMs": 70.748904,
+          "gpuP95Ms": 71.262237,
+          "fps": 13.84676249505474,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -15.5,
+          "changedFraction": 0.0006898148148148148,
+          "rmse": 0.013132162948414237,
+          "max": 1,
+          "spots": [
+            [
+              988,
+              0
+            ],
+            [
+              51,
+              1
+            ],
+            [
+              914,
+              1
+            ],
+            [
+              319,
+              2
+            ],
+            [
+              359,
+              2
+            ],
+            [
+              237,
+              3
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "allExterior",
+          "hidden": 10,
+          "samples": 46,
+          "gpuMedianMs": 65.203175,
+          "gpuP95Ms": 66.117237,
+          "fps": 14.918445829465616,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -22.2,
+          "changedFraction": 0.11614969135802469,
+          "rmse": 0.42954002098713645,
+          "max": 8,
+          "spots": [
+            [
+              980,
+              0
+            ],
+            [
+              981,
+              0
+            ],
+            [
+              982,
+              0
+            ],
+            [
+              983,
+              0
+            ],
+            [
+              984,
+              0
+            ],
+            [
+              985,
+              0
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 37,
+          "gpuMedianMs": 83.757289,
+          "gpuP95Ms": 84.679529,
+          "fps": 11.803665693957202,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": 0,
+          "driftCheck": 0
+        }
+      ]
+    },
+    {
+      "hour": 23,
+      "pose": "rear",
+      "cases": [
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 22,
+          "gpuMedianMs": 151.763121,
+          "gpuP95Ms": 155.171298,
+          "fps": 6.702412868632714,
+          "programs": 105,
+          "calls": 5,
+          "triangles": 71468,
+          "contextLost": false,
+          "deltaGpuPct": 0
+        },
+        {
+          "level": "navStrobe",
+          "hidden": 6,
+          "samples": 25,
+          "gpuMedianMs": 130.97635,
+          "gpuP95Ms": 134.77885,
+          "fps": 7.7009465746831385,
+          "programs": 105,
+          "calls": 5,
+          "triangles": 71468,
+          "contextLost": false,
+          "deltaGpuPct": -13.7,
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0
+        },
+        {
+          "level": "navStrobeBeacon",
+          "hidden": 8,
+          "samples": 27,
+          "gpuMedianMs": 120.126924,
+          "gpuP95Ms": 121.951715,
+          "fps": 8.387637912123354,
+          "programs": 105,
+          "calls": 5,
+          "triangles": 71468,
+          "contextLost": false,
+          "deltaGpuPct": -20.8,
+          "changedFraction": 0.0008171296296296297,
+          "rmse": 0.014306229757575655,
+          "max": 1,
+          "spots": [
+            [
+              549,
+              2
+            ],
+            [
+              1291,
+              2
+            ],
+            [
+              1385,
+              2
+            ],
+            [
+              1215,
+              3
+            ],
+            [
+              647,
+              4
+            ],
+            [
+              1112,
+              4
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "allExterior",
+          "hidden": 10,
+          "samples": 30,
+          "gpuMedianMs": 103.861768,
+          "gpuP95Ms": 107.396611,
+          "fps": 9.560859818013942,
+          "programs": 105,
+          "calls": 5,
+          "triangles": 71468,
+          "contextLost": false,
+          "deltaGpuPct": -31.6,
+          "changedFraction": 0.06003009259259259,
+          "rmse": 0.1975691393280206,
+          "max": 11,
+          "spots": [
+            [
+              549,
+              2
+            ],
+            [
+              989,
+              2
+            ],
+            [
+              1291,
+              2
+            ],
+            [
+              1385,
+              2
+            ],
+            [
+              491,
+              3
+            ],
+            [
+              987,
+              3
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 22,
+          "gpuMedianMs": 152.103954,
+          "gpuP95Ms": 154.236089,
+          "fps": 6.738112045177425,
+          "programs": 105,
+          "calls": 5,
+          "triangles": 71468,
+          "contextLost": false,
+          "deltaGpuPct": 0.2,
+          "driftCheck": 0.2
+        }
+      ]
+    },
+    {
+      "hour": 23,
+      "pose": "overhead",
+      "cases": [
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 28,
+          "gpuMedianMs": 115.536299,
+          "gpuP95Ms": 117.335309,
+          "fps": 8.710087636385477,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": 0
+        },
+        {
+          "level": "navStrobe",
+          "hidden": 6,
+          "samples": 30,
+          "gpuMedianMs": 103.845257,
+          "gpuP95Ms": 105.697237,
+          "fps": 9.613472120930924,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -10.1,
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0
+        },
+        {
+          "level": "navStrobeBeacon",
+          "hidden": 8,
+          "samples": 32,
+          "gpuMedianMs": 97.420466,
+          "gpuP95Ms": 99.40557,
+          "fps": 10.220229460635691,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -15.7,
+          "changedFraction": 0.0013757716049382716,
+          "rmse": 0.018545697647556102,
+          "max": 1,
+          "spots": [
+            [
+              856,
+              2
+            ],
+            [
+              159,
+              5
+            ],
+            [
+              389,
+              6
+            ],
+            [
+              798,
+              15
+            ],
+            [
+              262,
+              24
+            ],
+            [
+              1208,
+              49
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "allExterior",
+          "hidden": 10,
+          "samples": 37,
+          "gpuMedianMs": 82.555206,
+          "gpuP95Ms": 84.940258,
+          "fps": 11.868520529573285,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -28.5,
+          "changedFraction": 0.7917376543209876,
+          "rmse": 0.9433342126353709,
+          "max": 10,
+          "spots": [
+            [
+              149,
+              0
+            ],
+            [
+              150,
+              0
+            ],
+            [
+              151,
+              0
+            ],
+            [
+              152,
+              0
+            ],
+            [
+              153,
+              0
+            ],
+            [
+              154,
+              0
+            ]
+          ],
+          "glError": 0
+        },
+        {
+          "level": "none",
+          "hidden": 0,
+          "samples": 27,
+          "gpuMedianMs": 115.399268,
+          "gpuP95Ms": 117.611195,
+          "fps": 8.715473317243195,
+          "programs": 105,
+          "calls": 3,
+          "triangles": 70986,
+          "contextLost": false,
+          "deltaGpuPct": -0.1,
+          "driftCheck": -0.1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "setup": {
+    "gpu": "ANGLE (Intel, Vulkan 1.4.335 (Intel(R) Graphics (ADL-N) (0x000046D2)), Intel open-source Mesa driver)",
+    "gpuTimers": true,
+    "exterior": [
+      "nav",
+      "nav",
+      "nav",
+      "strobe",
+      "strobe",
+      "strobe",
+      "beacon",
+      "beacon",
+      "landing",
+      "landing"
+    ],
+    "pixelRatio": 1,
+    "cockpitLamps": {
+      "nav": [
+        false,
+        false,
+        false
+      ],
+      "strobe": [
+        false,
+        false,
+        false
+      ],
+      "beacon": [
+        true,
+        true
+      ],
+      "landing": [
+        true,
+        true
+      ]
+    },
+    "exteriorLamps": {
+      "nav": [
+        true,
+        true,
+        true
+      ],
+      "strobe": [
+        true,
+        true,
+        true
+      ],
+      "beacon": [
+        true,
+        true
+      ],
+      "landing": [
+        true,
+        true
+      ]
+    }
+  }
+}

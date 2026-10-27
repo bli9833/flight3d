@@ -67,6 +67,28 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     assert.strictEqual(aircraft.cockpit.group.visible, false, 'Cockpit must be hidden in exterior view');
   });
 
+  it('scopes airframe-only lamps out of the compiled light set in cockpit view', () => {
+    const aircraft = new Boeing737(new PFDCanvas(256, 256), new NDCanvas(256, 256), new EICASCanvas(256, 256));
+    const lamps = [...aircraft.navLights, ...aircraft.strobeLights];
+    assert.equal(lamps.length, 6, 'Three navigation and three strobe lamps are airframe-only');
+    assert.ok(lamps.every(light => light.visible), 'Exterior view must keep every lamp compiled');
+
+    aircraft.setCockpitMode(true);
+    assert.ok(lamps.every(light => !light.visible), 'Cockpit view must drop the lamps that shade nothing');
+    assert.ok([...aircraft.beaconLights, ...aircraft.landingLights].every(light => light.visible),
+      'Beacons and landing lights reach visible surfaces and must stay');
+
+    aircraft.setCockpitMode(false);
+    assert.ok(lamps.every(light => light.visible), 'Returning outside must restore every lamp');
+
+    // Crash recovery restores the lamp group, so per-lamp scoping must survive it.
+    aircraft.setCockpitMode(true);
+    aircraft.triggerCrashVisuals('gear');
+    aircraft.resetCrashVisuals();
+    assert.ok(lamps.every(light => !light.visible), 'Crash recovery must not undo cockpit scoping');
+    assert.ok(aircraft.lightsGroup.visible, 'The lamp group keeps following the master switch');
+  });
+
   it('should hide the procedural tail when the asynchronous model loads in cockpit view', (t) => {
     const aircraft = new Boeing737(new PFDCanvas(256, 256), new NDCanvas(256, 256), new EICASCanvas(256, 256));
     assert.strictEqual(aircraft.tailGroup, aircraft.empennageGroup);
