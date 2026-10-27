@@ -11,6 +11,13 @@ shadow setting and renderer counter mode. Normal quality preferences are not
 written. Changing aircraft, airport or the normal quality preset closes the
 trial; reopening starts at that new baseline.
 
+Cockpit material and face experiments require a separately mounted, fully loaded
+cockpit model. They remain disabled while the B737 lighting bake is loading and
+for the C172's unified interior/exterior model. Other comparisons remain available.
+Async loader changes become the restoration baseline instead of being overwritten
+by an earlier snapshot. First-time AO classification uses original materials even
+when Unlit is selected; restoring caster/light trials invalidates shadow caches.
+
 | Option | What the experiment changes |
 | --- | --- |
 | Pixel ratio | Absolute drawing-buffer pixels per CSS pixel, independently of terrain/shadow quality. Default restores the ratio captured on open. |
@@ -19,7 +26,7 @@ trial; reopening starts at that new baseline.
 | Local lights | Hide aircraft exterior lights or all point/spot lights during rendering. Normal animation of those lights continues. |
 | Cockpit material | Substitute cached unlit materials for cockpit PBR materials. Exterior materials remain unchanged. |
 | Cockpit faces | Front faces only, for measuring the cost of double-sided surfaces. Some interior surfaces will disappear. |
-| Fragment depth | Diagnostic projection depth instead of logarithmic fragment writes. Distant precision can break; this is not a production depth fix. |
+| Fragment depth | Scene-wide diagnostic projection depth instead of logarithmic fragment writes. Distant precision can break; this is not a production depth fix. |
 | Scene | Render aircraft only or world only, removing the other groups from render work. This also affects their lights and shadows. |
 | Frustum culling | Default versus disabling existing mesh frustum tests. This does not implement new spatial partitioning or hidden-surface culling; city batches with culling disabled in normal code retain that baseline. |
 
@@ -70,3 +77,25 @@ capture, stable program counts on repeated toggles, English/Korean desktop/mobil
 layout, and restoration when closing or changing normal settings. Inspect the
 images as well as the result JSON. These are controlled render checks, not a full
 flight, all-airport, GPU compatibility or permanent-hang reproduction suite.
+The verifier also holds the real lighting-bake request before readiness, checks
+shader-hook preservation after loading, initializes AO for the first time during
+an Unlit trial, checks shadow invalidation on restore, and rejects cockpit-only
+material/face changes for the loaded C172 unified model.
+
+## Interpreting the follow-up benchmarks
+
+[PR #241](https://github.com/stlim0727/flight3d/pull/241) contains repeated option
+measurements. Disabling current frustum culling made those cases slower, which
+shows that the existing culling is useful. It does **not** measure the potential
+of finer mesh partitioning or new occlusion culling. Likewise, a camera outside a
+point light's radius does not establish that visible surfaces are unaffected.
+
+[PR #242](https://github.com/stlim0727/flight3d/pull/242) checked day/night views
+and narrowed the safe light reduction to six nav/strobe light nodes; broader
+removal visibly changed the scene. Its reported mean GPU reduction is 11.8%.
+[PR #244](https://github.com/stlim0727/flight3d/pull/244) reports 5.02% for caching
+stationary sunlight shadows; moving aircraft still rebuild the map each frame.
+These are separate changes and their gains should not be added without a combined
+measurement. The scene-wide depth trial also cannot establish the benefit or
+visual safety of changing only cockpit depth. Unlit/front-only/depth options
+remain diagnostics rather than safe production defaults.

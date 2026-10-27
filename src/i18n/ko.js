@@ -1,5 +1,7 @@
 export default {
   "render.open": "렌더링 비교 패널",
+  "render.cockpitUnsupported": "이 기체는 내부·외부 모델이 통합되어 있어 콕핏 전용 재질·표면 비교를 지원하지 않습니다.",
+  "render.cockpitLoading": "모델·베이크 로딩이 끝나면 콕핏 재질·표면 비교를 사용할 수 있습니다.",
   "render.title": "렌더링 비교",
   "render.options": "비교 옵션",
   "render.close": "닫고 복원",

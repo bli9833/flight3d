@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { RenderDiagnostics } from '../src/dev/RenderDiagnostics.js';
+import { CockpitOcclusion } from '../src/aircraft/CockpitOcclusion.js';
 
 function fixture(gpu = false) {
   let time = 0, ratio = 1.5, queryId = 0, disjoint = false;
@@ -30,7 +31,7 @@ function fixture(gpu = false) {
     info: { autoReset: true, render: { calls: 0, triangles: 0 }, programs: [],
       reset() { this.render.calls = this.render.triangles = 0; } } };
   const sim = { scene, renderer, developerMode: { enabled: false }, renderQuality: 'balanced',
-    aircraft: { group: aircraft, lightsGroup: lights, cockpit: { gltfCockpitGroup: deck } },
+    aircraft: { group: aircraft, lightsGroup: lights, cockpit: { group: aircraft, gltfCockpitGroup: deck, gltfCockpitLoaded: true } },
     cockpitOcclusion: { enabled: true },
     renderStandardScene(quality) {
       this.lastQuality = quality;
@@ -131,4 +132,68 @@ test('GPU queries are asynchronous, discard disjoint samples and clean up on dis
   sim.developerMode.enabled = false; trial.render();
   assert.equal(trial.active, false); assert.equal(sim.renderer.info.autoReset, true);
   assert.equal(deleted.length, queries.length);
+});
+
+for (const option of ['default', 'projection', 'unlit']) test(`loader-installed lighting survives refresh and close during ${option} trials`, () => {
+  const { trial, sim, material } = fixture(); sim.developerMode.enabled = true; trial.open();
+  if (option === 'projection') trial.set('depth', option);
+  if (option === 'unlit') trial.set('material', option);
+  const baked = shader => { shader.baked = true; }, key = () => 'bake-ready';
+  material.onBeforeCompile = baked; material.customProgramCacheKey = key;
+  trial.refreshScene();
+  const shader = { fragmentShader: '#include <logdepthbuf_fragment>' };
+  material.onBeforeCompile(shader, {}); assert.equal(shader.baked, true);
+  trial.close();
+  assert.equal(material.onBeforeCompile, baked); assert.equal(material.customProgramCacheKey, key);
+});
+
+test('first AO initialization uses original cockpit materials while an unlit trial is active', t => {
+  const { trial, sim, deck, mesh } = fixture();
+  sim.developerMode.enabled = true; sim.renderQuality = 'performance';
+  sim.cameraSystem = { mode: 0, photoCockpit: false, isLookingAwayFromCenter: () => false };
+  sim.aircraft.cockpit.gltfCockpitLoaded = true;
+  const display = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial()); deck.add(display);
+  const ao = new CockpitOcclusion(sim.scene, new THREE.PerspectiveCamera(), sim.aircraft.cockpit);
+  t.after(() => ao.dispose()); sim.cockpitOcclusion = ao;
+  sim.renderStandardScene = quality => { if (ao.enabled && quality !== 'performance' && !ao.pass) ao.init(); };
+  trial.open(); trial.set('material', 'unlit'); trial.set('ao', 'on'); trial.render();
+  assert.equal(mesh.material.isMeshBasicMaterial, true, 'The actual experiment still renders unlit');
+  assert.ok(mesh.layers.isEnabled(1), 'Opaque cockpit surfaces belong to the AO geometry layer');
+  assert.equal(mesh.layers.isEnabled(2), false, 'Temporary unlit surfaces are not instrument displays');
+  assert.ok(display.layers.isEnabled(2));
+  trial.close(); assert.ok(mesh.layers.isEnabled(1)); assert.equal(mesh.layers.isEnabled(2), false);
+});
+
+test('unified C172 models reject cockpit-only material trials without changing exterior materials', () => {
+  const { trial, sim, mesh, material } = fixture();
+  sim.aircraft.cockpit.gltfCockpitGroup = sim.aircraft.group;
+  sim.aircraft.cockpit.group = new THREE.Group();
+  sim.developerMode.enabled = true; trial.open();
+  assert.equal(trial.set('material', 'unlit'), false);
+  assert.equal(trial.set('side', 'front'), false);
+  assert.equal(mesh.material, material); assert.equal(material.side, THREE.DoubleSide);
+  trial.close();
+});
+
+test('pending baked receiver binding cannot be bypassed by swapping materials before loading completes', () => {
+  const { trial, sim, material, mesh } = fixture();
+  sim.aircraft.cockpit.gltfCockpitLoaded = false;
+  sim.developerMode.enabled = true; trial.open();
+  assert.equal(trial.hasDedicatedCockpit, true);
+  assert.equal(trial.set('material', 'unlit'), false); assert.equal(trial.set('side', 'front'), false);
+  assert.equal(mesh.material, material, 'The pending baker must still find StandardMaterials to bind');
+  sim.aircraft.cockpit.gltfCockpitLoaded = true; trial.refreshScene();
+  assert.equal(trial.set('material', 'unlit'), true);
+  trial.close(); assert.equal(mesh.material, material);
+});
+
+test('leaving or closing a visibility experiment invalidates a consumed cockpit shadow cache', () => {
+  const { trial, sim, light } = fixture();
+  light.castShadow = true; light.shadow.autoUpdate = false;
+  sim.onRender = () => { if (!sim.aircraft.group.visible) light.shadow.needsUpdate = false; };
+  sim.developerMode.enabled = true; trial.open(); trial.set('scene', 'world'); trial.render();
+  assert.equal(light.shadow.needsUpdate, false, 'The experiment consumed an empty caster map');
+  trial.set('scene', 'default'); assert.equal(light.shadow.needsUpdate, true);
+  trial.set('scene', 'world'); trial.render(); assert.equal(light.shadow.needsUpdate, false);
+  trial.close(); assert.equal(light.shadow.needsUpdate, true);
 });

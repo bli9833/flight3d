@@ -12,7 +12,7 @@ export class RenderDiagnosticsPanel {
       <output data-metrics></output><p data-status></p><p data-comparison></p>
       <div class="render-trial-actions"><button class="btn" data-baseline></button>
       <button class="btn" data-reset></button><button class="btn" data-save></button></div>
-      <details open><summary></summary><p data-help></p><div data-options></div><p data-warning></p></details>`;
+      <details open><summary></summary><p data-help></p><div data-options></div><p data-unsupported></p><p data-warning></p></details>`;
     document.body.append(this.root);
     const text = (selector, key) => bindText(this.root.querySelector(selector), () => t(key));
     text('[data-title]', 'render.title'); text('summary', 'render.options');
@@ -77,6 +77,10 @@ export class RenderDiagnosticsPanel {
     if (this.root.hidden) return;
     if (!this.sim.developerMode.enabled || !this.trial.active) { this.close(); return; }
     for (const [key, select] of this.selects) select.value = this.trial.options[key];
+    for (const key of ['material', 'side']) this.selects.get(key).disabled = !this.trial.supportsCockpitMaterials;
+    this.root.querySelector('[data-unsupported]').hidden = this.trial.supportsCockpitMaterials;
+    this.root.querySelector('[data-unsupported]').textContent = t(this.trial.hasDedicatedCockpit
+      ? 'render.cockpitLoading' : 'render.cockpitUnsupported');
     const m = this.trial.snapshot(), f = value => value === null ? '—' : value.toFixed(1);
     this.root.querySelector('[data-metrics]').textContent = t('render.metrics', {
       fps: f(m.fps), frame: f(m.frameMs), frameP95: f(m.frameP95), gpu: f(m.gpuMs), gpuP95: f(m.gpuP95), cpu: f(m.cpuMs),

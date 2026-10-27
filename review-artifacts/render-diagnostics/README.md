@@ -9,7 +9,7 @@ flight or permanent browser-hang test.
 measurements, default-off gating, baseline/JSON export, mobile bounds, and reset.
 All passed. Shader inspection confirms all eight sampled StandardMaterial draws
 omit `USE_SHADOWMAP` with shadows disabled. World-only mode submits fewer
-triangles. Repeated shader-option cycles stabilize at 145 programs in this run.
+triangles. Repeated shader-option cycles stabilize (see `programCycles` in JSON).
 Native keyboard checks confirm focusing the panel releases held flight inputs
 and typing C in a control does not change the camera.
 
@@ -18,13 +18,25 @@ counter mode are restored, diagnostic material references are cleared, and norma
 quality preferences are unchanged. Aircraft/normal-quality changes also close
 the trial. No JavaScript/shader errors occurred. Unsupported/disjoint GPU query
 and restoration paths are covered by Node tests. The check/test/build gate passes
-with all 648 tests.
+with all 655 tests.
+
+The follow-up verifier holds the real B737 lighting-bake JSON request before
+readiness. Unlit/front-only changes are rejected during loading while projection
+depth remains usable. After the request resumes, all 99 sampled cockpit PBR
+materials retain their baked lighting hooks through refresh and close. The first
+AO initialization is forced while Unlit is active: 147 deck meshes and 20 genuine
+display meshes receive their original classifications, with zero invalid layers.
+Closing a world-only trial marks consumed caster shadow maps dirty. Loaded C172
+unified-model material/face experiments are rejected in both API and disabled UI,
+preserving exterior materials. The shadow check verifies invalidation flags, not
+a pixel comparison of the rebuilt shadow image.
 
 Inspected desktop and mobile screenshots:
 
 - [Default desktop](desktop-default.png)
 - [English desktop](desktop-english.png)
 - [Korean mobile](mobile-korean.png)
+- [C172 unsupported controls](c172-unsupported.png)
 
 The mobile panel keeps counters and baseline/export controls above a scrollable
 options area. The screenshot shows the settling state after resizing; missing
