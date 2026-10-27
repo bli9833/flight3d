@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { solveTransfer, solveFloodOutputs, sunWeights, SUN_DIRECTIONS,
-  TRANSFER_COLUMNS, TRANSFER_VERSION, receiverKey } from '../src/aircraft/CockpitTransferModel.js';
+  TRANSFER_COLUMNS, TRANSFER_VERSION, receiverKey, smoothTransport } from '../src/aircraft/CockpitTransferModel.js';
 import { CockpitLightTransfer } from '../src/aircraft/CockpitLightTransfer.js';
 import { Cockpit } from '../src/aircraft/Cockpit.js';
 import { loadCockpitGeometry } from '../scripts/lib/load-cockpit-geometry.mjs';
@@ -136,4 +136,17 @@ for (const variant of ['medium', 'draco']) it(`bakes a receiver for every ${vari
   assert.equal(transfer.coverage, 1,
     'Unbaked liner vertices sample the black sentinel and blot the ceiling');
   transfer.dispose();
+});
+
+it('smoothTransport bridges a 100x cell-to-cell cliff without inventing energy', () => {
+  const key = (x, y, z, nx = 0, ny = 2, nz = 0) => `${x},${y},${z},${nx},${ny},${nz}`;
+  const keys = [key(0, 0, 0), key(2, 0, 0), key(40, 0, 0), key(0, 0, 0, 2, 0, 0)];
+  const values = Float32Array.from([0, 4, 4, 2]); // dark|lit neighbours, far cell, opposite normal
+  const out = smoothTransport(keys, values, 1);
+  assert.ok(out[0] > .5 && out[0] < 2, `dark cell lifted toward neighbour, got ${out[0]}`);
+  assert.ok(out[1] > 2 && out[1] < 4, `lit cell eased down, got ${out[1]}`);
+  assert.equal(out[2], 4, 'a cell 3.2m away is untouched');
+  assert.equal(out[3], 2, 'an oppositely-oriented coincident cell is untouched');
+  const energy = out[0] + out[1] + out[2] + out[3];
+  assert.ok(energy > 0 && energy <= 14, `smoothing neither deletes a cliff nor amplifies (sum ${energy})`);
 });

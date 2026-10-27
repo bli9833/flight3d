@@ -5,7 +5,7 @@ import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Cockpit } from '../src/aircraft/Cockpit.js';
 import { APERTURE_OPENINGS, paneOutwardNormal } from '../src/aircraft/CockpitAperture.js';
-import { receiverKey, SUN_DIRECTIONS, TRANSFER_COLUMNS, TRANSFER_VERSION,
+import { receiverKey, smoothTransport, SUN_DIRECTIONS, TRANSFER_COLUMNS, TRANSFER_VERSION,
   solveTransfer } from '../src/aircraft/CockpitTransferModel.js';
 import { loadCockpitGeometry } from './lib/load-cockpit-geometry.mjs';
 
@@ -165,10 +165,11 @@ for (const variant of ['medium', 'draco']) {
     if (i && i % 10000 === 0) console.log(`${variant}: traced ${i}/${receivers.length}`);
   }
   const solved = solveTransfer(direct, links, receivers.map(r => r.rho), TRANSFER_COLUMNS);
-  const values = Float32Array.from(solved.values);
+  const raw = Float32Array.from(solved.values);
   for (let i = 0; i < receivers.length; i++) {
-    for (let j = 4; j < TRANSFER_COLUMNS; j++) values[i * TRANSFER_COLUMNS + j] -= direct[i * TRANSFER_COLUMNS + j];
+    for (let j = 4; j < TRANSFER_COLUMNS; j++) raw[i * TRANSFER_COLUMNS + j] -= direct[i * TRANSFER_COLUMNS + j];
   }
+  const values = smoothTransport(receivers.map(r => r.key), raw);
   const controls = receivers.map((r, i) => ({ r, i })).filter(({ r }) =>
     Math.abs(r.p.x) < .6 && r.p.z < -12.65 && r.p.y > .3 && r.p.y < 1.25 && r.n.z > .3)
     .filter((_, i) => i % 8 === 0).slice(0, 96).map(({ i }) => ({ index: i,

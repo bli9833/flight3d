@@ -19,6 +19,67 @@ export function receiverKey(position, normal) {
     ...normal.toArray().map(x => Math.round(x / NORMAL_STEP))].join(',');
 }
 
+/**
+ * The single-scatter bake has no light source size and few bounces, so receivers
+ * either side of a panel edge can differ ~100x while sitting 8cm apart; those
+ * steps read as jagged black blotches on the ceiling. Averaging each receiver
+ * with its nearby, similarly-oriented neighbours approximates penumbra and the
+ * multi-bounce fill the solver misses.
+ */
+export function smoothTransport(keys, values, columns = TRANSFER_COLUMNS) {
+  const grid = new Int16Array(keys.length * 6);
+  const cells = new Map();
+  const bucketKey = (x, y, z) => ((x + 512) << 20) | ((y + 512) << 10) | (z + 512);
+  for (let i = 0; i < keys.length; i++) {
+    const parts = keys[i].split(',');
+    if (parts.length !== 6) throw Error('Invalid receiver key');
+    for (let k = 0; k < 6; k++) grid[i * 6 + k] = Number(parts[k]);
+    const key = bucketKey(grid[i * 6] >> 3, grid[i * 6 + 1] >> 3, grid[i * 6 + 2] >> 3);
+    let list = cells.get(key);
+    if (!list) cells.set(key, list = []);
+    list.push(i);
+  }
+  const radius = 4 * POSITION_STEP, radius2 = radius * radius;
+  const out = new Float32Array(values.length);
+  const sums = new Float64Array(columns);
+  const magnitude = new Float32Array(keys.length);
+  for (let i = 0; i < keys.length; i++) {
+    const b = i * 6;
+    magnitude[i] = Math.sqrt(grid[b + 3] ** 2 + grid[b + 4] ** 2 + grid[b + 5] ** 2) || 1;
+  }
+  for (let i = 0; i < keys.length; i++) {
+    const a0 = i * 6;
+    const ax = grid[a0], ay = grid[a0 + 1], az = grid[a0 + 2];
+    const anx = grid[a0 + 3], any = grid[a0 + 4], anz = grid[a0 + 5];
+    const na = magnitude[i];
+    for (let c = 0; c < columns; c++) sums[c] = values[i * columns + c];
+    let weight = 1;
+    for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+      const list = cells.get(bucketKey((ax >> 3) + x, (ay >> 3) + y, (az >> 3) + z));
+      if (!list) continue;
+      for (const j of list) {
+        if (j === i) continue;
+        const b0 = j * 6;
+        const dx = grid[b0] - ax, dy = grid[b0 + 1] - ay, dz = grid[b0 + 2] - az;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 * POSITION_STEP * POSITION_STEP > radius2) continue;
+        const cosine = (anx * grid[b0 + 3] + any * grid[b0 + 4] + anz * grid[b0 + 5]) /
+          (na * magnitude[j]);
+        if (cosine < .55) continue;
+        const w = (1 - Math.sqrt(d2) * POSITION_STEP / radius) ** 2;
+        weight += w;
+        for (let c = 0; c < columns; c++) {
+          const v = values[j * columns + c];
+          if (v) sums[c] += w * v;
+        }
+      }
+    }
+    const inv = 1 / weight;
+    for (let c = 0; c < columns; c++) out[i * columns + c] = sums[c] * inv;
+  }
+  return out;
+}
+
 export function sunWeights(direction) {
   const ranked = SUN_DIRECTIONS.map((v, i) => ({ i,
     distance: Math.max(0, 1 - direction.dot(new THREE.Vector3(...v)))
