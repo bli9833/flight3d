@@ -410,16 +410,33 @@ async function main() {
       for (const id of ['B738', 'C172']) {
         sim.setAircraft(id);
         sim.setPreset('runway');
-        sim.cameraSystem.setMode(0, true);
-        sim.aircraftBreakup.spawn(sim.aircraft, new window.THREE.Vector3(35, -8, 0), 'TERRAIN');
+        sim.cameraSystem.userModeSelected = false;
+        sim.cameraSystem.setMode(0);
+        const vertexCount = source => {
+          let count = 0;
+          source.traverseVisible(mesh => {
+            if (mesh.isMesh) count += mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count;
+          });
+          return count;
+        };
+        sim.aircraft.setCockpitMode(false);
+        const gearVertices = id === 'B738' ? vertexCount(sim.aircraft.gearGroup) : 0;
+        const expectedVertices = vertexCount(sim.aircraft.gltfGroup) + gearVertices;
+        sim.aircraftBreakup.spawn(sim.aircraft, new window.THREE.Vector3(35, -8, 0));
         sim.cameraSystem.beginCrashView(sim.aircraftBreakup);
         sim.aircraftBreakup.update(0.6, sim.currentTerrain);
         sim.cameraSystem.updateCrashView(0, true);
         const pieces = sim.aircraftBreakup.pieces.length;
         const outside = sim.cameraSystem.mode === 1;
+        const actualVertices = sim.aircraftBreakup.pieces.reduce((sum, p) => sum + vertexCount(p.object), 0);
+        if (actualVertices !== expectedVertices || (id === 'B738' && gearVertices === 0)) {
+          throw new Error('Missing exterior/gear geometry: ' + JSON.stringify({ id, expectedVertices, actualVertices, gearVertices }));
+        }
         sim.aircraftBreakup.clear();
         sim.cameraSystem.endCrashView();
-        results.push({ id, pieces, outside, restored: sim.aircraft.group.visible && sim.cameraSystem.mode === 0 });
+        const restored = sim.aircraft.group.visible && sim.cameraSystem.mode === 0 && !sim.cameraSystem.userModeSelected;
+        if (!sim.cameraSystem.setMode(1)) throw new Error('Crash reset blocked automatic camera selection');
+        results.push({ id, pieces, outside, gearVertices, restored });
       }
       sim.setAircraft('B738');
       return results;
@@ -428,6 +445,71 @@ async function main() {
       throw new Error('Aircraft breakup/reset failed: ' + JSON.stringify(aircraftBreakups));
     }
     console.log('Both loaded aircraft breakup/cockpit exit/reset:', JSON.stringify(aircraftBreakups));
+
+    const stepping = await evalJs(`(() => {
+      const sim = window.simulator;
+      sim.resetCrash();
+      sim.position.set(120, 65, 360);
+      sim.linearVelocity.set(0, 0, -85);
+      sim.angularVelocity.set(0, 0, 0);
+      sim.quaternion.set(0, 0, 0, 1);
+      sim.aircraft.group.position.copy(sim.position);
+      sim.aircraft.group.quaternion.copy(sim.quaternion);
+      sim.aircraft.update(0, sim.telemetry);
+      sim.cameraSystem.setMode(1, true);
+      let ticks = 0, crashTick = 0, debrisTime = 0;
+      const integrate = sim.integratePhysics;
+      const update = sim.aircraftBreakup.update;
+      sim.integratePhysics = function(dt) {
+        const before = this.isCrashed;
+        integrate.call(this, dt);
+        ticks++;
+        if (!before && this.isCrashed) crashTick = ticks;
+      };
+      sim.aircraftBreakup.update = function(dt, ...args) {
+        debrisTime += dt;
+        update.call(this, dt, ...args);
+      };
+      try { sim.stepSimulation(1); }
+      finally { sim.integratePhysics = integrate; sim.aircraftBreakup.update = update; }
+      if (!crashTick || Math.abs(debrisTime - (1 - crashTick * sim.physicsDt)) > 1e-8) {
+        throw new Error('Incorrect post-impact time: ' + JSON.stringify({ crashTick, debrisTime }));
+      }
+      const postImpactTime = debrisTime;
+      // Reuse exactly the same impact state; preset reset does not reset fuel,
+      // engine spool or every animated component of the source model.
+      const initial = sim.aircraftBreakup.pieces.map(p => ({
+        position: p.object.position.clone(), quaternion: p.object.quaternion.clone(),
+        velocity: p.velocity.clone(), spin: p.spin.clone()
+      }));
+      const run = durations => {
+        sim.aircraftBreakup.pieces.forEach((p, i) => {
+          p.object.position.copy(initial[i].position);
+          p.object.quaternion.copy(initial[i].quaternion);
+          p.velocity.copy(initial[i].velocity);
+          p.spin.copy(initial[i].spin);
+        });
+        debrisTime = 0;
+        sim.aircraftBreakup.update = function(dt, ...args) {
+          debrisTime += dt;
+          update.call(this, dt, ...args);
+        };
+        try { for (const duration of durations) sim.stepSimulation(duration); }
+        finally { sim.aircraftBreakup.update = update; }
+        if (Math.abs(debrisTime - 10) > 1e-8) throw new Error('Truncated debris time: ' + debrisTime);
+        return sim.aircraftBreakup.pieces.flatMap(p => [
+          ...p.object.position.toArray(), ...p.object.quaternion.toArray(), ...p.velocity.toArray(), ...p.spin.toArray()
+        ]).concat(sim.camera.position.toArray(), sim.camera.quaternion.toArray());
+      };
+      const whole = run([10]);
+      const grouped = run(Array(10).fill(1));
+      if (!initial.length || whole.length !== grouped.length) throw new Error('Missing crash stepping coverage');
+      const maxDifference = Math.max(...whole.map((v, i) => Math.abs(v - grouped[i])));
+      if (!Number.isFinite(maxDifference) || maxDifference > 1e-7) throw new Error('Crash step grouping changed state: ' + maxDifference);
+      sim.resetCrash();
+      return { crashTick, postImpactTime, comparedSeconds: debrisTime, maxDifference };
+    })()`);
+    console.log('Deterministic post-impact debris and camera (10s vs 10 x 1s):', JSON.stringify(stepping));
 
     // Fixed camera and time samples expose effects without aircraft/HUD occlusion.
     await evalJs(`(async () => {

@@ -10,12 +10,13 @@ export class AircraftBreakup {
     this.radius = 20;
   }
 
-  spawn(aircraft, velocity, type) {
+  spawn(aircraft, velocity) {
     this.clear();
     aircraft.setCockpitMode(false);
     const root = aircraft.group;
     root.updateWorldMatrix(true, true);
-    const sources = aircraft.useGltf ? [aircraft.gltfGroup]
+    const sources = aircraft.useGltf ? [aircraft.gltfGroup,
+      aircraft.gearGroup?.parent === root ? aircraft.gearGroup : null]
       : aircraft.proceduralGroup ? [aircraft.proceduralGroup]
         : [aircraft.fuselageGroup, aircraft.wingGroup, aircraft.tailGroup,
           aircraft.empennageGroup, aircraft.enginesGroup, aircraft.gearGroup];
@@ -84,49 +85,54 @@ export class AircraftBreakup {
       n++;
     }
     this.aircraft = aircraft;
-    this.water = type === 'WATER';
     root.visible = false;
     this.updateBounds();
   }
 
-  update(dt, terrain) {
-    // Bounded substeps keep contact stable after slow render frames.
-    let remaining = Math.min(Math.max(dt, 0), 2);
+  update(dt, terrain, waterLevel = null) {
+    // Substeps bound contact integration, not the total elapsed simulation time.
+    let remaining = Number.isFinite(dt) ? Math.max(dt, 0) : 0;
     while (remaining > 0) {
       const h = Math.min(remaining, 1 / 120);
       remaining -= h;
       for (const piece of this.pieces) {
         const { object, velocity, spin, radius } = piece;
+        const floor = terrain?.getHeight(object.position.x, object.position.z) ?? 0;
+        // Approximate the immersed height of the fragment's contact sphere.
+        // Dry terrain, shoreline crossings and shallow water use the same forces.
+        const immersion = Number.isFinite(waterLevel) ? THREE.MathUtils.clamp(
+          (Math.min(waterLevel, object.position.y + radius)
+            - Math.max(floor, object.position.y - radius)) / (2 * radius), 0, 1) : 0;
         velocity.y -= 9.81 * h;
-        velocity.multiplyScalar(Math.exp(-0.12 * h));
+        velocity.multiplyScalar(Math.exp(-(0.12 + 2 * immersion) * h));
+        spin.multiplyScalar(Math.exp(-2 * immersion * h));
         object.position.addScaledVector(velocity, h);
         object.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), spin.x * h);
         object.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), spin.y * h);
         object.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), spin.z * h);
-        const floor = terrain?.getHeight(object.position.x, object.position.z) ?? 0;
-        if (!this.water && object.position.y < floor + radius) {
-          object.position.y = floor + radius;
-          if (velocity.y < 0) velocity.y = Math.abs(velocity.y) > 1 ? -velocity.y * 0.18 : 0;
+        object.quaternion.normalize();
+        const contactHeight = (terrain?.getHeight(object.position.x, object.position.z) ?? 0) + radius;
+        if (object.position.y < contactHeight) {
+          object.position.y = contactHeight;
+          if (velocity.y < 0) velocity.y = Math.abs(velocity.y) > 1 ? -velocity.y * 0.18 * (1 - immersion) : 0;
           velocity.x *= Math.exp(-3.5 * h);
           velocity.z *= Math.exp(-3.5 * h);
           spin.multiplyScalar(Math.exp(-5 * h));
-        } else if (this.water && object.position.y < 0) {
-          velocity.multiplyScalar(Math.exp(-2 * h));
-          spin.multiplyScalar(Math.exp(-2 * h));
         }
       }
     }
     if (this.aircraft) this.aircraft.group.visible = false;
-    this.updateBounds();
+    this.updateBounds(terrain, waterLevel);
   }
 
-  updateBounds() {
+  updateBounds(terrain, waterLevel = null) {
     if (!this.pieces.length) return;
     const box = new THREE.Box3();
     for (const { object } of this.pieces) box.expandByObject(object);
     box.getCenter(this.target);
     this.radius = Math.max(10, box.getSize(new THREE.Vector3()).length() / 2);
-    if (this.water) this.target.y = Math.max(0, this.target.y);
+    const floor = terrain?.getHeight(this.target.x, this.target.z) ?? 0;
+    if (Number.isFinite(waterLevel) && floor < waterLevel) this.target.y = Math.max(waterLevel, this.target.y);
   }
 
   clear() {

@@ -814,6 +814,7 @@ export class CameraSystem {
   }
 
   showTemporaryView(m, durationSeconds = 4.5, onComplete = null) {
+    if (this.crashView) return;
     if (this.autoPaused || this.userLookOverridden || (this.userModeSelected && !this.autoSwitch)) {
       return;
     }
@@ -1034,8 +1035,16 @@ export class CameraSystem {
   }
 
   beginCrashView(wreckage) {
-    this.preCrashMode = this.autoSwitch ? CameraSystem.MODES.AUTO : this.mode;
-    this.setMode(CameraSystem.MODES.CHASE, true);
+    this.preCrashState = {
+      mode: this.autoSwitch ? CameraSystem.MODES.AUTO : this.mode,
+      userModeSelected: this.userModeSelected,
+      userLookOverridden: this.userLookOverridden,
+      customViewUpdater: this.customViewUpdater,
+      autoPaused: this.autoPaused,
+      autoSwitchTimer: this.autoSwitchTimer,
+      touchAutoResumeTimer: this.touchAutoResumeTimer,
+    };
+    this.#applyMode(CameraSystem.MODES.CHASE);
     this.crashView = wreckage;
     this.crashDirection = new THREE.Vector3(1, 0.65, 1).normalize();
     this.updateCrashView(0, true);
@@ -1044,7 +1053,10 @@ export class CameraSystem {
   endCrashView() {
     if (!this.crashView) return;
     this.crashView = null;
-    this.setMode(this.preCrashMode, true);
+    const { mode, ...state } = this.preCrashState;
+    this.#applyMode(mode);
+    Object.assign(this, state);
+    this.preCrashState = null;
   }
 
   updateCrashView(dt, snap = false) {

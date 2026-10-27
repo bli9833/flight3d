@@ -1641,7 +1641,7 @@ class FlightSimulator {
 
     // 3. Aircraft Structural Damage Visuals
     this.aircraft.triggerCrashVisuals(crashResult.type);
-    this.aircraftBreakup.spawn(this.aircraft, impactVelocity, crashResult.type);
+    this.aircraftBreakup.spawn(this.aircraft, impactVelocity);
     this.cameraSystem.beginCrashView(this.aircraftBreakup);
 
     // 4. Catastrophic Camera Trauma Shake
@@ -1775,8 +1775,7 @@ class FlightSimulator {
     this.aircraft.cockpit.syncLighting(this.sky, this.quaternion, simSeconds);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
-    this.aircraftBreakup.update(simSeconds, this.currentTerrain);
-    if (this.isCrashed) this.cameraSystem.updateCrashView(simSeconds);
+    if (this.isCrashed) this.cameraSystem.updateCrashView(0, true);
     this.tireSmokeSystem.update(simSeconds);
     this.touchControls.updateUI();
     this.diagnostics.update(simSeconds, this.telemetry);
@@ -1854,7 +1853,6 @@ class FlightSimulator {
     }
     this.sky.updateSun(this.position, this.camera.position);
     this.explosionSystem.update(frameDelta);
-    this.aircraftBreakup.update(frameDelta, this.currentTerrain);
     this.tireSmokeSystem.update(frameDelta);
 
     // 4. Update Cockpit Visibility & Audio

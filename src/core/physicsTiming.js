@@ -11,7 +11,14 @@ export function stepPhysics(simulation) {
   }
   simulation.renderPose.reset(simulation.position, simulation.quaternion);
   simulation.devRunner?.beforePhysics();
+  const wasCrashed = simulation.isCrashed;
   simulation.integratePhysics(simulation.physicsDt);
+  // A collision at the end of this tick creates debris; only subsequent ticks
+  // advance it. Both deterministic stepping and rendered frames share this clock.
+  if (wasCrashed && simulation.isCrashed) {
+    simulation.aircraftBreakup?.update(simulation.physicsDt, simulation.currentTerrain,
+      simulation.water?.mesh.visible ? simulation.water.waterLevel : null);
+  }
   simulation.devRunner?.afterPhysics(simulation.physicsDt);
 }
 
