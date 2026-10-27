@@ -14,7 +14,8 @@ bounded particle counts; emitted dust and fragments inherit world momentum.
   atlases are retained until system disposal. Particle counts remain bounded.
 
 These are particle effects, not fluid simulation or structural deformation.
-Aircraft crash motion, damage detection and audio are independent of this change.
+Damage detection and audio remain separate from particle emission. Aircraft
+breakup and its camera are described below.
 
 ## Verification
 
@@ -38,3 +39,32 @@ collision assertions or establish whole-scene camera acceptance. Omit
 `CRASH_SCREENSHOTS=0` for the ordinary in-flight captures as well.
 
 See [captured effects](../../review-artifacts/impact-realism/README.md).
+
+## Aircraft breakup and crash camera
+
+`AircraftBreakup` partitions the active exterior's triangles into left/right
+outboard regions and four longitudinal center sections. It retains source
+materials/UVs, including batched GLBs and the 737's separate procedural landing
+gear, and hides the intact aircraft until reset.
+Debris inherits pre-contact world velocity plus a bounded outward impulse, then
+integrates gravity, drag, rotation and damped terrain contact in the shared 120 Hz
+physics steps. Debris begins advancing on the tick after impact, so deterministic
+stepping applies only post-impact time without truncating long requests. Paused
+physics also holds debris. Water drag and seabed restitution vary with each
+piece's immersed height above the current terrain, independently of the collision
+label. This lets ship-impact debris sink and water-impact debris reach dry land.
+Scenes without a visible ocean supply no water surface. Generated geometry is disposed
+on reset; aircraft materials and textures remain shared.
+
+The camera cuts immediately outside, fits the debris bounds (including portrait
+aspect ratios), follows its center and prevents view switches until crash reset.
+Reset restores the previous view, user/automatic camera selection state and the
+intact aircraft. Deterministic steps snap the camera to the final debris bounds.
+Node verification is `node --test tests/aircraftBreakup.test.js tests/physicsTiming.test.js`;
+`test:crash` checks the exterior view, complete loaded geometry including gear,
+camera reset, and equal debris/camera state for one 10-second request versus ten
+1-second requests. It captures `aircraft_breakup_exterior.png`.
+
+This is a bounded visual breakup approximation, not a structural solver: region
+boundaries have open cut faces, and debris uses approximate terrain contact radii.
+It does not simulate collisions between fragments or with buildings after impact.
