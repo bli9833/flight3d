@@ -37,6 +37,10 @@
       ]
     }
   ],
+  "airportRestore": {
+    "active": false,
+    "hidden": true
+  },
   "status": "PASS",
   "errors": []
 }

@@ -18,3 +18,11 @@ recovery, mobile support, or performance on Mac.
 
 Syntax/action-pin checks and the four focused `neonCity.test.js` tests passed.
 The existing production behavior is unchanged by this preview follow-up.
+
+Integration follow-up: merged the diagnostics, benchmark, lamp-scope and shadow
+cache changes from main. The airport-switch conflict preserves both Neon and
+diagnostic restoration. A browser rerun checks that leaving Neon closes an active
+World-only trial (`airportRestore` in JSON). Syntax/action checks, the 38 related
+Neon/diagnostics/shadow/B737 tests, and a production build pass. The images above
+are the original inspected preview captures; the integration rerun's raw captures
+are retained with the task cache.

@@ -57,7 +57,12 @@ try {
     assert.equal(state.airport,'neon');assert.equal(state.aircraft,'C172');assert.equal(state.visible,true);
     assert.ok(state.buildings>50);report.cases.push(state);
   }
-  await evaluate(`window.simulator.setAirport('coastal')`);
+  report.airportRestore = await evaluate(`(async()=>{
+    const s=window.simulator;s.developerMode.enable();s.renderDiagnosticsPanel.open();
+    s.renderDiagnostics.set('scene','world');await s.setAirport('coastal');
+    return {active:s.renderDiagnostics.active,hidden:s.renderDiagnosticsPanel.root.hidden};
+  })()`);
+  assert.deepEqual(report.airportRestore,{active:false,hidden:true},'Changing airports must restore diagnostic trials');
   assert.equal(await evaluate('window.simulator.neonCity.group.visible'),false,'Leaving Neon must hide its scenery');
   assert.deepEqual(errors,[]);report.status='PASS';
 } catch(error) {report.failure=error.stack;process.exitCode=1;console.error(error)}
