@@ -1,6 +1,8 @@
 # Neon City browser preview
 
-Captured from PR #243 on 2026-10-27 using the reusable Flight3d Chrome session,
+Updated to a softer, eye-friendly lofi/synthwave night aesthetic featuring a serene celestial moon,
+gentle starry night dome, soft candlelight & pale ice-cyan window illumination, and soothing purple night mist.
+Captured using the reusable Flight3d Chrome session,
 Intel ADL-N / ANGLE Vulkan, 1440×900, Balanced quality and C172 chase camera.
 Physics integration was held to keep each preset at its spawn pose.
 
