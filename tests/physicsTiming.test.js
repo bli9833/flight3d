@@ -93,3 +93,25 @@ test('developer hooks share the fixed-step path and completion discards queued s
   stepPhysics(simulation);
   assert.equal(simulation.ticks, 2);
 });
+
+test('debris shares fixed steps only after impact and receives the current ocean surface', () => {
+  const simulation = createSimulation();
+  const integrate = simulation.integratePhysics;
+  const calls = [];
+  simulation.integratePhysics = function(dt) {
+    integrate.call(this, dt);
+    if (this.ticks === 60) this.isCrashed = true;
+  };
+  simulation.currentTerrain = { getHeight: () => -50 };
+  simulation.water = { mesh: { visible: true }, waterLevel: 0 };
+  simulation.aircraftBreakup = { update: (...args) => calls.push(args) };
+  for (let i = 0; i < 120; i++) stepPhysics(simulation);
+  assert.equal(calls.length, 60, 'no debris time is applied before or on the impact tick');
+  for (const args of calls) assert.deepEqual(args, [1 / 120, simulation.currentTerrain, 0]);
+  simulation.water.mesh.visible = false;
+  stepPhysics(simulation);
+  assert.equal(calls.at(-1)[2], null);
+  simulation.devRunner = { blocksPhysics: true };
+  stepPhysics(simulation);
+  assert.equal(calls.length, 61, 'blocked physics must also hold debris');
+});

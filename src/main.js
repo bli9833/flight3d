@@ -1,3 +1,4 @@
+import { AircraftBreakup } from './effects/AircraftBreakup.js';
 import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
 import { cockpitCasterState } from './aircraft/CockpitLighting.js';
@@ -62,6 +63,7 @@ import {
 } from './config/scenarioRegistry.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
+import { initBuildInfo } from './ui/BuildInfo.js';
 import { installInputLatencyMonitor } from './ui/InputLatencyMonitor.js';
 
 // Expose THREE globally for test harness and browser console debugging
@@ -70,10 +72,29 @@ if (typeof window !== 'undefined') {
 }
 
 initLocalization();
+initBuildInfo();
 
-// Upper bound on waiting for an idle slot; the browser runs the callback by then even if
-// the thread is still busy, so warmup cannot be starved by a long boot.
-const PRELOAD_IDLE_TIMEOUT_MS = 1500;
+// Window-level flight shortcuts must not run behind the loading screen.
+window.addEventListener('keydown', event => {
+  if (document.body.classList.contains('booting') && event.target?.id !== 'startup-retry') {
+    if (event.key !== 'Tab') event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}, { capture: true });
+
+async function startupStage(value, message) {
+  document.getElementById('startup-progress').value = value;
+  bindText(document.getElementById('startup-status'), () => t(message));
+  // Two frames ensure the updated stage paints before synchronous construction.
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
+function showStartupError(error) {
+  console.error('Simulator startup failed:', error);
+  bindText(document.getElementById('startup-status'), () => t('startup.failed'));
+  document.getElementById('startup-progress').hidden = true;
+  document.getElementById('startup-retry').hidden = false;
+}
 
 // Attach latency telemetry before the simulator constructor: its synchronous scene
 // build is exactly the window where user input stalls, and event-timing entries are
@@ -85,7 +106,8 @@ const inputLatency = installInputLatencyMonitor();
  * Integrates 6-DOF rigid body physics, aircraft systems, procedural world, audio, and user interface.
  */
 class FlightSimulator {
-  constructor() {
+  async initialize() {
+    await startupStage(0, 'startup.scene');
     this.container = document.getElementById('canvas-container');
     this.inputLatency = inputLatency;
 
@@ -117,6 +139,8 @@ class FlightSimulator {
     this.mcpCanvas = new MCPCanvas(1024, 128);
     this.isfdCanvas = new ISFDCanvas(256, 256);
     this.cduCanvas = new CDUCanvas(512, 512);
+
+    await startupStage(1, 'startup.aircraft');
 
     // 3. Boeing 737 Aircraft 3D Model
     this.aircraft = new Boeing737(
@@ -151,6 +175,8 @@ class FlightSimulator {
     this.engines = new EngineModel();
     this.engines.bindMassProperties(this.aero.massProperties);
     this.gear = new LandingGear();
+
+    await startupStage(2, 'startup.world');
 
     // 5. Procedural World & Real-World Environments
     this.terrain = new Terrain(22000, 256, { quality: RENDER_QUALITY[this.renderQuality].terrain });
@@ -191,6 +217,8 @@ class FlightSimulator {
     this.sky.setShadowMapSize(RENDER_QUALITY[this.renderQuality].shadowMapSize);
     this.foliage.setTimeOfDay(this.sky.timeOfDay);
     this.water.syncWithAtmosphere(this.sky);
+
+    await startupStage(3, 'startup.controls');
 
     // 6. Audio & Controls & Camera & Diagnostics
     this.audio = new FlightAudio();
@@ -238,6 +266,7 @@ class FlightSimulator {
       this.water
     );
     this.explosionSystem = new ExplosionSystem(this.scene, this.currentTerrain);
+    this.aircraftBreakup = new AircraftBreakup(this.scene);
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
     this.isCrashed = false;
     this.crashResult = null;
@@ -654,33 +683,48 @@ class FlightSimulator {
   }
 
   /**
-   * One model per idle period, after the first frame: building both planes up front in
-   * the constructor would add to the load stall this is meant to remove, and doing them
-   * together would just move the freeze instead of softening it.
+   * Finish model preparation behind the startup overlay, yielding between models.
    */
   scheduleAircraftPreload() {
     if (this.aircraftPreloadScheduled) return;
     this.aircraftPreloadScheduled = true;
-    const pending = () => LOBBY_AIRCRAFT_IDS.filter(id =>
-      AIRCRAFT_REGISTRY[id] && id !== this.currentAircraftId && !this.aircraftInstances.has(id));
-    const requestIdle = (task) => (typeof window !== 'undefined' && window.requestIdleCallback)
-      ? window.requestIdleCallback(task, { timeout: PRELOAD_IDLE_TIMEOUT_MS })
-      : setTimeout(task, PRELOAD_IDLE_TIMEOUT_MS);
-    const onIdle = () => {
-      // A lobby choice or a scenery load owns the main thread and has its own progress
-      // indication; both clear on their own, and the idle timeout still bounds the wait.
-      if (this.lobbySelectionPending || this.airportLoading) {
-        requestIdle(onIdle);
-        return;
+    this.finishStartup().catch(showStartupError);
+  }
+
+  async finishStartup() {
+    await startupStage(4, 'startup.preload');
+    for (const id of LOBBY_AIRCRAFT_IDS) {
+      if (id !== this.currentAircraftId) {
+        this.prebuildAircraftInstance(id);
+        await startupStage(4, 'startup.preload');
       }
-      const next = pending()[0];
-      if (!next) return;
-      // Stops on a build failure rather than retrying the same id every idle period.
-      if (this.prebuildAircraftInstance(next)) {
-        if (pending().length) requestIdle(onIdle);
-      }
-    };
-    requestIdle(onIdle);
+    }
+    await startupStage(5, 'startup.cockpit');
+    const deadline = performance.now() + 60000;
+    while ([...this.aircraftInstances.values()].some(aircraft => aircraft.cockpit?.cockpitModelLoading || aircraft.loadingGltf)) {
+      if (performance.now() > deadline) throw new Error('Startup assets timed out');
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    let timeout;
+    try {
+      await Promise.race([
+        Promise.all([...this.aircraftInstances.values()].map(aircraft => aircraft.cockpit?.shaderWarmup)),
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => reject(new Error('Startup shaders timed out')), Math.max(0, deadline - performance.now()));
+        }),
+      ]);
+    } finally {
+      clearTimeout(timeout);
+    }
+    await startupStage(6, 'startup.ready');
+    this.startupReady = true;
+    document.body.classList.remove('booting');
+    document.getElementById('startup-overlay').hidden = true;
+    document.getElementById('canvas-container').inert = false;
+    document.getElementById('hud-overlay').inert = false;
+    // Loading time must not turn into accumulated simulation time.
+    this.clock.getDelta();
+    inputLatency?.mark('startup-complete');
   }
 
   setAircraft(aircraftId = 'B738') {
@@ -1661,6 +1705,8 @@ class FlightSimulator {
 
     // 3. Aircraft Structural Damage Visuals
     this.aircraft.triggerCrashVisuals(crashResult.type);
+    this.aircraftBreakup.spawn(this.aircraft, impactVelocity);
+    this.cameraSystem.beginCrashView(this.aircraftBreakup);
 
     // 4. Catastrophic Camera Trauma Shake
     this.cameraSystem.addTrauma(1.0);
@@ -1683,6 +1729,8 @@ class FlightSimulator {
     this.isCrashed = false;
     this.crashResult = null;
     this.explosionSystem.clear();
+    this.aircraftBreakup.clear();
+    this.cameraSystem.endCrashView();
     this.aircraft.resetCrashVisuals();
 
     const crashEl = document.getElementById('crash-overlay');
@@ -1791,6 +1839,7 @@ class FlightSimulator {
     this.aircraft.cockpit.syncLighting(this.sky, this.quaternion, simSeconds);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
+    if (this.isCrashed) this.cameraSystem.updateCrashView(0, true);
     this.tireSmokeSystem.update(simSeconds);
     this.touchControls.updateUI();
     this.diagnostics.update(simSeconds, this.telemetry);
@@ -1820,7 +1869,8 @@ class FlightSimulator {
   animate() {
     requestAnimationFrame(this.animate);
 
-    const frameDelta = clampFrameDelta(this.clock.getDelta());
+    const elapsed = this.clock.getDelta();
+    const frameDelta = this.startupReady ? clampFrameDelta(elapsed) : 0;
     this.totalSimTime += frameDelta;
     if (!this.gameFlow.isPhysicsFrozen()) this.devRunner.updatePreparation(frameDelta);
     this.devPanelTimer = (this.devPanelTimer || 0) + frameDelta;
@@ -1942,7 +1992,7 @@ class FlightSimulator {
     this.renderScene();
     if (!this.hasRenderedFirstFrame) {
       this.hasRenderedFirstFrame = true;
-      document.body.classList.remove('booting');
+      document.getElementById('startup-overlay').classList.add('scene-ready');
       inputLatency?.mark('first-frame');
       this.scheduleAircraftPreload();
     }
@@ -2375,12 +2425,19 @@ class FlightSimulator {
 }
 
 // Start Simulator when DOM is ready (guaranteed across all browser lifecycle states)
-function initFlightSimulator() {
+async function initFlightSimulator() {
   if (!window.simulator) {
-    window.simulator = new FlightSimulator();
-    window.sim = window.simulator;
+    document.getElementById('startup-retry').addEventListener('click', () => location.reload());
+    document.getElementById('canvas-container').inert = true;
+    document.getElementById('hud-overlay').inert = true;
+    const simulator = new FlightSimulator();
     // The latency monitor is exposed as window.sim.inputLatency (constructor-assigned);
     // `sim.telemetry` stays the physics snapshot namespace, rewritten by fly().
+    try {
+      await simulator.initialize();
+      window.simulator = simulator;
+      window.sim = simulator;
+    } catch (error) { showStartupError(error); }
     inputLatency?.mark('ready');
   }
 }

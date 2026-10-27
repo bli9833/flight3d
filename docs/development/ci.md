@@ -270,3 +270,14 @@ immediate resume, and cancellation on manual view selection. Camera timers are
 advanced explicitly while rendering continues. Screenshots cover all five quick
 views, the 390px settings layout and paused/looking/playing states. This is a
 fixed-pose browser check, not a full flight or landing acceptance run.
+
+### Startup loading screen
+
+Start Vite on port 5273 (`npm run dev -- --host 127.0.0.1 --port 5273`),
+then run `chrome-session --project flight3d node scripts/verify-startup.mjs`
+against the project Chrome session. Override `SIM_URL` and `ARTIFACT_DIR` as
+needed; screenshots and a stage report default to `/tmp/startup-progress`.
+The scenario checks that the loading screen covers scene construction, aircraft
+preloading, asset processing and shader preparation; it then verifies real mouse
+camera input and the retry screen after a forced WebGL initialization failure.
+The bar counts preparation stages, not downloaded bytes or estimated time.

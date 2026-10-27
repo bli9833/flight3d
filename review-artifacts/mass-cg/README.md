@@ -1,11 +1,12 @@
 # Mass / CG verification — 2026-10-28 (Asia/Seoul)
 
-Base: `3d94b01` (upstream main). Runtime: Node 22.23.2, Windows, local Vite
+Browser-check base: `3d94b01`; final merged base: `e4f7725` (upstream main).
+Runtime: Node 22.23.2, Windows, local Vite
 and the connected in-app browser. No production deployment was performed.
 
-- `npm run check`: 288 JavaScript files, zero syntax failures; 11 pinned actions.
-- `npm test`: 689 passed, zero failed, skipped or cancelled.
-- `npm run build`: success (143 modules); existing large-chunk advisory remains.
+- Final `npm run check`: 293 JavaScript files, zero syntax failures; 11 pinned actions.
+- Final `npm test`: 700 passed, zero failed, skipped or cancelled (689 before main refresh).
+- Final `npm run build`: success (146 modules); existing large-chunk advisory remains.
 - `git diff --check`: clean.
 
 An initial terrain checksum failure was traced to checkout CRLF conversion.
@@ -38,6 +39,8 @@ navigation/tool inspection; no source URL was attached, so it is not attributed
 to the application or claimed resolved. The explicit acceptance assertions
 completed successfully. Subsequent Work settings disabled browser use; additional
 C172/F16 browser switching and a final screenshot could not be collected.
+Browser acceptance was not rerun after merging the latest startup/build-info/
+crash-breakup features; the combined head passed the final Node/check/build gate.
 All three aircraft's reference mass/CG/inertia are covered by Node tests.
 
 These checks do not certify full takeoff/landing, Lukla circuits, engine-out
