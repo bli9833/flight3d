@@ -1,4 +1,14 @@
 export default {
+  "startup.scene": "시뮬레이터 준비 중…",
+  "startup.aircraft": "항공기 구성 중…",
+  "startup.world": "풍경 구성 중…",
+  "startup.controls": "조작 준비 중…",
+  "startup.preload": "추가 항공기 준비 중…",
+  "startup.cockpit": "콕핏 준비 중…",
+  "startup.ready": "준비 완료",
+  "startup.failed": "시작을 완료하지 못했습니다. 다시 시도해 주세요.",
+  "startup.retry": "다시 시도",
+
   "render.open": "렌더링 비교 패널",
   "render.cockpitUnsupported": "이 기체는 내부·외부 모델이 통합되어 있어 콕핏 전용 재질·표면 비교를 지원하지 않습니다.",
   "render.cockpitLoading": "모델·베이크 로딩이 끝나면 콕핏 재질·표면 비교를 사용할 수 있습니다.",

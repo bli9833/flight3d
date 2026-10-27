@@ -2214,8 +2214,8 @@ body[data-dev-scenario="true"] #touch-controls-overlay { display: none !importan
 .pause-card .btn { min-height: 44px; }
 
 /* The lobby owns airport/spawn/time: park the in-game chrome meanwhile.
-   The same park applies while booting (.booting, removed after the first
-   rendered frame) so the HUD does not flash over the black canvas. */
+   The same park applies while booting (.booting, removed after startup)
+   so the HUD does not flash over the loading screen. */
 body:is([data-flow="lobby"], .booting) .hud-strip,
 body:is([data-flow="lobby"], .booting) .ap-bar,
 body:is([data-flow="lobby"], .booting) .flight-toolbar,
@@ -2380,3 +2380,13 @@ body[data-flow="lobby"] #incheon-attribution { z-index: 81; bottom: 4px; }
 #render-trials output { display: block; white-space: pre-wrap; line-height: 1.7; font-variant-numeric: tabular-nums; }
 .render-trial-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 #render-trials .render-trial-actions .btn { flex: 1; min-width: 88px; padding: 6px; }
+
+/* Present from the HTML first paint, including while JavaScript downloads. */
+.startup-overlay { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; background: #09111f; color: #e8eef7; padding: 24px; }
+.startup-overlay[hidden] { display: none; }
+.startup-overlay.scene-ready { background: rgb(9 17 31 / 22%); }
+.startup-card { width: min(340px, 100%); box-sizing: border-box; padding: 28px; border: 1px solid rgb(148 163 184 / 25%); border-radius: 16px; background: rgb(9 17 31 / 88%); box-shadow: 0 16px 48px rgb(0 0 0 / 25%); text-align: center; }
+.startup-card h1 { margin: 0 0 24px; font-size: 28px; letter-spacing: 2px; }
+.startup-card p { min-height: 1.5em; line-height: 1.5; }
+.startup-card progress { width: 100%; height: 12px; accent-color: #60a5fa; }
+.startup-card button { padding: 10px 24px; cursor: pointer; }
