@@ -172,7 +172,12 @@ export class SkyAtmosphere {
     const phi = THREE.MathUtils.degToRad(90 - elevation);
     const theta = THREE.MathUtils.degToRad(azimuth);
 
-    this.sunPosition.setFromSphericalCoords(1, phi, theta);
+    if (this.activeAirport === 'neon') {
+      // Celestial moon shines from the East horizon (where the retro sun/moon is at +X)
+      this.sunPosition.set(0.98, 0.12, 0.0).normalize();
+    } else {
+      this.sunPosition.setFromSphericalCoords(1, phi, theta);
+    }
 
     // Update Sky Shader uniforms (smooth continuous Rayleigh transition prevents sky flashing)
     const rayleighT = Math.max(0.0, Math.min(1.0, (elevation - 4.0) / 12.0));
@@ -199,20 +204,15 @@ export class SkyAtmosphere {
 
     if (this.activeAirport === 'neon') {
       // Soft Dreamy Lofi / Synthwave Night:
-      // Soothing deep violet-indigo sky, gentle cool silver-lavender moonlight, soft purple atmospheric haze
-      this.sunLight.color.setRGB(0.72, 0.80, 0.94); // Gentle cool silvery-lavender moonlight
-      this.sunLight.intensity = 1.05;
-      this.ambientLight.color.setRGB(0.38, 0.25, 0.52); // Gentle deep lavender-indigo ambient
-      this.ambientLight.intensity = 0.92;
+      // Soothing deep violet-indigo sky, gentle lavender-magenta moonlight, seamless dark horizon haze
+      this.sunLight.color.setRGB(0.85, 0.55, 0.90); // Gentle celestial lavender-pink moon/sun glow
+      this.sunLight.intensity = 0.70;
+      this.ambientLight.color.setRGB(0.18, 0.10, 0.28); // Gentle deep lavender-indigo ambient
+      this.ambientLight.intensity = 0.55;
 
-      this.fogColor.setRGB(0.20, 0.08, 0.28); // Soothing, soft purple night mist (easy on the eyes)
-      this.baseDensity = 0.00012;
-      exposure = 0.98; // Calm exposure, eliminates harsh eye strain
-
-      uniforms['turbidity'].value = 8.0;
-      uniforms['rayleigh'].value = 3.6;
-      uniforms['mieCoefficient'].value = 0.008;
-      uniforms['mieDirectionalG'].value = 0.82;
+      this.fogColor.setRGB(0.06, 0.02, 0.11); // Deep midnight purple night mist matching horizon
+      this.baseDensity = 0.00008;
+      exposure = 1.02; // Calm exposure, eliminates harsh eye strain
     } else if (elevation > 5.0) {
       // Daylight / Noon (elevation 5° to 65°)
       const t = Math.min(1.0, (elevation - 5.0) / 25.0);
@@ -260,25 +260,27 @@ export class SkyAtmosphere {
       exposure = 1.15; // Preserves dark ground silhouettes and stars without muddy dark crushing
     }
 
-    // 1b. Cloud Cover: direct sun and shadow sharpness fall off continuously with
-    // overcast, skylight and haze take over. Functions of the cloudCover state scalar,
-    // never a clear/overcast mode switch.
-    const cloud = Math.min(1, Math.max(0, this.cloudCover));
-    const cloudRamp = cloud * cloud * (3 - 2 * cloud);
-    this.sunAttenuation = 1 - 0.85 * cloudRamp;
-    this.shadowSoftening = 1 - 0.65 * cloudRamp;
-    this.sunLight.intensity *= this.sunAttenuation;
-    this.sunLight.shadow.intensity = this.shadowSoftening;
-    this.cockpitSun.light.shadow.intensity = this.shadowSoftening;
-    this.ambientLight.intensity += 0.25 * cloudRamp;
-    this.fogColor.lerp(OVERCAST_GREY, 0.35 * cloudRamp);
+    if (this.activeAirport !== 'neon') {
+      // 1b. Cloud Cover: direct sun and shadow sharpness fall off continuously with
+      // overcast, skylight and haze take over. Functions of the cloudCover state scalar,
+      // never a clear/overcast mode switch.
+      const cloud = Math.min(1, Math.max(0, this.cloudCover));
+      const cloudRamp = cloud * cloud * (3 - 2 * cloud);
+      this.sunAttenuation = 1 - 0.85 * cloudRamp;
+      this.shadowSoftening = 1 - 0.65 * cloudRamp;
+      this.sunLight.intensity *= this.sunAttenuation;
+      this.sunLight.shadow.intensity = this.shadowSoftening;
+      this.cockpitSun.light.shadow.intensity = this.shadowSoftening;
+      this.ambientLight.intensity += 0.25 * cloudRamp;
+      this.fogColor.lerp(OVERCAST_GREY, 0.35 * cloudRamp);
 
-    // 2. High-Altitude Rayleigh Blue Depth Cueing
-    // As aircraft ascends above 400m towards stratosphere (1,500m ~ 3,000m+),
-    // aerosol turbidity gives way to pure Rayleigh blue scatter
-    const altT = Math.min(1.0, Math.max(0.0, (altitude - 400.0) / 2200.0));
-    if (elevation > 5.0) {
-      this.fogColor.lerp(new THREE.Color(0.48, 0.64, 0.86), altT * 0.40);
+      // 2. High-Altitude Rayleigh Blue Depth Cueing
+      // As aircraft ascends above 400m towards stratosphere (1,500m ~ 3,000m+),
+      // aerosol turbidity gives way to pure Rayleigh blue scatter
+      const altT = Math.min(1.0, Math.max(0.0, (altitude - 400.0) / 2200.0));
+      if (elevation > 5.0) {
+        this.fogColor.lerp(new THREE.Color(0.48, 0.64, 0.86), altT * 0.40);
+      }
     }
 
     // 3. Exponential Height Falloff: Density(y) = baseDensity * exp(-lambda * max(0, y))
@@ -360,9 +362,11 @@ export class SkyAtmosphere {
     } else if (airportId === 'neon') {
       this.cloudsGroup.position.y = 0;
       this.cloudsGroup.visible = false;
+      this.sky.visible = false;
     } else {
       this.cloudsGroup.position.y = 0;
       this.cloudsGroup.visible = true;
+      this.sky.visible = true;
     }
     this.updateSun();
   }
