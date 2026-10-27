@@ -41,6 +41,25 @@ for (const variant of ['medium', 'draco']) {
     }
     return lookup.get(key);
   };
+  // The runtime binds the transfer to the visible liners and skips the cut proxies,
+  // so every liner vertex needs a baked cell; unmatched vertices sample the black
+  // sentinel row and paint jagged patches on the ceiling. The proxies below remain
+  // the only occluders, so side-window light still passes.
+  cockpit.gltfCockpitGroup.traverse(mesh => {
+    if (!mesh.isMesh || !mesh.visible) return;
+    if (mesh.userData.cockpitApertureShadow && mesh.name.endsWith('_SideWindowShadow')) return;
+    const material = mesh.material;
+    if (Array.isArray(material) || material.transparent || !material.isMeshStandardMaterial) return;
+    const g = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    for (let i = 0; i < g.attributes.position.count; i++) {
+      point.fromBufferAttribute(g.attributes.position, i);
+      normal.fromBufferAttribute(g.attributes.normal, i).normalize();
+      receiver(point, normal, material);
+      if (material.side === THREE.DoubleSide) receiver(point, normal.clone().negate(), material);
+    }
+    g.dispose();
+  });
   cockpit.gltfCockpitGroup.traverse(mesh => {
     if (!mesh.isMesh || !mesh.visible) return;
     // Closed liners opt out of the deck pass; only their cut proxies occlude.

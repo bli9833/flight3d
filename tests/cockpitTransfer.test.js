@@ -6,6 +6,8 @@ import * as THREE from 'three';
 import { solveTransfer, solveFloodOutputs, sunWeights, SUN_DIRECTIONS,
   TRANSFER_COLUMNS, TRANSFER_VERSION, receiverKey } from '../src/aircraft/CockpitTransferModel.js';
 import { CockpitLightTransfer } from '../src/aircraft/CockpitLightTransfer.js';
+import { Cockpit } from '../src/aircraft/Cockpit.js';
+import { loadCockpitGeometry } from '../scripts/lib/load-cockpit-geometry.mjs';
 import { batchStaticCockpit } from '../src/aircraft/StaticCockpitBatch.js';
 
 it('converges to the analytical two-patch radiosity solution, including repeated bounces', () => {
@@ -117,5 +119,21 @@ for (const variant of ['medium', 'draco']) it(`ships a finite, current, checksum
     skySum += sky;
   }
   assert.ok(skySum > 1, 'The bake must not silently contain only zero visibility');
+  transfer.dispose();
+});
+
+// The 98% gate in bind() tolerates a few percent of vertices sampling the black
+// sentinel row; on the 737 they all landed adjacent on the ceiling liner and read
+// as jagged black blotches. Every vertex the runtime binds must have a baked cell.
+for (const variant of ['medium', 'draco']) it(`bakes a receiver for every ${variant} cockpit vertex the runtime binds`, async () => {
+  const manifest = JSON.parse(fs.readFileSync(`public/lighting/cockpit-${variant}.json`));
+  const transfer = new CockpitLightTransfer(manifest,
+    new Float32Array(manifest.keys.length * TRANSFER_COLUMNS));
+  const cockpit = new Cockpit({}, {}, {}, {}, {}, {});
+  cockpit.prepareModel(await loadCockpitGeometry(`public/models/b737-cockpit-${variant}.glb`));
+  cockpit.group.updateMatrixWorld(true);
+  transfer.bind(cockpit.gltfCockpitGroup);
+  assert.equal(transfer.coverage, 1,
+    'Unbaked liner vertices sample the black sentinel and blot the ceiling');
   transfer.dispose();
 });
