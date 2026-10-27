@@ -223,6 +223,21 @@ export class NDCanvas {
         { name: 'RW06', x: -224, z: 140 },
         { name: 'NAMCH', x: 2500, z: -5500 }
       ];
+    } else if (this.airportId === 'neon') {
+      activeWpt = 'RW09';
+      threshPos = { x: -2000, z: 0 };
+      rwyStart = projectToScreen(-2000, 0);
+      rwyEnd = projectToScreen(1800, 0);
+      extStart = projectToScreen(-8000, 0);
+      extEnd = projectToScreen(6000, 0);
+      vor1 = 'SYNTH  108.80';
+      vor2 = 'OUTRN  114.20';
+      fixes = [
+        { name: 'OUTRN', x: -6000, z: 0 },
+        { name: 'SYNTH', x: -3500, z: 0 },
+        { name: 'RW09', x: -2000, z: 0 },
+        { name: 'TOWER', x: 2000, z: 0 }
+      ];
     } else {
       activeWpt = 'RW09L';
       threshPos = { x: -1350, z: 0 };

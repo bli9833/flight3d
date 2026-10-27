@@ -6,6 +6,7 @@ const AIRPORT_NAME_KEYS = {
   incheon: 'incheon.airport',
   coastal: 'coastal.airport',
   lukla: 'lukla.vnlk',
+  neon: 'neon.metropolis',
 };
 
 /**

@@ -34,6 +34,7 @@ import { Ships } from './environment/Ships.js';
 import { SkyAtmosphere } from './environment/SkyAtmosphere.js';
 import { LuklaTerrain } from './environment/LuklaTerrain.js';
 import { LuklaAirport } from './environment/LuklaAirport.js';
+import { NeonCity } from './environment/NeonCity.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
@@ -171,6 +172,11 @@ class FlightSimulator {
     this.luklaAirport = new LuklaAirport();
     this.luklaAirport.group.visible = false;
     this.scene.add(this.luklaAirport.group);
+
+    // Neon Metropolis 80s Synthwave City & Flight Canyons
+    this.neonCity = new NeonCity();
+    this.neonCity.group.visible = false;
+    this.scene.add(this.neonCity.group);
 
     this.activeAirport = 'lukla'; // 'coastal' | 'lukla' | 'incheon'; initControls flips to coastal below
     this.currentTerrain = this.terrain;
@@ -760,7 +766,70 @@ class FlightSimulator {
 
     const groundClearance = this.gear?.cgGroundHeightM ?? 3.5;
 
-    if (this.activeAirport === 'incheon') {
+    if (this.activeAirport === 'neon') {
+      const isC172 = this.currentAircraftId === 'C172';
+      const c172Clearance = this.gear?.cgGroundHeightM ?? 1.4;
+      const clearance = isC172 ? c172Clearance : groundClearance;
+
+      if (type === 'runway') {
+        // Lined up on the glowing Neon Highway / Runway (heading 090° East towards skyline & setting retro sun)
+        this.position.set(-1800, clearance, 0);
+        this.linearVelocity.set(0, 0, 0);
+        this.angularVelocity.set(0, 0, 0);
+        this.quaternion.setFromEuler(new THREE.Euler(0, -Math.PI * 0.5, 0, 'YXZ'));
+
+        this.controls.throttle = 0.0;
+        this.engines.setThrottle(0.0);
+        this.engines.setReverser(false, true);
+        this.gear.setGearTarget(true);
+        this.gear.gearState = 1.0;
+        this.aero.setFlapPosition(isC172 ? 1 : 2);
+        this.aero.spoilers = 0.0;
+        this.aero.pitchTrim = isC172 ? 1.2 : 1.8;
+        this.controls.pitchTrim = this.aero.pitchTrim;
+
+        this.showToast(() => t('preset.neon.runway'));
+      } else if (type === 'approach') {
+        // Urban Canyon Slalom: 110m altitude, right between the 350m glowing skyscrapers!
+        const speedMs = isC172 ? 46.0 : 70.0;
+        this.position.set(200, 110, 0);
+        this.linearVelocity.set(speedMs, 0, 0);
+        this.angularVelocity.set(0, 0, 0);
+        this.quaternion.setFromEuler(new THREE.Euler(0, -Math.PI * 0.5, 0, 'YXZ'));
+
+        this.controls.throttle = 0.62;
+        this.engines.setThrottle(0.62);
+        this.engines.setReverser(false, true);
+        this.gear.setGearTarget(true);
+        this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
+        this.aero.setFlapPosition(0);
+        this.aero.spoilers = 0.0;
+        this.aero.pitchTrim = isC172 ? 0.8 : 1.4;
+        this.controls.pitchTrim = this.aero.pitchTrim;
+
+        this.showToast(() => t('preset.neon.canyon'));
+      } else if (type === 'cruise') {
+        // Skyline Cruise: 2,500 FT (760m), 110 kts, heading 110° overlooking the glowing metropolis
+        const speedMs = isC172 ? 52.0 : 120.0;
+        this.position.set(-600, 760, -800);
+        const headingRad = THREE.MathUtils.degToRad(110);
+        this.linearVelocity.set(speedMs * Math.sin(headingRad), 0, -speedMs * Math.cos(headingRad));
+        this.angularVelocity.set(0, 0, 0);
+        this.quaternion.setFromEuler(new THREE.Euler(0, -headingRad, 0, 'YXZ'));
+
+        this.controls.throttle = 0.65;
+        this.engines.setThrottle(0.65);
+        this.engines.setReverser(false, true);
+        this.gear.setGearTarget(false);
+        this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
+        this.aero.setFlapPosition(0);
+        this.aero.spoilers = 0.0;
+        this.aero.pitchTrim = isC172 ? 0.9 : 1.2;
+        this.controls.pitchTrim = this.aero.pitchTrim;
+
+        this.showToast(() => t('preset.neon.cruise'));
+      }
+    } else if (this.activeAirport === 'incheon') {
       this.currentAirport.resetTraffic();
       const spawn = incheonSpawn(type, groundClearance, this.currentAircraftId);
       this.position.set(spawn.x, spawn.y, spawn.z);
@@ -1017,7 +1086,7 @@ class FlightSimulator {
    */
   async setAirport(id) {
     this.renderDiagnosticsPanel?.close();
-    if (!['coastal', 'lukla', 'incheon'].includes(id)) return;
+    if (!['coastal', 'lukla', 'incheon', 'neon'].includes(id)) return;
     const request = this.airportRequest = (this.airportRequest || 0) + 1;
     this.airportLoading = false;
     document.getElementById('btn-fly').disabled = false;
@@ -1057,12 +1126,13 @@ class FlightSimulator {
     const isLukla = id === 'lukla';
     const isIncheon = id === 'incheon';
     const isCoastal = id === 'coastal';
+    const isNeon = id === 'neon';
     document.getElementById('incheon-attribution').hidden = !isIncheon;
 
     // Toggle 3D mesh visibility
     this.terrain.mesh.visible = isCoastal;
     this.airport.group.visible = isCoastal;
-    this.water.mesh.visible = !isLukla;
+    this.water.mesh.visible = !isLukla && !isNeon;
     this.ships.group.visible = isCoastal;
     this.foliage.group.visible = isCoastal;
 
@@ -1070,11 +1140,14 @@ class FlightSimulator {
     this.luklaAirport.group.visible = isLukla;
 
     if (this.incheonAirport) this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = isIncheon;
-    this.currentTerrain = isIncheon ? this.incheonAirport.terrain : isLukla ? this.luklaTerrain : this.terrain;
-    this.currentAirport = isIncheon ? this.incheonAirport : isLukla ? this.luklaAirport : this.airport;
+    if (this.neonCity) this.neonCity.group.visible = isNeon;
+    this.currentTerrain = isNeon ? this.neonCity.terrain : isIncheon ? this.incheonAirport.terrain : isLukla ? this.luklaTerrain : this.terrain;
+    this.currentAirport = isNeon ? this.neonCity.airport : isIncheon ? this.incheonAirport : isLukla ? this.luklaAirport : this.airport;
 
     if (this.collisionDetector) {
-      if (isIncheon) {
+      if (isNeon) {
+        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, this.neonCity);
+      } else if (isIncheon) {
         this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
       } else if (isLukla) {
         this.collisionDetector.setEnvironment(this.luklaTerrain, this.luklaAirport, null, null, null);
@@ -1094,7 +1167,10 @@ class FlightSimulator {
     // Relocate tower camera position and update active terrain for the active airport environment
     if (this.cameraSystem) {
       this.cameraSystem.setTerrain(this.currentTerrain);
-      if (isIncheon) {
+      if (isNeon) {
+        const t = this.neonCity.airport.controlTowerData;
+        this.cameraSystem.towerPos.set(t.x, t.y + t.height - 1.5, t.z);
+      } else if (isIncheon) {
         const cab = this.incheonAirport.towerCab;
         this.cameraSystem.towerPos.set(cab.x, cab.y, cab.z);
       } else if (isLukla) {

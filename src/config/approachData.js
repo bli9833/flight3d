@@ -10,6 +10,13 @@ import incheon from './incheonAirfield.json' with { type: 'json' };
  */
 export const APPROACH_DATA = {
   incheon: incheon.approach,
+  neon: {
+    // Neon Metropolis Runway 09, aligned with +X towards the setting retro sun.
+    threshold: { x: -2000, z: 0 },
+    headingDeg: 90,
+    gsAngleDeg: 3.0,
+    elevationFt: 0,
+  },
   lukla: {
     // Lukla Runway 06 (Tenzing-Hillary), 11.7% uphill runway; approach slope 4.28°.
     threshold: { x: -223.5, z: 139.6 },
