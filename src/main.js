@@ -1820,6 +1820,20 @@ class FlightSimulator {
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && this.cameraSystem.supportsPhotoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
+    // Looking forward in photo mode skips the occlusion pass entirely, so build
+    // and compile it now instead of on the user's first head turn. The forced
+    // cockpit sun state makes warm compile the shadow-receiving deck variants
+    // and caster depth programs that a photo frame would never present; the
+    // regular updateCockpitSun call below restores the real state this frame.
+    if (isCockpit && this.cameraSystem.photoCockpit && this.cockpitOcclusion.canWarm(this.renderQuality)) {
+      this.sky.updateCockpitSun({
+        position: this.aircraft.group.position,
+        quaternion: this.aircraft.group.quaternion,
+        cockpitActive: true, dt: 0,
+        casterState: cockpitCasterState(this.aircraft.cockpit),
+      });
+      this.cockpitOcclusion.warm(this.renderer, this.renderQuality);
+    }
     this.sky.updateCockpitSun({
       position: this.aircraft.group.position,
       quaternion: this.aircraft.group.quaternion,
@@ -2017,7 +2031,11 @@ class FlightSimulator {
     this.renderer.render(this.scene, this.camera);
     if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT &&
         (!this.cameraSystem.photoCockpit || this.cameraSystem.isLookingAwayFromCenter())) {
-      this.cockpitOcclusion.render(this.renderer, aoQuality);
+      // Photo mode only reaches the 3D interior mid head-turn; the cabin then
+      // fills the viewport and the AO early-out cannot fire, so run that
+      // transitional view at a reduced AO scale.
+      const transitional = this.cameraSystem.photoCockpit && this.cameraSystem.isLookingAwayFromCenter();
+      this.cockpitOcclusion.render(this.renderer, aoQuality, transitional);
     }
   }
 

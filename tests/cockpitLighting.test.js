@@ -117,3 +117,57 @@ it('AO linearizes nearby contacts with its own range on initialization and camer
   }
   ao.dispose();
 });
+
+it('warmup preserves independent photo deck visibility and skips performance until quality changes', () => {
+  const group = new THREE.Group();
+  const deck = new THREE.Group();
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+  deck.add(mesh);
+  group.add(deck);
+  group.visible = false;
+  const camera = new THREE.PerspectiveCamera();
+  camera.layers.set(3);
+  const ao = new CockpitOcclusion(new THREE.Scene(), camera, {
+    group, gltfCockpitGroup: deck, gltfCockpitLoaded: true,
+  });
+  const previous = {};
+  let target = previous, beautyDraws = 0, aoDraws = 0;
+  const renderer = {
+    getRenderTarget: () => target,
+    setRenderTarget: value => { target = value; },
+    render() {
+      beautyDraws++;
+      assert.equal(group.visible, true);
+      assert.equal(deck.visible, true);
+      assert.equal(mesh.frustumCulled, false);
+    },
+  };
+  // Isolate warmup orchestration from WebGL; render() itself is covered above.
+  ao.render = () => { aoDraws++; ao.pass = {}; };
+  for (let i = 0; i < 3; i++) ao.warm(renderer, 'performance');
+  assert.equal(beautyDraws, 0);
+  assert.equal(aoDraws, 0);
+  assert.equal(ao.pass, null);
+  ao.warm(renderer, 'balanced');
+  assert.equal(beautyDraws, 1);
+  assert.equal(aoDraws, 2);
+  assert.equal(group.visible, false);
+  assert.equal(deck.visible, true);
+  assert.equal(mesh.frustumCulled, true);
+  assert.equal(camera.layers.mask, 8);
+  assert.equal(target, previous);
+  group.visible = true; // Photo look-away / switching to the 3D cockpit.
+  assert.equal(deck.visible, true, 'The loaded deck remains available after warmup');
+  ao.warm(renderer, 'high');
+  assert.equal(beautyDraws, 1, 'An initialized pass is not warmed repeatedly');
+
+  ao.pass = null;
+  deck.visible = false;
+  renderer.render = () => { throw new Error('warm draw failed'); };
+  assert.throws(() => ao.warm(renderer, 'balanced'), /warm draw failed/);
+  assert.equal(group.visible, true);
+  assert.equal(deck.visible, false);
+  assert.equal(mesh.frustumCulled, true);
+  assert.equal(camera.layers.mask, 8);
+  assert.equal(target, previous);
+});

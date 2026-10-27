@@ -71,7 +71,7 @@ export class CockpitOcclusion {
     );
   }
 
-  render(renderer, quality) {
+  render(renderer, quality, reduced = false) {
     if (!this.enabled || quality === 'performance' || !this.cockpit.gltfCockpitLoaded) return;
     if (!this.pass) this.init();
     const camera = this.aoCamera;
@@ -82,8 +82,12 @@ export class CockpitOcclusion {
     camera.updateMatrixWorld();
     renderer.getDrawingBufferSize(this.size);
     const scale = Math.min(quality === 'high' ? 0.75 : 0.5, 960 / this.size.x);
-    const w = Math.max(1, Math.round(this.size.x * scale));
-    const h = Math.max(1, Math.round(this.size.y * scale));
+    // While the photo cockpit is only a transitional head-turn view, the cabin
+    // fills the viewport so the depth early-out never fires; quarter the AO
+    // budget there instead of paying the steady forward-view cost.
+    const aoScale = reduced ? Math.min(scale, 480 / this.size.x) : scale;
+    const w = Math.max(1, Math.round(this.size.x * aoScale));
+    const h = Math.max(1, Math.round(this.size.y * aoScale));
     if (this.pass.width !== w || this.pass.height !== h) this.pass.setSize(w, h);
     // Keep linearization and metre-based rejection consistent with the camera,
     // including near-plane and FOV changes that happen without resizing targets.
@@ -118,6 +122,60 @@ export class CockpitOcclusion {
       renderer.autoClear = autoClear;
       renderer.shadowMap.autoUpdate = shadowAuto;
       renderer.shadowMap.needsUpdate = shadowDirty;
+    }
+  }
+
+  canWarm(quality) {
+    return !this.pass && this.enabled && quality !== 'performance' && this.cockpit.gltfCockpitLoaded;
+  }
+
+  // Photo mode looking forward never runs render(), so a lazy init() would land
+  // its construction, shader compilation and target sizing on the first
+  // look-away frame (~100ms hitch). Pay that cost here instead: one screen
+  // beauty pass with the interior forced visible and unculled, then both AO
+  // scale tiers. The normal renderScene later in the frame redraws the screen.
+  warm(renderer, quality) {
+    if (!this.canWarm(quality)) return;
+    const deck = this.cockpit.gltfCockpitGroup;
+    // Photo mode hides the whole cockpit.group ancestor; un-hide it too or the
+    // warm draw stays invisible and compiles nothing.
+    const deckWasVisible = deck.visible;
+    const groupWasVisible = this.cockpit.group.visible;
+    deck.visible = true;
+    this.cockpit.group.visible = true;
+    const previous = renderer.getRenderTarget();
+    const scratch = new THREE.WebGLRenderTarget(8, 8);
+    try {
+      const camera = this.camera;
+      const layers = camera.layers.mask;
+      const frustumState = [];
+      try {
+        camera.layers.set(0);
+        deck.traverse(node => {
+          if (!node.isMesh) return;
+          frustumState.push([node, node.frustumCulled]);
+          node.frustumCulled = false; // ensure aft-facing deck batches really draw
+        });
+        // Screen output so the sRGB program variants match the real frames.
+        // The beauty draw compiles the deck with the cockpit sun shadow state;
+        // this frame's visible draw is overwritten by the normal renderScene
+        // immediately after.
+        renderer.setRenderTarget(null);
+        renderer.render(this.scene, this.camera);
+        this.render(renderer, quality || 'balanced');
+        // Pre-size both AO tiers so neither the first look-forward nor the
+        // first reduced look-away frame reallocates render targets.
+        renderer.setRenderTarget(scratch);
+        this.render(renderer, quality || 'balanced', true);
+      } finally {
+        for (const [node, was] of frustumState) node.frustumCulled = was;
+        camera.layers.mask = layers;
+      }
+    } finally {
+      deck.visible = deckWasVisible;
+      this.cockpit.group.visible = groupWasVisible;
+      renderer.setRenderTarget(previous);
+      scratch.dispose();
     }
   }
 
