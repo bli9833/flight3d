@@ -1,4 +1,14 @@
 export default {
+  "startup.scene": "Preparing simulator…",
+  "startup.aircraft": "Building aircraft…",
+  "startup.world": "Building scenery…",
+  "startup.controls": "Preparing controls…",
+  "startup.preload": "Preparing additional aircraft…",
+  "startup.cockpit": "Preparing cockpit…",
+  "startup.ready": "Ready",
+  "startup.failed": "Startup could not finish. Please try again.",
+  "startup.retry": "Try again",
+
   "render.open": "Render comparison panel",
   "render.cockpitUnsupported": "This aircraft has a unified interior/exterior model. Cockpit-only material and face comparisons are unavailable.",
   "render.cockpitLoading": "Cockpit material and face comparisons become available after the model and lighting bake finish loading.",
