@@ -43,8 +43,8 @@ export function shadeCockpitMaterial(material, transfer = null) {
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <lights_fragment_end>',
       `irradiance = ${transfer
-    ? 'PI * (gl_FrontFacing ? deckFrontIrradiance.rgb : deckBackIrradiance.rgb)'
-    : 'vec3(0.0)'};
+    ? 'PI * (gl_FrontFacing ? deckFrontIrradiance.rgb : deckBackIrradiance.rgb) +'
+    : ''} getAmbientLightIrradiance(ambientLightColor);
       iblIrradiance = vec3(0.0);
       #include <lights_fragment_end>
       reflectedLight.indirectSpecular *= ${transfer
