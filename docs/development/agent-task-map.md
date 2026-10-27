@@ -23,7 +23,7 @@ context, while the current implementation defines actual behavior.
 | Sound | src/audio/FlightAudio.js; src/audio/pistonSoundState.js | tests/flightAudio.test.js; scripts/verify-aircraft-audio.mjs; browser interaction and listening |
 | Crash and tire effects | src/effects/; [impact effects](impact-effects.md) | npm run test:crash; screenshots |
 | Events and diagnostics | src/core/EventBus.js; src/ui/DiagnosticsInspector.js | relevant Node tests and browser inspection |
-| Developer mode, scenarios, build identity | src/dev/; src/ui/DeveloperPanel.js; [developer mode](developer-mode.md) | tests/developerMode.test.js; node scripts/verify-developer-mode.mjs |
+| Developer mode, scenarios, build identity, render comparisons | src/dev/; src/ui/DeveloperPanel.js; RenderDiagnosticsPanel.js; [developer mode](developer-mode.md); [render comparisons](render-diagnostics.md) | tests/developerMode.test.js; renderDiagnostics.test.js; scripts/verify-developer-mode.mjs and verify-render-diagnostics.mjs |
 | CI and agent guidance | package.json; .github/workflows/ci.yml; scripts/check-*.mjs; AGENTS.md | npm run check; npm test; npm run build |
 | PR self-feedback | .agents/skills/flight3d-pr-feedback/SKILL.md; .github/workflows/pr-feedback.yml; scripts/pr-feedback.mjs; [setup and usage](pr-feedback.md) | tests/prFeedback.test.js; npm run check; npm test; npm run build; configured PR smoke test |
 
