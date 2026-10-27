@@ -14,6 +14,11 @@
       <h1 id="startup-title">Flight3d</h1>
       <p id="startup-status" role="status" data-i18n="startup.scene">시뮬레이터 준비 중…</p>
       <progress id="startup-progress" max="6" value="0" aria-labelledby="startup-status"></progress>
+      <p class="build-info" data-build-info>
+        <span data-i18n="build.branch">Branch</span> <span data-build-branch>unknown</span>
+        <span aria-hidden="true"> · </span>
+        <span data-i18n="build.commit">Commit</span> <a data-build-commit target="_blank" rel="noopener noreferrer">unknown</a>
+      </p>
       <button id="startup-retry" data-i18n="startup.retry" hidden>다시 시도</button>
     </div>
   </section>
@@ -173,6 +178,11 @@
           </div>
         </div>
       </header>
+      <p class="build-info" data-build-info>
+        <span data-i18n="build.branch">Branch</span> <span data-build-branch>unknown</span>
+        <span aria-hidden="true"> · </span>
+        <span data-i18n="build.commit">Commit</span> <a data-build-commit target="_blank" rel="noopener noreferrer">unknown</a>
+      </p>
       <p id="lobby-loading" class="lobby-loading" data-i18n="loading.lukla.terrain" hidden></p>
       <p id="lobby-selection" class="lobby-loading" data-i18n="lobby.applying" aria-live="polite" hidden></p>
       <div class="lobby-tabs" role="tablist" aria-labelledby="lobby-tabs-title">

@@ -1,4 +1,6 @@
 export default {
+  "build.branch": "브랜치",
+  "build.commit": "커밋",
   "startup.scene": "시뮬레이터 준비 중…",
   "startup.aircraft": "항공기 구성 중…",
   "startup.world": "풍경 구성 중…",

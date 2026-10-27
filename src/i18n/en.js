@@ -1,4 +1,6 @@
 export default {
+  "build.branch": "Branch",
+  "build.commit": "Commit",
   "startup.scene": "Preparing simulator…",
   "startup.aircraft": "Building aircraft…",
   "startup.world": "Building scenery…",

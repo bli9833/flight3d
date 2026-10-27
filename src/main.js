@@ -58,6 +58,7 @@ import {
 } from './config/scenarioRegistry.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
+import { initBuildInfo } from './ui/BuildInfo.js';
 import { installInputLatencyMonitor } from './ui/InputLatencyMonitor.js';
 
 // Expose THREE globally for test harness and browser console debugging
@@ -66,6 +67,7 @@ if (typeof window !== 'undefined') {
 }
 
 initLocalization();
+initBuildInfo();
 
 // Window-level flight shortcuts must not run behind the loading screen.
 window.addEventListener('keydown', event => {

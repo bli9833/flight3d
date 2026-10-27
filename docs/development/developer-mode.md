@@ -1,7 +1,13 @@
 # Developer mode (#172)
 
 Main menu → Settings → **Developer mode (this session)** → Developer.
-The panel shows package version, 12-character Git revision and UTC build time,
+The loading card and main menu show the build branch and a linked 12-character
+commit. GitHub builds use `GITHUB_HEAD_REF` / `GITHUB_REF_NAME` for the branch;
+local builds use the checked-out branch. Detached checkouts without CI metadata
+and source archives show `unknown` for the branch. Commit links use the full SHA
+embedded at build time, so cached pages identify their own build.
+
+The Developer panel shows package version, 12-character Git revision and UTC build time,
 supported aircraft/airports, initial conditions and expected outcomes. Git-less
 source archives display `unknown` for the revision. The switch defaults off on
 reload; it is a feature gate, not authentication. Direct `setPreset('shadow')`
