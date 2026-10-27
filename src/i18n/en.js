@@ -1,5 +1,7 @@
 export default {
   "render.open": "Render comparison panel",
+  "render.cockpitUnsupported": "This aircraft has a unified interior/exterior model. Cockpit-only material and face comparisons are unavailable.",
+  "render.cockpitLoading": "Cockpit material and face comparisons become available after the model and lighting bake finish loading.",
   "render.title": "Render comparison",
   "render.options": "Comparison options",
   "render.close": "Close & restore",
