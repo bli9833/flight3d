@@ -26,16 +26,22 @@ export class AircraftBreakup {
     for (const source of sources.filter(Boolean)) source.traverseVisible(mesh => {
       if (!mesh.isMesh || !mesh.geometry.attributes.position) return;
       const geometry = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
-      geometry.applyMatrix4(inverse.clone().multiply(mesh.matrixWorld));
+      const transform = inverse.clone().multiply(mesh.matrixWorld);
+      const mirrored = transform.determinant() < 0;
+      geometry.applyMatrix4(transform);
+      const tangent = geometry.getAttribute('tangent');
+      if (mirrored && tangent) {
+        for (let i = 0; i < tangent.count; i++) tangent.setW(i, -tangent.getW(i));
+      }
       geometry.computeBoundingBox();
       bounds.union(geometry.boundingBox);
-      meshes.push({ geometry, material: mesh.material });
+      meshes.push({ geometry, material: mesh.material, mirrored });
     });
     if (bounds.isEmpty()) return;
     const size = bounds.getSize(new THREE.Vector3());
     const center = bounds.getCenter(new THREE.Vector3());
     const regions = new Map();
-    for (const { geometry, material } of meshes) {
+    for (const { geometry, material, mirrored } of meshes) {
       const p = geometry.attributes.position;
       const buckets = new Map();
       for (let i = 0; i < p.count; i += 3) {
@@ -48,7 +54,9 @@ export class AircraftBreakup {
         const matIndex = group?.materialIndex ?? 0;
         const key = `${region}:${matIndex}`;
         if (!buckets.has(key)) buckets.set(key, { region, matIndex, indices: [] });
-        buckets.get(key).indices.push(i, i + 1, i + 2);
+        // Baking removes the negative object scale that WebGL used to reverse
+        // front-face culling, so carry that reversal into every vertex attribute.
+        buckets.get(key).indices.push(...(mirrored ? [i + 2, i + 1, i] : [i, i + 1, i + 2]));
       }
       for (const { region, matIndex, indices } of buckets.values()) {
         const fragment = new THREE.BufferGeometry();

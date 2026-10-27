@@ -1035,8 +1035,9 @@ export class CameraSystem {
   }
 
   beginCrashView(wreckage) {
+    const returnMode = this.temporaryViewTimer > 0 && this.savedMode != null ? this.savedMode : this.mode;
     this.preCrashState = {
-      mode: this.autoSwitch ? CameraSystem.MODES.AUTO : this.mode,
+      mode: this.autoSwitch ? CameraSystem.MODES.AUTO : returnMode,
       userModeSelected: this.userModeSelected,
       userLookOverridden: this.userLookOverridden,
       customViewUpdater: this.customViewUpdater,

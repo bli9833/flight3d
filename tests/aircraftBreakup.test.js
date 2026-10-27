@@ -124,6 +124,65 @@ test('loaded exterior includes independent landing gear without duplicating nest
   }
 });
 
+test('crashing during a temporary gear view restores its underlying view without a stale timer', async () => {
+  const { CameraSystem } = await import('../src/cameras/CameraSystem.js');
+  const wreckage = { target: new THREE.Vector3(), radius: 15 };
+  for (const mode of [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.CHASE, CameraSystem.MODES.AUTO]) {
+    const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+    system.setMode(mode);
+    for (let cycle = 0; cycle < 2; cycle++) {
+      system.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
+      assert.equal(system.mode, CameraSystem.MODES.GEAR);
+      system.beginCrashView(wreckage);
+      system.endCrashView();
+      assert.equal(system.mode, mode === CameraSystem.MODES.AUTO ? CameraSystem.MODES.CHASE : mode);
+      assert.equal(system.autoSwitch, mode === CameraSystem.MODES.AUTO);
+      assert.equal(system.savedMode, null);
+      assert.equal(system.temporaryViewTimer, 0);
+      assert.equal(system.userModeSelected, false);
+    }
+  }
+});
+
+test('mirrored fallback triangles retain front faces, tangent handedness and matching UVs', () => {
+  for (const indexed of [false, true]) {
+    const { scene, aircraft } = fixture();
+    aircraft.useGltf = false;
+    aircraft.proceduralGroup = aircraft.gltfGroup;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 2, 0, 0, 0, 2, 0], 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1], 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2));
+    geometry.setAttribute('tangent', new THREE.Float32BufferAttribute([1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1], 4));
+    if (indexed) geometry.setIndex([0, 1, 2]);
+    const material = new THREE.MeshStandardMaterial({ side: THREE.FrontSide });
+    const wing = new THREE.Group();
+    wing.scale.x = -1;
+    wing.add(new THREE.Mesh(geometry, material));
+    aircraft.proceduralGroup.add(wing);
+    const breakup = new AircraftBreakup(scene);
+    breakup.spawn(aircraft, new THREE.Vector3());
+    let triangles = 0;
+    for (const { object } of breakup.pieces) object.traverse(mesh => {
+      if (!mesh.isMesh || mesh.material !== material) return;
+      const p = mesh.geometry.attributes.position;
+      const normal = mesh.geometry.attributes.normal;
+      const tangent = mesh.geometry.attributes.tangent;
+      const uv = mesh.geometry.attributes.uv;
+      const [a, b, c] = [0, 1, 2].map(i => new THREE.Vector3().fromBufferAttribute(p, i));
+      assert.ok(b.sub(a).cross(c.sub(a)).dot(new THREE.Vector3().fromBufferAttribute(normal, 0)) > 0);
+      for (let i = 0; i < 3; i++) {
+        assert.equal(tangent.getW(i), -1);
+        assert.equal(tangent.getX(i), -1);
+      }
+      assert.deepEqual(Array.from(uv.array), [0, 1, 1, 0, 0, 0]);
+      triangles++;
+    });
+    assert.equal(triangles, 1);
+    assert.equal(geometry.attributes.tangent.getW(0), 1, 'source attributes stay untouched');
+  }
+});
+
 test('long elapsed updates preserve all time and match grouped updates', () => {
   const make = () => {
     const { scene, aircraft } = fixture();

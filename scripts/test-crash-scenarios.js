@@ -446,6 +446,43 @@ async function main() {
     }
     console.log('Both loaded aircraft breakup/cockpit exit/reset:', JSON.stringify(aircraftBreakups));
 
+    const fallback = await evalJs(`(() => {
+      const sim = window.simulator;
+      sim.setPreset('runway');
+      const aircraft = sim.aircraft;
+      const roots = [aircraft.gltfGroup, aircraft.fuselageGroup, aircraft.wingGroup,
+        aircraft.tailGroup, aircraft.empennageGroup, aircraft.enginesGroup];
+      sim.fallbackReviewVisibility = roots.map(object => [object, object.visible]);
+      aircraft.useGltf = false;
+      aircraft.setCockpitMode(false);
+      aircraft.group.updateWorldMatrix(true, true);
+      let mirroredMeshes = 0;
+      aircraft.wingGroup.traverse(mesh => {
+        if (mesh.isMesh && mesh.matrixWorld.determinant() < 0) mirroredMeshes++;
+      });
+      sim.cameraSystem.userModeSelected = false;
+      sim.cameraSystem.setMode(0);
+      sim.cameraSystem.showTemporaryView(5, 4.5);
+      sim.aircraftBreakup.spawn(aircraft, new window.THREE.Vector3(35, -8, 0));
+      sim.aircraftBreakup.update(0.6, sim.currentTerrain);
+      sim.cameraSystem.beginCrashView(sim.aircraftBreakup);
+      sim.renderScene();
+      return { mirroredMeshes, pieces: sim.aircraftBreakup.pieces.length };
+    })()`);
+    if (fallback.mirroredMeshes < 2 || fallback.pieces < 4) throw new Error('Missing mirrored fallback coverage');
+    await takeScreenshot('aircraft_breakup_fallback.png');
+    const fallbackCameraRestored = await evalJs(`(() => {
+      const sim = window.simulator;
+      sim.aircraftBreakup.clear();
+      sim.cameraSystem.endCrashView();
+      sim.aircraft.useGltf = true;
+      for (const [object, visible] of sim.fallbackReviewVisibility) object.visible = visible;
+      delete sim.fallbackReviewVisibility;
+      return sim.cameraSystem.mode === 0 && sim.cameraSystem.savedMode === null && sim.cameraSystem.temporaryViewTimer === 0;
+    })()`);
+    if (!fallbackCameraRestored) throw new Error('Temporary gear/crash/reset stranded the fallback camera');
+    console.log('Mirrored fallback breakup and temporary-view reset:', JSON.stringify(fallback));
+
     const stepping = await evalJs(`(() => {
       const sim = window.simulator;
       sim.resetCrash();
