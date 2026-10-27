@@ -22,6 +22,14 @@ export default {
   "incheon.load.failed": "Incheon assets failed to load. Select the airport to retry.",
   "incheon.limitations": "12 × 12 km experimental area · 2 × 2 km city detail · modeled 7 m pavement · manual flight",
 
+  "neon.metropolis": "🌆 Neon Metropolis",
+  "neon.runway": "🛫 Neon Runway Takeoff",
+  "neon.canyon": "🏙️ Urban Canyon Flight",
+  "neon.cruise": "🌆 Skyline Cruise (2,500 FT)",
+  "preset.neon.runway": "Preset: Neon Metropolis runway takeoff (Rwy 09)",
+  "preset.neon.canyon": "Preset: Urban canyon building slalom (120 m)",
+  "preset.neon.cruise": "Preset: Neon Metropolis skyline cruise (2,500 FT)",
+
   "demo.route": "Demo route",
   "demo.watch": "Watch demo flight",
   "demo.b738.classic": "Boeing 737 · Airport cinematic flight",

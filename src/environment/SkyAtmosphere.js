@@ -192,7 +192,22 @@ export class SkyAtmosphere {
     // 1. Time-of-Day Atmospheric Scattering, Light Colors & Base Fog Properties
     let exposure = 1.05;
 
-    if (elevation > 5.0) {
+    if (this.activeAirport === 'neon') {
+      // Synthwave / Outrun Dusk: Deep purple/magenta glowing twilight sky, fiery golden sun & neon ambient
+      this.sunLight.color.setRGB(1.0, 0.52, 0.18);
+      this.sunLight.intensity = 2.4;
+      this.ambientLight.color.setRGB(0.55, 0.18, 0.68); // Rich purple-magenta skylight
+      this.ambientLight.intensity = 1.15;
+
+      this.fogColor.setRGB(0.38, 0.08, 0.42); // Dreamy neon magenta-purple haze
+      this.baseDensity = 0.00015;
+      exposure = 1.08;
+
+      uniforms['turbidity'].value = 9.0;
+      uniforms['rayleigh'].value = 4.0;
+      uniforms['mieCoefficient'].value = 0.012;
+      uniforms['mieDirectionalG'].value = 0.88;
+    } else if (elevation > 5.0) {
       // Daylight / Noon (elevation 5° to 65°)
       const t = Math.min(1.0, (elevation - 5.0) / 25.0);
       this.sunLight.color.setRGB(1.0, 0.95 + t * 0.05, 0.88 + t * 0.12);
@@ -330,11 +345,18 @@ export class SkyAtmosphere {
    * Coastal airport sits at sea level (12m), while Lukla sits at 2,845m in the Himalayas.
    */
   setAirport(airportId) {
+    this.activeAirport = airportId;
     if (airportId === 'lukla') {
       // Elevate fair-weather cloud deck high above Himalayan peaks (base ~6,200m / 20,300 FT)
       this.cloudsGroup.position.y = 3400;
+      this.cloudsGroup.visible = true;
+    } else if (airportId === 'neon') {
+      this.cloudsGroup.position.y = 0;
+      this.cloudsGroup.visible = false;
     } else {
       this.cloudsGroup.position.y = 0;
+      this.cloudsGroup.visible = true;
     }
+    this.updateSun();
   }
 }

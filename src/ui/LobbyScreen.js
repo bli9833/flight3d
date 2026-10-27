@@ -3,7 +3,7 @@ import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../config/scenarioRegistry.js';
 
-const AIRPORT_BUTTONS = { incheon: 'lobby-airport-incheon', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla' };
+const AIRPORT_BUTTONS = { incheon: 'lobby-airport-incheon', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla', neon: 'lobby-airport-neon' };
 const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172' };
 /** Aircraft the lobby offers, so warmup can prepare exactly this set. */
 export const LOBBY_AIRCRAFT_IDS = Object.keys(AIRCRAFT_BUTTONS);
@@ -57,6 +57,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     ['lobby-airport-coastal', () => onAirport('coastal')],
     ['lobby-airport-incheon', () => onAirport('incheon')],
     ['lobby-airport-lukla', () => onAirport('lukla')],
+    ['lobby-airport-neon', () => onAirport('neon')],
     ['lobby-aircraft-b738', () => onAircraft?.('B738')],
     ['lobby-aircraft-c172', () => onAircraft?.('C172')],
   ]) {

@@ -22,6 +22,14 @@ export default {
   "incheon.load.failed": "인천 데이터를 불러오지 못했습니다. 다시 선택해 주세요.",
   "incheon.limitations": "12 × 12 km 실험 구역 · 2 × 2 km 도시 상세 · 공항 표면 7m 근사 · 자동 데모 미제공",
 
+  "neon.metropolis": "🌆 네온 메트로폴리스",
+  "neon.runway": "🛫 네온 하이웨이 이륙",
+  "neon.canyon": "🏙️ 빌딩 슬라롬 (Urban Canyon)",
+  "neon.cruise": "🌆 나이트라인 순항 (2,500 FT)",
+  "preset.neon.runway": "프리셋: 네온 메트로폴리스 하이웨이 이륙 (Rwy 09)",
+  "preset.neon.canyon": "프리셋: 어반 캐니언 마천루 사이 저공비행 (120 m)",
+  "preset.neon.cruise": "프리셋: 네온 메트로폴리스 나이트라인 순항 (2,500 FT)",
+
   "demo.route": "데모 코스",
   "demo.watch": "데모 감상 시작",
   "demo.b738.classic": "보잉 737 · 공항 시네마틱 비행",
