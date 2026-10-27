@@ -67,6 +67,7 @@ export class Boeing737 {
     this.gearScissors = [];
 
     // Lighting
+    this.navLights = [];
     this.strobeLights = [];
     this.beaconLights = [];
     this.landingLights = [];
@@ -706,6 +707,7 @@ export class Boeing737 {
     const navTail = new THREE.PointLight(0xffffff, 1.5, 8);
     navTail.position.set(0, 1.2, 19.4);
 
+    this.navLights.push(navL, navR, navTail);
     this.lightsGroup.add(navL, navR, navTail);
 
     // Wingtip Flashing Strobes (High intensity white)
@@ -742,7 +744,18 @@ export class Boeing737 {
     this.landingLights.push(landL, landR);
     this.lightsGroup.add(landL, landR);
 
+    this.scopeAirframeLamps();
     this.group.add(this.lightsGroup);
+  }
+
+  /**
+   * Three compiles every visible punctual light into the light loop of every
+   * material. Wingtip navigation and strobe lamps only ever shine on the
+   * airframe skin, which the pilot seat does not render and which sits outside
+   * the cockpit view, so they cost the whole loop and shade nothing.
+   */
+  scopeAirframeLamps() {
+    for (const light of [...this.navLights, ...this.strobeLights]) light.visible = !this.isCockpit;
   }
 
   /**
@@ -1070,6 +1083,7 @@ export class Boeing737 {
     if (this.cockpit && this.cockpit.group) {
       this.cockpit.group.visible = isCockpit && showInterior;
     }
+    this.scopeAirframeLamps();
   }
 
   triggerCrashVisuals(collisionType) {

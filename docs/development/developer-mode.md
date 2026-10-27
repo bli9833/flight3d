@@ -8,6 +8,12 @@ reload; it is a feature gate, not authentication. Direct `setPreset('shadow')`
 and `shadowDemo.start()` calls honor the same gate. The normal scenario list
 no longer offers shadow inspection; normal Fly is hidden on the developer tab.
 
+The Developer tab also opens the session-only [render comparison panel](render-diagnostics.md).
+It isolates resolution, AO, shadows, lighting, cockpit materials/sidedness, depth,
+scene groups and current frustum culling, with CPU/GPU/counter measurements.
+Closing the panel restores the rendering baseline; it does not run a physical
+scenario or change normal quality preferences.
+
 Only one run owns controls. Pause uses GameFlowController. Restart reconstructs
 initial conditions. Exit repairs the aircraft on the runway, releases inputs,
 resets RenderPose and restores the camera/lighting. Airport/aircraft/preset changes,

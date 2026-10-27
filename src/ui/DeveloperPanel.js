@@ -15,6 +15,11 @@ export class DeveloperPanel {
       this.select.append(option);
     }
     document.getElementById('dev-build').textContent = `v${build.version} · ${build.revision} · ${build.builtAt}`;
+    document.getElementById('dev-render-trials').addEventListener('click', () => {
+      if (!sim.developerMode.enabled) return;
+      sim.devRunner.stop(); sim.demoDirector.stop(); sim.gameFlow.enterFlight();
+      sim.renderDiagnosticsPanel.open();
+    });
     document.getElementById('dev-enabled').addEventListener('change', event => {
       if (event.target.checked) sim.developerMode.enable();
       else {

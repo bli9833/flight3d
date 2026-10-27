@@ -2358,3 +2358,25 @@ body[data-flow="lobby"] .menu-toggle {
 body[data-flow="lobby"] #incheon-attribution { z-index: 81; bottom: 4px; }
 
 .lobby-card .btn-airport span { white-space: normal; overflow-wrap: anywhere; }
+
+#render-trials {
+  display: flex; flex-direction: column;
+  position: fixed; top: 145px; right: 12px; z-index: 75;
+  width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 160px);
+  overflow: hidden; box-sizing: border-box; padding: 12px;
+  color: #e2e8f0; background: rgba(10, 20, 34, .97);
+  border: 1px solid #475569; border-radius: 10px; font-size: 12px;
+}
+#render-trials[hidden] { display: none; }
+#render-trials header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#render-trials > :not(details) { flex-shrink: 0; }
+#render-trials details { min-height: 0; overflow: auto; }
+#render-trials summary { cursor: pointer; padding: 10px 0; color: #7dd3fc; }
+#render-trials label { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 1.8fr); align-items: center; gap: 8px; margin: 6px 0; }
+#render-trials .btn { font-size: 11px; min-width: 0; min-height: 36px; white-space: normal; }
+#render-trials select { width: 100%; }
+#render-trials p { line-height: 1.5; color: #94a3b8; margin: 8px 0; }
+#render-trials [data-warning] { color: #fbbf24; }
+#render-trials output { display: block; white-space: pre-wrap; line-height: 1.7; font-variant-numeric: tabular-nums; }
+.render-trial-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+#render-trials .render-trial-actions .btn { flex: 1; min-width: 88px; padding: 6px; }

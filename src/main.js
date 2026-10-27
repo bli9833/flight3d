@@ -50,6 +50,8 @@ import { initLobbyScreen, LOBBY_AIRCRAFT_IDS } from './ui/LobbyScreen.js';
 import { DeveloperModeController } from './dev/DeveloperModeController.js';
 import { DevScenarioRunner } from './dev/DevScenarioRunner.js';
 import { DeveloperPanel } from './ui/DeveloperPanel.js';
+import { RenderDiagnostics } from './dev/RenderDiagnostics.js';
+import { RenderDiagnosticsPanel } from './ui/RenderDiagnosticsPanel.js';
 import {
   DEFAULT_SCENARIO,
   isScenarioAvailable,
@@ -206,7 +208,10 @@ class FlightSimulator {
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
     this.shadowDemo = new CockpitShadowDemo(this, () => this.updateShadowDemoUi());
-    this.developerMode = new DeveloperModeController(() => this.devRunner?.stop());
+    this.developerMode = new DeveloperModeController(() => {
+      this.devRunner?.stop(); this.renderDiagnosticsPanel?.close();
+    });
+    this.renderDiagnostics = new RenderDiagnostics(this);
     this.devRunner = new DevScenarioRunner(this, this.developerMode);
 
     // Game flow: lobby (cinematic menu) / flight / paused
@@ -542,6 +547,7 @@ class FlightSimulator {
     const cockpit = aircraft.cockpit;
     if (!cockpit || !cockpit.gltfCockpitGroup) return;
     cockpit.onModelReady = () => {
+      this.renderDiagnostics?.refreshScene();
       const visible = cockpit.group.visible;
       // Include cabin lights even if the user is currently in an exterior view.
       // compileAsync gathers lights synchronously, then polls program readiness.
@@ -666,6 +672,7 @@ class FlightSimulator {
   setAircraft(aircraftId = 'B738') {
     const config = AIRCRAFT_REGISTRY[aircraftId];
     if (!config) return;
+    this.renderDiagnosticsPanel?.close();
     this.devRunner?.stop();
 
     if (this.demoDirector && this.demoDirector.isActive && aircraftId !== this.currentAircraftId) {
@@ -1078,6 +1085,7 @@ class FlightSimulator {
    * Switch the active airport; Incheon assets are loaded before committing the selection.
    */
   async setAirport(id) {
+    this.renderDiagnosticsPanel?.close();
     if (!['coastal', 'lukla', 'incheon', 'neon'].includes(id)) return;
     const request = this.airportRequest = (this.airportRequest || 0) + 1;
     this.airportLoading = false;
@@ -1204,6 +1212,7 @@ class FlightSimulator {
       ? 'tenzing.hillary.airport.nepal.vnlk.runway.24'
       : 'pacific.coastal.international.airport.runway.09l.elevation';
     this.showToast(() => t('airport.changed.value', { value: t(airportKey) }));
+    this.renderDiagnostics?.refreshScene();
   }
 
   /**
@@ -1998,12 +2007,17 @@ class FlightSimulator {
   }
 
   renderScene() {
+    if (this.renderDiagnostics?.active) { this.renderDiagnostics.render(); return; }
+    this.renderStandardScene();
+  }
+
+  renderStandardScene(aoQuality = this.renderQuality) {
     prepareCockpitShadowDepth(this.aircraft.group);
     this.sky.prepareRender(this.camera, this.aircraft.group.position);
     this.renderer.render(this.scene, this.camera);
     if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT &&
         (!this.cameraSystem.photoCockpit || this.cameraSystem.isLookingAwayFromCenter())) {
-      this.cockpitOcclusion.render(this.renderer, this.renderQuality);
+      this.cockpitOcclusion.render(this.renderer, aoQuality);
     }
   }
 
@@ -2026,6 +2040,7 @@ class FlightSimulator {
   }
 
   setRenderQuality(value) {
+    this.renderDiagnosticsPanel?.close();
     this.renderQuality = resolveRenderQuality(value);
     const preset = RENDER_QUALITY[this.renderQuality];
     this.sky.setShadowMapSize(preset.shadowMapSize);
@@ -2150,6 +2165,7 @@ class FlightSimulator {
       },
       onFly: () => this.fly(),
     });
+    this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
     this.developerPanel = new DeveloperPanel(this);
     document.getElementById('btn-pause-resume')?.addEventListener('click', () => this.gameFlow.resume());
     document.getElementById('btn-pause-restart')?.addEventListener('click', () => {
