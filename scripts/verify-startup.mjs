@@ -36,6 +36,20 @@ assert.notEqual(await ev('sim.cameraSystem.chaseYaw'),before,'camera drag respon
 report.camera=await ev('({mode:sim.cameraSystem.mode,yaw:sim.cameraSystem.chaseYaw,dragging:sim.cameraSystem.isDragging})');
 fs.writeFileSync(`${artifacts}/report.json`,JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(`${artifacts}/ready.png`,Buffer.from(shot.data,'base64'));
+// Both loading and menu surfaces identify the exact build, without developer mode.
+const builds=await ev(`Array.from(document.querySelectorAll('[data-build-info]'), element => ({branch:element.querySelector('[data-build-branch]').textContent, revision:element.querySelector('[data-build-commit]').textContent, href:element.querySelector('[data-build-commit]').getAttribute('href')}))`);
+assert.equal(builds.length,2);
+assert.deepEqual(builds[0],builds[1]);
+assert.notEqual(builds[0].branch,'unknown');
+assert.match(builds[0].revision,/^[a-f0-9]{12}$/);
+assert.match(builds[0].href,/^https:\/\/github\.com\/stlim0727\/flight3d\/commit\/[a-f0-9]{40}$/);
+assert.equal(builds[0].revision,builds[0].href.split('/').at(-1).slice(0,12));
+if(process.env.EXPECTED_COMMIT) assert.equal(builds[0].href,`https://github.com/stlim0727/flight3d/commit/${process.env.EXPECTED_COMMIT}`);
+if(process.env.EXPECTED_BRANCH) assert.equal(builds[0].branch,process.env.EXPECTED_BRANCH);
+await ev('sim.toggleMainMenu()');
+assert.equal(await ev(`getComputedStyle(document.getElementById('lobby-screen')).display === 'none'`),false);
+const menuShot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(`${artifacts}/menu.png`,Buffer.from(menuShot.data,'base64'));
+console.log('Build identity:',JSON.stringify(builds[0]));
 // Force renderer initialization to fail and verify a usable recovery screen.
 const injected=await send('Page.addScriptToEvaluateOnNewDocument',{source:`const original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return type==='webgl2'?null:original.call(this,type,...args)};`});
 await send('Page.navigate',{url});

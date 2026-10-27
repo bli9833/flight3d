@@ -1,8 +1,7 @@
 import { bindText, t } from '../i18n/index.js';
 import { DEV_SCENARIOS } from '../config/scenarioRegistry.js';
 
-const build = typeof __BUILD_INFO__ === 'undefined'
-  ? { version: 'unknown', revision: 'unknown', builtAt: 'unknown' } : __BUILD_INFO__;
+import { BUILD_INFO as build } from '../dev/buildInfo.js';
 
 export class DeveloperPanel {
   constructor(sim) {
