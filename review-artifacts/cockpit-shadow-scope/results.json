@@ -1,0 +1,496 @@
+{
+  "url": "http://127.0.0.1:5173/",
+  "seconds": 3,
+  "rows": [
+    {
+      "hour": 12,
+      "pose": "forward",
+      "cases": [
+        {
+          "level": "ship",
+          "frames": 19,
+          "passes": 1,
+          "samples": 19,
+          "gpuMedianMs": 164.284214,
+          "gpuP95Ms": 172.611714,
+          "wallMedianMs": 166.6999999999989,
+          "contextLost": false,
+          "deltaGpuPct": -5.9
+        },
+        {
+          "level": "before",
+          "frames": 19,
+          "passes": 19,
+          "samples": 19,
+          "gpuMedianMs": 174.573693,
+          "gpuP95Ms": 177.605256,
+          "wallMedianMs": 183.29999999999927,
+          "contextLost": false,
+          "pair": "before vs ship",
+          "changedFraction": 0.000004861111111111111,
+          "rmse": 0.06600320909706672,
+          "max": 55,
+          "spots": [
+            [
+              1475,
+              106
+            ],
+            [
+              1475,
+              107
+            ],
+            [
+              756,
+              255
+            ],
+            [
+              1498,
+              352
+            ],
+            [
+              1517,
+              355
+            ],
+            [
+              1517,
+              356
+            ]
+          ],
+          "glError": 0,
+          "noiseFraction": 0.00000625,
+          "noiseMax": 96,
+          "noiseSpots": [
+            [
+              1475,
+              106
+            ],
+            [
+              1475,
+              107
+            ],
+            [
+              1517,
+              355
+            ],
+            [
+              1517,
+              356
+            ],
+            [
+              1083,
+              360
+            ]
+          ]
+        },
+        {
+          "level": "ship",
+          "frames": 20,
+          "passes": 0,
+          "samples": 20,
+          "gpuMedianMs": 164.25161,
+          "gpuP95Ms": 164.701245,
+          "wallMedianMs": 166.6999999999971,
+          "contextLost": false,
+          "driftPct": 0
+        }
+      ]
+    },
+    {
+      "hour": 12,
+      "pose": "right",
+      "cases": [
+        {
+          "level": "ship",
+          "frames": 33,
+          "passes": 0,
+          "samples": 33,
+          "gpuMedianMs": 82.873591,
+          "gpuP95Ms": 83.808487,
+          "wallMedianMs": 100,
+          "contextLost": false,
+          "deltaGpuPct": -6.7
+        },
+        {
+          "level": "before",
+          "frames": 32,
+          "passes": 32,
+          "samples": 32,
+          "gpuMedianMs": 88.860258,
+          "gpuP95Ms": 89.278539,
+          "wallMedianMs": 100,
+          "contextLost": false,
+          "pair": "before vs ship",
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0,
+          "noiseFraction": 0,
+          "noiseMax": 0,
+          "noiseSpots": []
+        },
+        {
+          "level": "ship",
+          "frames": 33,
+          "passes": 0,
+          "samples": 33,
+          "gpuMedianMs": 82.890466,
+          "gpuP95Ms": 83.61906,
+          "wallMedianMs": 100,
+          "contextLost": false,
+          "driftPct": 0
+        }
+      ]
+    },
+    {
+      "hour": 12,
+      "pose": "rear",
+      "cases": [
+        {
+          "level": "ship",
+          "frames": 20,
+          "passes": 0,
+          "samples": 20,
+          "gpuMedianMs": 158.3051,
+          "gpuP95Ms": 158.711194,
+          "wallMedianMs": 166.6999999999971,
+          "contextLost": false,
+          "deltaGpuPct": -3.7
+        },
+        {
+          "level": "before",
+          "frames": 20,
+          "passes": 20,
+          "samples": 20,
+          "gpuMedianMs": 164.374891,
+          "gpuP95Ms": 164.73036,
+          "wallMedianMs": 183.29999999999563,
+          "contextLost": false,
+          "pair": "before vs ship",
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0,
+          "noiseFraction": 0,
+          "noiseMax": 0,
+          "noiseSpots": []
+        },
+        {
+          "level": "ship",
+          "frames": 20,
+          "passes": 0,
+          "samples": 20,
+          "gpuMedianMs": 158.339214,
+          "gpuP95Ms": 159.108121,
+          "wallMedianMs": 166.6999999999971,
+          "contextLost": false,
+          "driftPct": 0
+        }
+      ]
+    },
+    {
+      "hour": 12,
+      "pose": "overhead",
+      "cases": [
+        {
+          "level": "ship",
+          "frames": 25,
+          "passes": 0,
+          "samples": 25,
+          "gpuMedianMs": 123.042653,
+          "gpuP95Ms": 123.678799,
+          "wallMedianMs": 133.3000000000029,
+          "contextLost": false,
+          "deltaGpuPct": -4.7
+        },
+        {
+          "level": "before",
+          "frames": 24,
+          "passes": 24,
+          "samples": 24,
+          "gpuMedianMs": 129.142236,
+          "gpuP95Ms": 132.054423,
+          "wallMedianMs": 133.3000000000029,
+          "contextLost": false,
+          "pair": "before vs ship",
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0,
+          "noiseFraction": 0,
+          "noiseMax": 0,
+          "noiseSpots": []
+        },
+        {
+          "level": "ship",
+          "frames": 25,
+          "passes": 0,
+          "samples": 25,
+          "gpuMedianMs": 123.055257,
+          "gpuP95Ms": 123.545049,
+          "wallMedianMs": 133.3000000000029,
+          "contextLost": false,
+          "driftPct": 0
+        }
+      ]
+    },
+    {
+      "hour": 23,
+      "pose": "forward",
+      "cases": [
+        {
+          "level": "ship",
+          "frames": 20,
+          "passes": 0,
+          "samples": 20,
+          "gpuMedianMs": 157.15411,
+          "gpuP95Ms": 157.881089,
+          "wallMedianMs": 166.60000000000582,
+          "contextLost": false,
+          "deltaGpuPct": -6.2
+        },
+        {
+          "level": "before",
+          "frames": 20,
+          "passes": 20,
+          "samples": 20,
+          "gpuMedianMs": 167.56385,
+          "gpuP95Ms": 170.767547,
+          "wallMedianMs": 166.6999999999971,
+          "contextLost": false,
+          "pair": "before vs ship",
+          "changedFraction": 6.944444444444445e-7,
+          "rmse": 0.0007216878364870322,
+          "max": 1,
+          "spots": [
+            [
+              1083,
+              360
+            ]
+          ],
+          "glError": 0,
+          "noiseFraction": 0.000006944444444444445,
+          "noiseMax": 48,
+          "noiseSpots": [
+            [
+              1461,
+              103
+            ],
+            [
+              1498,
+              352
+            ]
+          ]
+        },
+        {
+          "level": "ship",
+          "frames": 21,
+          "passes": 0,
+          "samples": 21,
+          "gpuMedianMs": 157.133954,
+          "gpuP95Ms": 160.042339,
+          "wallMedianMs": 166.6999999999971,
+          "contextLost": false,
+          "driftPct": 0
+        }
+      ]
+    },
+    {
+      "hour": 23,
+      "pose": "right",
+      "cases": [
+        {
+          "level": "ship",
+          "frames": 34,
+          "passes": 0,
+          "samples": 34,
+          "gpuMedianMs": 81.263175,
+          "gpuP95Ms": 81.918175,
+          "wallMedianMs": 99.90000000000873,
+          "contextLost": false,
+          "deltaGpuPct": -6.9
+        },
+        {
+          "level": "before",
+          "frames": 33,
+          "passes": 33,
+          "samples": 33,
+          "gpuMedianMs": 87.266664,
+          "gpuP95Ms": 88.043279,
+          "wallMedianMs": 100,
+          "contextLost": false,
+          "pair": "before vs ship",
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0,
+          "noiseFraction": 0,
+          "noiseMax": 0,
+          "noiseSpots": []
+        },
+        {
+          "level": "ship",
+          "frames": 34,
+          "passes": 0,
+          "samples": 34,
+          "gpuMedianMs": 81.287654,
+          "gpuP95Ms": 81.53505,
+          "wallMedianMs": 99.89999999999418,
+          "contextLost": false,
+          "driftPct": 0
+        }
+      ]
+    },
+    {
+      "hour": 23,
+      "pose": "rear",
+      "cases": [
+        {
+          "level": "ship",
+          "frames": 21,
+          "passes": 0,
+          "samples": 21,
+          "gpuMedianMs": 150.894944,
+          "gpuP95Ms": 151.302756,
+          "wallMedianMs": 166.60000000000582,
+          "contextLost": false,
+          "deltaGpuPct": -3.8
+        },
+        {
+          "level": "before",
+          "frames": 20,
+          "passes": 20,
+          "samples": 20,
+          "gpuMedianMs": 156.8351,
+          "gpuP95Ms": 157.449996,
+          "wallMedianMs": 166.6999999999971,
+          "contextLost": false,
+          "pair": "before vs ship",
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0,
+          "noiseFraction": 0,
+          "noiseMax": 0,
+          "noiseSpots": []
+        },
+        {
+          "level": "ship",
+          "frames": 21,
+          "passes": 0,
+          "samples": 21,
+          "gpuMedianMs": 150.830152,
+          "gpuP95Ms": 151.928746,
+          "wallMedianMs": 166.60000000000582,
+          "contextLost": false,
+          "driftPct": 0
+        }
+      ]
+    },
+    {
+      "hour": 23,
+      "pose": "overhead",
+      "cases": [
+        {
+          "level": "ship",
+          "frames": 25,
+          "passes": 0,
+          "samples": 25,
+          "gpuMedianMs": 116.38359,
+          "gpuP95Ms": 116.919059,
+          "wallMedianMs": 133.3000000000029,
+          "contextLost": false,
+          "deltaGpuPct": -4.9
+        },
+        {
+          "level": "before",
+          "frames": 25,
+          "passes": 25,
+          "samples": 25,
+          "gpuMedianMs": 122.387028,
+          "gpuP95Ms": 122.597653,
+          "wallMedianMs": 133.3000000000029,
+          "contextLost": false,
+          "pair": "before vs ship",
+          "changedFraction": 0,
+          "rmse": 0,
+          "max": 0,
+          "spots": [],
+          "glError": 0,
+          "noiseFraction": 6.944444444444445e-7,
+          "noiseMax": 11,
+          "noiseSpots": [
+            [
+              1317,
+              127
+            ]
+          ]
+        },
+        {
+          "level": "ship",
+          "frames": 26,
+          "passes": 0,
+          "samples": 26,
+          "gpuMedianMs": 116.395309,
+          "gpuP95Ms": 116.724892,
+          "wallMedianMs": 133.3000000000029,
+          "contextLost": false,
+          "driftPct": 0
+        }
+      ]
+    }
+  ],
+  "moving": [
+    {
+      "hour": 12,
+      "pose": "taxiing",
+      "nudge": 0.5,
+      "ship": {
+        "level": "ship",
+        "frames": 23,
+        "passes": 23,
+        "samples": 23,
+        "gpuMedianMs": 101.798487,
+        "gpuP95Ms": 244.912598,
+        "wallMedianMs": 100.10000000000582,
+        "contextLost": false
+      },
+      "before": {
+        "level": "before",
+        "frames": 23,
+        "passes": 23,
+        "samples": 23,
+        "gpuMedianMs": 101.939737,
+        "gpuP95Ms": 244.299889,
+        "wallMedianMs": 100,
+        "contextLost": false
+      },
+      "deltaGpuPct": -0.1,
+      "deltaFramesPct": 0
+    }
+  ],
+  "errors": [],
+  "setup": {
+    "autoUpdate": false,
+    "mapSize": 2048,
+    "quality": "balanced",
+    "refresh": true,
+    "casters": 270,
+    "meshes": 644,
+    "spinningCastors": [],
+    "animatorsParked": [
+      "aircraft",
+      "water",
+      "ships",
+      "airport",
+      "luklaAirport",
+      "currentAirport",
+      "explosions",
+      "smoke"
+    ]
+  }
+}
