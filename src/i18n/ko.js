@@ -1,6 +1,12 @@
 export default {
+  "departure.speaker.pilot": "조종사",
+  "departure.speaker.apron": "계류장 관제",
+  "departure.speaker.crew": "지상요원",
+  "departure.speaker.ground": "지상 관제",
+  "departure.speaker.tower": "관제탑",
+
   "departure.name": "인천 탑승구 → 푸시백 → 이륙",
-  "departure.briefing": "C172 자동 출발: 견인차 푸시백 → 택싱 → 관제탑 교신 → 15R 이륙. 교신은 자막으로 자동 진행됩니다. 게이트와 연결 유도로는 가상 설정입니다.",
+  "departure.briefing": "Boeing 737-800 자동 출발: 견인차 푸시백 → 택싱 → 관제탑 교신 → 15R 이륙. 교신은 음성과 자막으로 자동 진행됩니다. 게이트와 연결 유도로는 가상 설정입니다.",
   "departure.complete": "출발 완료 · 조종을 이어받으세요",
   "departure.failed": "출발 경로 안내가 중단되었습니다. 다시 시작해 주세요.",
   "departure.stage.gate": "[1/8] 탑승구 출발 준비",

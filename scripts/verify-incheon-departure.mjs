@@ -29,6 +29,7 @@ const evaluate = async expression => {
   return result.result.value;
 };
 const capture = async name => {
+  if (process.env.SCREENSHOTS === '0') return;
   await evaluate(`(() => {
     const sim = window.simulator;
     sim.aircraft.group.updateMatrixWorld(true);
@@ -41,10 +42,10 @@ const capture = async name => {
 };
 try {
   await call('Runtime.enable'); await call('Page.enable');
-  for (let i=0;i<120;i++) { if(await evaluate('Boolean(window.simulator?.lobbyScreen)')) break; await new Promise(r=>setTimeout(r,500)); }
-  assert.ok(await evaluate('Boolean(window.simulator?.lobbyScreen)'), 'simulator ready');
+  for (let i=0;i<120;i++) { if(await evaluate('Boolean(window.simulator?.startupReady && window.simulator?.lobbyScreen)')) break; await new Promise(r=>setTimeout(r,500)); }
+  assert.ok(await evaluate('Boolean(window.simulator?.startupReady && window.simulator?.lobbyScreen)'), 'simulator ready');
   await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-  await evaluate(`(async()=>{ const s=window.simulator; s.demoDirector.stop(); s.gameFlow.isPhysicsFrozen=()=>true; s.setAircraft('C172'); await s.setAirport('incheon'); s.gameFlow.enterLobby(); s.lobby.preset='demo'; s.lobby.demoProfile='incheon-departure'; s.lobbyScreen.refresh(); })()`);
+  await evaluate(`(async()=>{ const s=window.simulator; s.demoDirector.stop(); s.gameFlow.isPhysicsFrozen=()=>true; s.setAircraft('B738'); await s.setAirport('incheon'); s.gameFlow.enterLobby(); s.audio.setMuted(true); s.lobby.preset='demo'; s.lobby.demoProfile='incheon-departure'; s.lobbyScreen.refresh(); })()`);
   assert.equal(await evaluate(`document.getElementById('lobby-demo-select').value`), 'incheon-departure');
   await capture('menu-desktop');
   await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
@@ -54,13 +55,15 @@ try {
   await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await evaluate(`document.getElementById('btn-fly').click()`);
   let previous;
-  for (let sec=0;sec<1800;sec+=2) {
-    const sample=await evaluate(`(()=>{const s=window.simulator; s.stepSimulation(2); const d=s.demoDirector; return {sec:${sec},active:d.isActive,stage:d.currentStage,index:d.incheonDepartureScenario.index,result:d.incheonDepartureScenario.result,pos:s.position.toArray(),speed:s.telemetry.groundSpeedKnots,heading:s.telemetry.headingDeg,crashed:s.isCrashed,incident:s.landingIncident,gear:s.gear.contacts.map(c=>c.damageState),onGround:s.gear.onGround,inputs:[s.controls.rudder,s.controls.throttle,s.controls.brakes],yawRate:s.angularVelocity.y};})()`);
+  for (let sec=0;sec<1800;) {
+    const seconds = sec < 60 ? 2 : 20;
+    const sample=await evaluate(`(()=>{const s=window.simulator; s.stepSimulation(${seconds}); const d=s.demoDirector; return {sec:${sec},active:d.isActive,stage:d.currentStage,index:d.incheonDepartureScenario.index,result:d.incheonDepartureScenario.result,pos:s.position.toArray(),speed:s.telemetry.groundSpeedKnots,heading:s.telemetry.headingDeg,crashed:s.isCrashed,incident:s.landingIncident,gear:s.gear.contacts.map(c=>c.damageState),onGround:s.gear.onGround,inputs:[s.controls.rudder,s.controls.throttle,s.controls.brakes],yawRate:s.angularVelocity.y};})()`);
     results.push(sample);
     if (previous !== sample.stage || sec%60===0 || !sample.active) console.log(JSON.stringify({...sample,result:{status:sample.result.status,airborne:sample.result.airborne}}));
-    if (previous !== sample.stage || !sample.active) await capture('stage-'+sample.stage);
+    if (previous !== sample.stage && [50,51,52].includes(sample.stage) || !sample.active) await capture('stage-'+sample.stage);
     previous=sample.stage;
     if (!sample.active) break;
+    sec += seconds;
   }
   const last=results.at(-1);
   assert.equal(last.result.status, 'completed');

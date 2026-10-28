@@ -483,6 +483,7 @@ class FlightSimulator {
   /** Apply the game-flow state to the DOM: menu visibility, input blocking. */
   syncFlowUi() {
     const state = this.gameFlow.state;
+    this.audio?.departureRadio.setPaused(state !== FLOW.FLIGHT);
     document.body.dataset.flow = state;
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
     this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active);
