@@ -54,7 +54,10 @@ APP_URL=http://127.0.0.1:5274 chrome-session --project flight3d node scripts/ver
 ```
 
 This bounded browser check covers signal routing and synthesized audio output,
-not listening acceptance or complete flight recovery.
+not listening acceptance or complete flight recovery. All non-warning source
+channels (including both turbine whines and engine roar) are silenced. A second
+render disconnects only the warning oscillator and must produce exactly zero RMS,
+so engine sound cannot mask a broken warning path.
 
 Verified for this change with Node 22.23.2: syntax/action checks, all 698 Node
 tests and production build passed. Chrome module/Web Audio check passed for all

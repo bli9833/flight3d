@@ -34,7 +34,9 @@ try {
     const { AIRCRAFT_REGISTRY } = await import('/src/config/aircraftConfigs.js');
     const THREE = await import('/node_modules/three/build/three.module.js');
     const results = [];
-    for (const config of Object.values(AIRCRAFT_REGISTRY)) {
+    const cases = Object.values(AIRCRAFT_REGISTRY).flatMap(config =>
+      [false, true].map(disconnectWarning => ({ config, disconnectWarning })));
+    for (const { config, disconnectWarning } of cases) {
       const aero = new Aerodynamics(config);
       aero.gearHandleDown = true;
       const audio = new FlightAudio(); audio.loadAircraftConfig(config);
@@ -64,15 +66,18 @@ try {
       audio.update(0.01, { ...state, isStallWarning: true, isStalled: true, onGround: true }, false);
       const groundGain = scheduledWarningGain;
       // Render warning alone to prove the browser audio graph produces samples.
-      for (const node of ['turbineGain','pistonGain','propGain','packGain','windGain','rumbleGain']) {
+      for (const node of ['engineGain','turbineGain','turbineGain2','pistonGain','propGain','propModGain','packGain','windGain','rumbleGain']) {
         audio[node]?.gain.cancelScheduledValues(0); audio[node]?.gain.setValueAtTime(0, 0);
       }
       audio.warningGain.gain.cancelScheduledValues(0);
       audio.warningGain.gain.setValueAtTime(activeGain, 0);
+      // Negative control: retain the engine graph, but break only the warning
+      // oscillator. Unrelated sound must not satisfy the warning RMS check.
+      if (disconnectWarning) audio.warningOsc.disconnect();
       const buffer = await ctx.startRendering();
       const samples = buffer.getChannelData(0);
       const rms = Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
-      results.push({ id: config.id, warning: warning.isStallWarning, activeGain, separated: separated.isStalled,
+      results.push({ id: config.id, disconnectWarning, warning: warning.isStallWarning, activeGain, separated: separated.isStalled,
         recoveryWarning: unloaded.isStallWarning, recoverySeparation: unloaded.isStalled, recoveryGain, groundGain, rms });
     }
     return results;
@@ -80,7 +85,9 @@ try {
   if (result.exceptionDetails) throw Error(JSON.stringify(result.exceptionDetails));
   for (const row of result.result.value) {
     assert.equal(row.warning, true, row.id);
-    assert.ok(row.activeGain > 0 && row.rms > 0, `${row.id}: audible graph`);
+    assert.ok(row.activeGain > 0, `${row.id}: warning scheduled`);
+    if (row.disconnectWarning) assert.equal(row.rms, 0, `${row.id}: disconnected warning must be silent`);
+    else assert.ok(row.rms > 0, `${row.id}: audible warning graph`);
     assert.equal(row.separated, true);
     assert.equal(row.recoveryWarning, false);
     assert.equal(row.recoverySeparation, true);
