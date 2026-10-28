@@ -1426,6 +1426,10 @@ class FlightSimulator {
       .add(aeroResult.forceWorld)
       .add(gearResult.forces);
 
+    // A connected ground tug contributes forces through the normal integrator.
+    const towing = this.demoDirector?.isActive
+      ? this.demoDirector.getActiveScenario().towingForces?.() : null;
+    if (towing) netForceWorld.add(towing.force);
     const accelerationWorld = netForceWorld.divideScalar(this.aero.mass);
     this.linearVelocity.addScaledVector(accelerationWorld, dt);
 
@@ -1441,6 +1445,8 @@ class FlightSimulator {
     const netMomentBody = this._intNetMoment.set(0, 0, 0)
       .add(aeroResult.momentBody)
       .add(gearResult.moments);
+
+    if (towing) netMomentBody.add(towing.moment);
 
     // Angular acceleration: [p_dot, q_dot, r_dot] = [Mx/Ixx, My/Iyy, Mz/Izz]
     const angAccBody = this._intAngAcc.set(

@@ -1,7 +1,10 @@
 /** Demo choices are separate from manual spawn presets. */
 export function demoProfiles(aircraftId = 'B738', airport = 'coastal') {
   if (aircraftId === 'C172') {
-    if (airport === 'incheon') return [{ id: 'incheon-tour', labelKey: 'demo.incheon.name', briefingKey: 'demo.incheon.briefing' }];
+    if (airport === 'incheon') return [
+      { id: 'incheon-tour', labelKey: 'demo.incheon.name', briefingKey: 'demo.incheon.briefing' },
+      { id: 'incheon-departure', labelKey: 'departure.name', briefingKey: 'departure.briefing' },
+    ];
     if (airport === 'lukla') {
       return [
         { id: 'scenic', labelKey: 'demo.c172.canyon', briefingKey: 'demo.c172.canyon.briefing' },
