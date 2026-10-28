@@ -336,3 +336,37 @@ it('aircraftControlsDisabled blocks airplane controls while permitting camera, l
     else globalThis.window = previousWindow;
   }
 });
+
+it('integrates HOTAS One stick, throttle, and trigger inputs into FlightControls update pipeline', () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { addEventListener() {} };
+  try {
+    let mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [0.75, 0.8, -1.0, 0.6, 0.0], // Roll right, Pitch up, Full TOGA throttle, Rudder right
+      buttons: [{ pressed: true, value: 0.85 }], // Trigger brakes pulled at 85%
+    };
+
+    let deviceConnected = null;
+    const controls = new FlightControls({ addEventListener() {} }, {
+      getGamepads: () => [mockGamepad],
+    });
+    controls.onDeviceConnected = (dev) => { deviceConnected = dev; };
+
+    // Initial update
+    controls.update(1.0, 140);
+
+    assert.ok(deviceConnected !== null, 'onDeviceConnected should fire upon device detection');
+    assert.strictEqual(deviceConnected.type, 'hotas-one');
+    assert.strictEqual(controls.throttle, 1.0, 'Throttle should match 100% TOGA from HOTAS lever');
+    assert.ok(controls.elevator > 0.4, `Elevator should slew positive for climb, got ${controls.elevator}`);
+    assert.ok(controls.aileron > 0.4, `Aileron should slew positive for right roll, got ${controls.aileron}`);
+    assert.ok(controls.rudder > 0.3, `Rudder should slew positive for right yaw, got ${controls.rudder}`);
+    assert.strictEqual(controls.brakes, 0.85, 'Brakes should match HOTAS trigger pull');
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
+

@@ -10,7 +10,7 @@ context, while the current implementation defines actual behavior.
 | Loading, fuel CG, inertia and trim | src/physics/MassProperties.js; TrimSolver.js; src/ui/LoadingPanel.js; [mass/CG model](mass-cg.md) | tests/massProperties.test.js; trimSolver.test.js; scripts/verify-mass-cg.html |
 | Lift, drag, atmosphere, engines | src/physics/Aerodynamics.js; Atmosphere.js; EngineModel.js | tests/aerodynamics.test.js; atmosphere.test.js; engine.test.js |
 | Gear, collision, touchdown | src/physics/LandingGear.js; CollisionDetector.js | tests/landingGear.test.js; collision.test.js; gearCamAndTouchdown.test.js; npm run test:crash |
-| Keyboard, gamepad, touch input | src/controls/FlightControls.js; TouchFlightControls.js; index.html; style.css | tests/flightControls.test.js; npm run test:mobile |
+| Keyboard, HOTAS/gamepad, touch input | src/controls/FlightControls.js; HotasController.js; TouchFlightControls.js; index.html; style.css | tests/flightControls.test.js; tests/hotasController.test.js; npm run test:mobile |
 | HUD, responsive panels, localization | index.html; style.css; src/ui/FlightPanels.js; src/i18n/ | tests/controlPanelState.test.js; scripts/verify-responsive-ui.mjs; browser screenshots |
 | Cameras and framing | src/cameras/CameraSystem.js | tests/gearCamAndTouchdown.test.js; browser screenshots |
 | Autonomous flight and stage transitions | src/director/DemoFlightDirector.js; src/director/PilotControlLaws.js; src/director/scenarios/ | tests/demoFlightDirector.test.js; tests/demoTouchdown.test.js; npm run test:demo; npm run test:flight |
