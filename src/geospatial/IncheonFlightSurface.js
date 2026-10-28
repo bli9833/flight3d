@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { DEPARTURE_CONNECTOR, DEPARTURE_STAND, DEPARTURE_TAXI_PAVEMENT } from '../config/incheonDeparture.js';
 import airfield from '../config/incheonAirfield.json' with { type: 'json' };
 import { pointInRing, segmentDistance } from './incheonDressing.js';
 
@@ -10,7 +9,7 @@ export class IncheonFlightSurface {
   constructor(source) {
     this.source = source;
     this.isLoaded = true;
-    this.surfaces = [...airfield.surfaces, DEPARTURE_CONNECTOR, DEPARTURE_STAND, DEPARTURE_TAXI_PAVEMENT].map(s => ({ ...s, bounds: [
+    this.surfaces = airfield.surfaces.map(s => ({ ...s, bounds: [
       Math.min(...s.points.map(p=>p[0])), Math.min(...s.points.map(p=>p[1])),
       Math.max(...s.points.map(p=>p[0])), Math.max(...s.points.map(p=>p[1])),
     ] }));
@@ -40,7 +39,11 @@ export class IncheonFlightSurface {
   }
 
   distance(surface, x, z) {
-    if (surface.area && pointInRing(x,z,surface.points)) return 0;
+    if (surface.area && pointInRing(x,z,surface.points)) {
+      const hole = surface.holes?.find(ring=>pointInRing(x,z,ring));
+      if (!hole) return 0;
+      return Math.min(...hole.slice(1).map((point,i)=>segmentDistance(x,z,hole[i],point)));
+    }
     let distance = Infinity;
     for (let i=1;i<surface.points.length;i++) distance=Math.min(distance,segmentDistance(x,z,surface.points[i-1],surface.points[i]));
     return Math.max(0,distance-(surface.area?0:surface.width/2));

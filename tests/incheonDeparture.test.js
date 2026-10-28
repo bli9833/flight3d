@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { IncheonDepartureScenario, DEPARTURE_GATE } from '../src/director/scenarios/IncheonDepartureScenario.js';
-import { DEPARTURE_TAXI_ROUTE, DEPARTURE_LINEUP_ROUTE } from '../src/config/incheonDeparture.js';
+import { DEPARTURE_TAXI_ROUTE, DEPARTURE_LINEUP_ROUTE, DEPARTURE_RUNWAY, departurePushbackPose } from '../src/config/incheonDeparture.js';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { resolveDemoProfile } from '../src/director/demoProfiles.js';
 
@@ -63,7 +63,9 @@ test('pushback waits for a settled position and disconnect removes the tug befor
   assert.equal(director.currentStage,S.PUSHBACK);
   scenario.update(2);
   assert.equal(director.currentStage,S.PUSHBACK,'timer alone cannot complete pushback');
-  sim.position.x=DEPARTURE_TAXI_ROUTE[0].x;sim.position.z=DEPARTURE_TAXI_ROUTE[0].z;
+  const end=departurePushbackPose(1);
+  sim.position.x=end.x;sim.position.z=end.z;
+  sim.quaternion.setFromEuler(new THREE.Euler(0,-end.heading,0,'YXZ'));
   scenario.update(.6);
   assert.equal(director.currentStage,S.PUSHBACK);
   scenario.update(.6);
@@ -80,7 +82,7 @@ test('lineup cannot authorize takeoff until aligned, stopped, and clearance has 
   director.setStage(S.LINEUP);
   scenario.index=DEPARTURE_LINEUP_ROUTE.length-1;
   Object.assign(sim.position,DEPARTURE_LINEUP_ROUTE.at(-1));
-  sim.telemetry.headingDeg=144.68220519241027;
+  sim.telemetry.headingDeg=DEPARTURE_RUNWAY.headingDeg;
   sim.linearVelocity.set(2,0,0);scenario.update(.1);
   assert.equal(director.currentStage,S.LINEUP);
   sim.linearVelocity.set(0,0,0);scenario.update(.1);

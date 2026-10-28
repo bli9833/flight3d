@@ -1,5 +1,27 @@
-// Airport-frame metres. Taxi route follows mapped pavement; the short stand
-// and runway-entry connector below are authored simulation scenery, not AIP data.
+import airfield from './incheonAirfield.json' with { type: 'json' };
+
+// Every taxi vertex below is an unchanged node from the frozen mapped taxiways.
+// No stand, taxi corridor or runway connector pavement is added by this scenario.
+export const DEPARTURE_ROUTE_SOURCES = {
+  "apron": "relation/3917465/0",
+  "taxiways": [
+    "way/316419114",
+    "way/507584723",
+    "way/469349309",
+    "way/13528077",
+    "way/507584756",
+    "way/316419089",
+    "way/968023574"
+  ],
+  "runway": "way/13528056"
+};
+const runway = airfield.surfaces.find(surface=>surface.id===DEPARTURE_ROUTE_SOURCES.runway);
+const [tx,tz] = runway.points.at(-1), [ex,ez] = runway.points[0];
+export const DEPARTURE_RUNWAY = {
+  designator: '33L', threshold: {x:tx,z:tz}, end: {x:ex,z:ez},
+  headingDeg: (Math.atan2(ex-tx,tz-ez)*180/Math.PI+360)%360,
+};
+
 export const DEPARTURE_TAXI_ROUTE = [
   [101.37, -148.16],
   [182.4, -122.34],
@@ -27,114 +49,61 @@ export const DEPARTURE_TAXI_ROUTE = [
   [273.54, -311.05],
   [263.06, -341.42],
   [259.82, -348.57],
-  [258.1, -352.4],
-  [240.72, -378.55],
-  [215.22, -406.06],
-  [210.07, -410.42],
-  [204.4, -415.61],
-  [200.9, -420.08],
-  [196.51, -427.38],
-  [193.47, -436.26],
-  [192.02, -448.18],
-  [193.34, -459.06],
-  [195.98, -467.42],
-  [199.46, -473.28],
-  [202.82, -478.75],
-  [207.86, -484.95],
-  [229.04, -500.14],
-  [234.95, -506.27],
-  [239.59, -512.56],
-  [243.26, -519.3],
-  [245.06, -524.06],
-  [246.38, -529.78],
-  [247.02, -535.35],
-  [246.78, -542.12],
-  [245.66, -550.42],
-  [242.85, -558.07],
-  [239.09, -564.91],
-  [234.31, -572.06],
-  [209.24, -607.84],
-  [181.5, -647.18],
-  [99.28, -762.1],
-  [73.83, -798.69],
-  [47.66, -836.19],
-  [-52.95, -978.02],
-  [-58.47, -990.25],
-  [-60.01, -1001.72],
-  [-59.9, -1009.51],
-  [-58.59, -1017.43],
-  [-54.97, -1027.05],
-  [-51.24, -1033.56],
-  [-43.58, -1042.24],
-  [-31.81, -1050.84],
-  [-23.15, -1058.11],
-  [-18.54, -1063.86],
-  [-15.91, -1068.16],
-  [-13.92, -1072.48],
-  [-11.32, -1080.05],
-  [-10.19, -1091.93],
-  [-10.43, -1099.77],
-  [-12.45, -1107.52],
-  [-17.14, -1117.8],
-  [-33.6, -1141.09],
-  [-44.56, -1156.36],
-  [-56.13, -1172.49],
-  [-76.77, -1202.18],
-  [-155.52, -1312.49],
-  [-195.99, -1369.8],
-  [-262.25, -1463.01],
-  [-279.72, -1487.91],
-  [-297.72, -1513.14],
-  [-314.11, -1536.01],
-  [-323.49, -1549.45],
-  [-334.05, -1564.21],
-  [-368.28, -1612.35],
-  [-372.2, -1617.69],
-  [-425.48, -1692.86],
-  [-665.75, -2031.87],
-  [-691.35, -2068.39],
-  [-704.48, -2087.1],
-  [-720.32, -2108.92],
-  [-733.29, -2127.93],
-  [-744.55, -2143.11],
-  [-772, -2181.74],
-  [-1008.2, -2514.78],
-  [-1066.57, -2597.4],
-  [-1106.51, -2652.91],
-  [-1115.23, -2665.22],
-  [-1124.84, -2679.48],
-  [-1244.03, -2847.46],
-  [-1281.2, -2900.08],
-  [-1360.81, -3012.63],
-  [-1381.56, -3042.94],
-  [-1392.23, -3057.17],
-  [-1408.52, -3079.69],
-  [-1418.83, -3094.87],
-  [-1434.13, -3115.52],
-  [-1446.52, -3132.64],
-  [-1479.15, -3179.97],
-  [-1712.37, -3507.22],
-  [-1738.33, -3544.74],
-  [-1764.91, -3581.77],
-  [-1768.75, -3587.56],
-  [-1668.94, -3658.56],
-].map(([x, z]) => ({ x, z }));
-export const DEPARTURE_LINEUP_ROUTE = [[-1611.82, -3699.03], [-1356.87, -3339.19]].map(([x, z]) => ({ x, z }));
-export const DEPARTURE_CONNECTOR = {
-  id: 'simulation/departure-connector', kind: 'taxiway', width: 22, area: false,
-  points: [[-1768.75, -3587.56], [-1668.94, -3658.56], [-1611.82, -3699.03]],
-};
+  [255.67, -363.58],
+  [254.71, -375.26],
+  [256.06, -384.84],
+  [260.09, -393.58],
+  [263.65, -399.01],
+  [269.74, -407.07],
+  [373.49, -482.56],
+  [378.82, -487.77],
+  [383.7, -493.62],
+  [386.84, -498.56],
+  [389.42, -504.14],
+  [391.25, -510.75],
+  [392.33, -516.44],
+  [392.77, -522.92],
+  [391.95, -531.28],
+  [389.88, -538.67],
+  [385.97, -546.8],
+  [382.44, -551.59],
+  [376.2, -570.4],
+  [375.72, -582.93],
+  [378.4, -595.64],
+  [382.62, -604.41],
+  [386.93, -610.51],
+  [394.18, -617.59],
+  [453.21, -659.59],
+  [463.16, -669.01],
+].map(([x,z])=>({x,z}));
 
-export const DEPARTURE_GATE = {"x": 90.62, "z": -191.86, "heading": -0.24119528084767608};
-// A full-width apron is needed for the 737's turn out of the stand. A narrow
-// C172-sized lead-in leaves the main gear on ungraded ground during this turn.
-export const DEPARTURE_STAND = {
-  id: 'simulation/gate-apron', kind: 'apron', area: true,
-  points: [[30,-220],[230,-220],[230,-65],[30,-65],[30,-220]],
-};
+// Mapped entry nodes followed by an alignment target on the source runway axis.
+export const DEPARTURE_LINEUP_ROUTE = [
+  [470.27, -678.02],
+  [474.75, -685.82],
+  [477.67, -693.7],
+  [479.89, -700.95],
+  [481.36, -708.4],
+  [482.05, -727.72],
+  [480.52, -735.35],
+  [478.16, -743.71],
+  [473.18, -754.45],
+  [463.91, -769.31],
+  [226.3, -1104.66],
+].map(([x,z])=>({x,z}));
 
-// Modeled 737 taxi corridor on the mapped centreline, including swept wheel clearance.
-export const DEPARTURE_TAXI_PAVEMENT = {
-  id: 'simulation/737-taxi-corridor', kind: 'taxiway', width: 40, area: false,
-  points: DEPARTURE_TAXI_ROUTE.map(({x,z}) => [x,z]),
-};
+// Authored gate placement inside source Apron 1; this is not a surveyed stand ID.
+export const DEPARTURE_GATE = {x:90.62,z:-201.86,heading:-0.24119528084767608};
+
+// A reverse turning manoeuvre inside Apron 1, not additional pavement geometry.
+const radius = 18;
+const center = {x:DEPARTURE_GATE.x-radius*Math.cos(DEPARTURE_GATE.heading),
+  z:DEPARTURE_GATE.z-radius*Math.sin(DEPARTURE_GATE.heading)};
+const dx = DEPARTURE_TAXI_ROUTE[0].x-center.x, dz = DEPARTURE_TAXI_ROUTE[0].z-center.z;
+const exitHeading = Math.atan2(dz,dx)+Math.acos(radius/Math.hypot(dx,dz));
+const pushTurn = exitHeading-DEPARTURE_GATE.heading;
+export const DEPARTURE_PUSHBACK = {radius,turn:pushTurn,exitHeading,center};
+export function departurePushbackPose(progress) {
+  const heading=DEPARTURE_GATE.heading+pushTurn*Math.max(0,Math.min(1,progress));
+  return {x:center.x+radius*Math.cos(heading),z:center.z+radius*Math.sin(heading),heading};
+}

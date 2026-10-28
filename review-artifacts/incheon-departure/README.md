@@ -1,31 +1,36 @@
-# Boeing 737-800 departure acceptance
+# Boeing 737-800 departure on source-mapped pavement
 
-Verified the production build on the task's preview server through the shared
-Flight3d Chrome session. The flight harness mutes speech for accelerated stepping;
-the audio harness separately verifies actual wall-clock playback.
+The previously authored apron rectangle, widened taxi corridor and runway
+connector have been removed. Missing Apron 1/2 multipolygon members are restored
+from frozen full-relation OSM snapshots. Checksums, original versions, shared
+coordinates and the original source cutoff are verified. Incomplete/open rings
+are rejected, and holes remain unpaved. The rendered pavement and contact queries
+use the same source shapes; no scenario pavement is appended.
 
-- Full eight-stage B738 departure completed in 961.85 simulated seconds, with
-  about 36 seconds of observed pushback. No crash, gear damage or browser exception.
-- Desktop and 390 px mobile menu selection passed; no page overflow.
-- Jetbridge docks at the forward port door, then retracts 13 m before pushback.
-- Tractor wheels / beacon animate, coupling retracts and the tractor drives clear.
-- Manual handoff retains climb thrust. Restart / Esc remove the tug, retract the
-  bridge, stop radio playback and release aircraft controls.
-- A native click starts the bundled speech; live RMS measured 0.170. All eight
-  clips decode and render with nonzero signal and peaks below clipping.
-- Pause/resume preserves speech position. Mute/cancel stop playback; unmuting
-  does not replay an outdated call.
-- `npm run check`: 300 JavaScript files, 11 pinned action references, no failures.
-- `npm test`: 701 passing tests. `npm run build` passed (large-chunk advisory remains).
-  After the final bridge-cab orientation adjustment, nine focused tests, syntax
-  checks, the build and the gate browser harness passed again.
+Verified the production build using the shared Flight3d Chrome session:
 
-[Flight results](results.json) · [Audio results](audio-results.json) · [Gate results](gate-results.json)
+- All eight stages completed through runway **33L** in **373.45 simulated seconds**.
+- **130,522 grounded-wheel contact checks; zero pavement exits.** The observer runs
+  after every physics step and the harness rejects an empty contact audit.
+- No crash, gear damage, invalid pose or browser exception.
+- Gate placement and the reverse turning manoeuvre fit source Apron 1. Taxi edges
+  come from identified source ways; the existing connector supplies runway entry.
+- The 737 jetbridge docks/retracts; the tug uncouples and drives clear with animated
+  wheels. Desktop and 390 px menus fit; cancellation cleans up bridge/tug/radio.
+- Spoken 33L calls start on a native click; all eight assets decode/render with
+  audible signal and no clipping. Pause/resume, mute/unmute and cancel pass.
+- `npm test`: **707 passed**. After the final source-cutoff/edge provenance checks,
+  **13 focused tests**, syntax checks and deterministic airfield regeneration pass.
+- `npm run check`: 302 JavaScript files and 11 pinned action references pass.
+  `npm run build` passes (the existing large-chunk advisory remains).
 
-[737 with docked bridge](gate.png) · [Bridge clear before pushback](bridge-clear.png) · [Tractor after disconnect](tug-disconnected.png)
+[Flight results](results.json) · [Every-step pavement audit](pavement-audit.json) · [Audio results](audio-results.json) · [Gate results](gate-results.json)
+
+[737 at source Apron 1](gate.png) · [Bridge clear before pushback](bridge-clear.png) · [Turned aircraft after tug disconnect](tug-disconnected.png)
 
 Reproduce with `scripts/verify-incheon-departure.mjs`,
 `scripts/verify-departure-audio.mjs` and `scripts/verify-departure-gate.mjs`.
-The route is fictional simulator scenery; bundled speech is synthesized scripted
-English dialogue. Microphone input, passengers and animated aircraft doors are
-outside this change.
+The accelerated flight check mutes speech; the audio check separately exercises
+actual wall-clock playback. OSM boundaries are map data, not surveyed precision;
+existing default widths for untagged taxiways and modeled 7 m elevation remain.
+G1 placement, the bridge and radio dialogue are authored simulator content.

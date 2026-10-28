@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CessnaDemoScenario } from './CessnaDemoScenario.js';
 import { INCHEON_AIRFIELD } from '../../geospatial/IncheonFlightSurface.js';
-import { DEPARTURE_TAXI_ROUTE, DEPARTURE_LINEUP_ROUTE, DEPARTURE_GATE } from '../../config/incheonDeparture.js';
+import { DEPARTURE_TAXI_ROUTE, DEPARTURE_LINEUP_ROUTE, DEPARTURE_GATE, DEPARTURE_RUNWAY, DEPARTURE_PUSHBACK, departurePushbackPose } from '../../config/incheonDeparture.js';
 import { createDepartureTug, disposeDepartureTug, updateDepartureTug } from '../../environment/DepartureTug.js';
 import { flyVerticalPath } from '../PilotControlLaws.js';
 import { CameraSystem } from '../../cameras/CameraSystem.js';
@@ -11,7 +11,7 @@ import { departureRadioCaption } from '../../config/departureRadio.js';
 const clamp = THREE.MathUtils.clamp;
 const STAGES = { GATE: 50, PUSHBACK: 51, DISCONNECT: 52, TAXI: 53, HOLD: 54, LINEUP: 55, CLEARANCE: 56, TAKEOFF: 57, COMPLETED: 58 };
 const names = ['gate', 'pushback', 'disconnect', 'taxi', 'hold', 'lineup', 'clearance', 'takeoff'];
-const first = DEPARTURE_TAXI_ROUTE[0];
+const pushbackEnd = departurePushbackPose(1);
 export { DEPARTURE_GATE };
 
 /** One gate reset; towing forces, wheel steering and flight controls thereafter. */
@@ -43,7 +43,7 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       sim.currentAirport?.departureBridge?.setExtension(1);
       sim.audio?.departureRadio.preload();
     }
-    if (stage === STAGES.TAXI) { this.removeTug(); this.index = 1; }
+    if (stage === STAGES.TAXI) { this.removeTug(); this.index = 0; }
     if (stage === STAGES.LINEUP) { this.index = 0; this.lineupBraking = false; }
     const name = names[stage - STAGES.GATE];
     if (name) {
@@ -70,31 +70,34 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
     if (this.result.status === 'running') this.result.status = 'cancelled';
   }
 
+  pushbackGuidance() {
+    const pos=this.sim.position, path=DEPARTURE_PUSHBACK;
+    const angle=Math.atan2(pos.z-path.center.z,pos.x-path.center.x);
+    const swept=Math.atan2(Math.sin(angle-DEPARTURE_GATE.heading),Math.cos(angle-DEPARTURE_GATE.heading));
+    const progress=clamp(swept/path.turn,0,1);
+    return {progress,reference:departurePushbackPose(progress),target:departurePushbackPose(progress+3/(path.radius*path.turn))};
+  }
+
   towingForces() {
     if (this.director.currentStage !== STAGES.PUSHBACK || !this.sim.gear.onGround) return null;
-    const sim = this.sim;
-    const dx = first.x - sim.position.x, dz = first.z - sim.position.z;
-    const distance = Math.hypot(dx, dz);
-    const speed = Math.min(1.5, distance * .35);
-    const scale = distance > .01 ? speed / distance : 0;
-    const maxForce = sim.aero.mass * 1.5;
-    this.force.set((dx * scale - sim.linearVelocity.x) * sim.aero.mass * 2, 0,
-      (dz * scale - sim.linearVelocity.z) * sim.aero.mass * 2).clampLength(0, maxForce);
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(sim.quaternion);
-    // Tow straight out of the stand. Trying to yaw the main wheels sideways
-    // here fights their lateral grip; the aircraft turns with nosewheel steering
-    // under its own power after disconnect instead.
-    const targetHeading = DEPARTURE_GATE.heading;
-    const currentHeading = Math.atan2(forward.x, -forward.z);
-    const error = Math.atan2(Math.sin(targetHeading - currentHeading), Math.cos(targetHeading - currentHeading));
-    this.moment.set(0, (-error * 2 - sim.angularVelocity.y * 3) / sim.aero.invIzz, 0);
-    return { force: this.force, moment: this.moment };
+    const sim=this.sim,{target,reference,progress}=this.pushbackGuidance();
+    const dx=target.x-sim.position.x,dz=target.z-sim.position.z,distance=Math.hypot(dx,dz);
+    const speed=Math.min(1.2,distance*.5),scale=distance>.01?speed/distance:0;
+    this.force.set((dx*scale-sim.linearVelocity.x)*sim.aero.mass*2,0,
+      (dz*scale-sim.linearVelocity.z)*sim.aero.mass*2).clampLength(0,sim.aero.mass*1.5);
+    const forward=new THREE.Vector3(0,0,-1).applyQuaternion(sim.quaternion);
+    const heading=Math.atan2(forward.x,-forward.z);
+    const error=Math.atan2(Math.sin(reference.heading-heading),Math.cos(reference.heading-heading));
+    const rate=-speed/DEPARTURE_PUSHBACK.radius*clamp((1-progress)*15,0,1);
+    const torque=(-error*.8+(rate-sim.angularVelocity.y)*1.5)/sim.aero.invIzz;
+    this.moment.set(0,clamp(torque,-sim.aero.mass*4,sim.aero.mass*4),0);
+    return {force:this.force,moment:this.moment};
   }
 
   /** Track a continuous path ahead of the 737 instead of circling missed points. */
   taxi(route, stopping) {
     const sim = this.sim, pos = sim.position;
-    const leadIn = route === DEPARTURE_LINEUP_ROUTE ? DEPARTURE_TAXI_ROUTE.at(-1) : route[0];
+    const leadIn = route === DEPARTURE_LINEUP_ROUTE ? DEPARTURE_TAXI_ROUTE.at(-1) : pushbackEnd;
     let start, end, length, along;
     while (true) {
       start = this.index > 0 ? route[this.index - 1] : leadIn;
@@ -104,7 +107,8 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       if (this.index < route.length - 1 && (length < .01 || along >= length)) this.index++;
       else break;
     }
-    let look = 35;
+    const speed = Math.hypot(sim.linearVelocity.x,sim.linearVelocity.z);
+    let look = 14 + Math.min(speed,4)*1.5;
     let from = {x:start.x+(end.x-start.x)*clamp(along/Math.max(.01,length),0,1),
       z:start.z+(end.z-start.z)*clamp(along/Math.max(.01,length),0,1)};
     let target = end;
@@ -118,13 +122,12 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
     const distance = Math.hypot(target.x-pos.x,target.z-pos.z);
     const bearing = Math.atan2(target.x-pos.x,-(target.z-pos.z));
     const error = ((bearing*180/Math.PI-sim.telemetry.headingDeg+540)%360)-180;
-    const curvature = 2*Math.sin(clamp(error*Math.PI/180,-Math.PI/2,Math.PI/2))/Math.max(20,distance);
-    const speed = Math.hypot(sim.linearVelocity.x,sim.linearVelocity.z);
+    const curvature = 2*Math.sin(clamp(error*Math.PI/180,-Math.PI/2,Math.PI/2))/Math.max(14,distance);
     const steeringRatio = Math.max(.15,1-Math.min(1,speed/35)*.82);
     const steering = Math.atan(14.3*curvature)/(55*Math.PI/180*steeringRatio);
     const finalDistance = Math.hypot(route.at(-1).x-pos.x,route.at(-1).z-pos.z);
     const final = this.index === route.length-1;
-    const desired = final && stopping ? Math.min(4,finalDistance*.3) : Math.abs(error)>45 ? 3.5 : 6;
+    const desired = final && stopping ? Math.min(2.5,finalDistance*.3) : Math.min(4, Math.sqrt(.6/Math.max(.01,Math.abs(curvature))));
     sim.controls.setVirtualInput('rudder',clamp(steering+sim.angularVelocity.y*2,-.7,.7));
     sim.controls.setVirtualInput('throttle',clamp(.22+(desired-speed)*.18,0,.75));
     sim.controls.setVirtualInput('brakes',speed>desired+.3?clamp((speed-desired)*.4,0,1):0);
@@ -148,7 +151,15 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
     if (stage === STAGES.GATE && d.stageTimer > 6 && !radioBusy) d.setStage(STAGES.PUSHBACK);
     else if (stage === STAGES.PUSHBACK) {
       sim.controls.setVirtualInput('brakes', 0);
-      const stopped = Math.hypot(sim.position.x - first.x, sim.position.z - first.z) < .7 && sim.linearVelocity.length() < .3;
+      const {reference,progress}=this.pushbackGuidance();
+      const forward=new THREE.Vector3(0,0,-1).applyQuaternion(sim.quaternion);
+      const heading=Math.atan2(forward.x,-forward.z);
+      const error=Math.atan2(Math.sin(reference.heading-heading),Math.cos(reference.heading-heading));
+      const ratio=Math.max(.15,1-Math.min(1,sim.linearVelocity.length()/35)*.82);
+      const feedForward=Math.atan(14.3/DEPARTURE_PUSHBACK.radius)/(55*Math.PI/180*ratio);
+      sim.controls.setVirtualInput('rudder',clamp(-feedForward*clamp((1-progress)*15,0,1)-error*1.5-sim.angularVelocity.y*2,-.8,.8));
+      const aligned=Math.abs(Math.atan2(Math.sin(pushbackEnd.heading-heading),Math.cos(pushbackEnd.heading-heading)))<5*Math.PI/180;
+      const stopped = Math.hypot(sim.position.x-pushbackEnd.x,sim.position.z-pushbackEnd.z)<.7 && sim.linearVelocity.length()<.3 && aligned;
       this.settleTime = stopped ? this.settleTime + dt : 0;
       if (this.settleTime > 1 && !radioBusy) d.setStage(STAGES.DISCONNECT);
     } else if (stage === STAGES.DISCONNECT && d.stageTimer > 8 && !radioBusy) d.setStage(STAGES.TAXI);
@@ -157,7 +168,7 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       this.result.taxiPoints = this.index;
     } else if (stage === STAGES.HOLD && d.stageTimer > 8 && !radioBusy) d.setStage(STAGES.LINEUP);
     else if (stage === STAGES.LINEUP) {
-      const runway = INCHEON_AIRFIELD.approach;
+      const runway = DEPARTURE_RUNWAY;
       const angle = runway.headingDeg * Math.PI/180;
       const dx = sim.position.x-runway.threshold.x, dz = sim.position.z-runway.threshold.z;
       const along = dx*Math.sin(angle)-dz*Math.cos(angle);
@@ -174,7 +185,7 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       } else this.taxi(DEPARTURE_LINEUP_ROUTE,false);
     } else if (stage === STAGES.CLEARANCE && d.stageTimer > 6 && !radioBusy) d.setStage(STAGES.TAKEOFF);
     else if (stage === STAGES.TAKEOFF) {
-      const runwayHeading = INCHEON_AIRFIELD.approach.headingDeg;
+      const runwayHeading = DEPARTURE_RUNWAY.headingDeg;
       const error = ((runwayHeading - sim.telemetry.headingDeg + 540) % 360) - 180;
       sim.controls.setVirtualInput('brakes', 0);
       sim.controls.setVirtualInput('throttle', 1);

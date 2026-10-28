@@ -1,20 +1,34 @@
 # Incheon gate departure demo
 
 Select **Incheon → Boeing 737-800 → Auto demo → Incheon gate → pushback → takeoff**
-in the lobby, then watch the demo. The original Incheon tour remains the default.
+in the lobby, then watch the demo.
 The departure profile is offered only for B738. C172 keeps its original Incheon tour.
 
 The departure flies eight stages: gate preparation, tug pushback, disconnect,
 taxi, hold short / tower contact, line up and wait, takeoff clearance, and takeoff
 with an airborne manual handoff. Bundled English radio speech includes distinct pilot, ground-crew and controller voices with matching captions. Stage names, speaker labels and the briefing support Korean and English. Exchanges are scripted; microphone recognition is not included. Waiting stages finish only after the current call ends. The master mute/volume controls apply to radio playback, the menu pauses and resumes at the same speech position, and cancellation/reset stops it without stale replay.
 
-G1 is an authored stand near the mapped Terminal 1 outline. Its telescoping passenger bridge docks at the 737 forward port door, then retracts 13 metres during gate preparation before pushback. Cancelling/restarting retracts the bridge. The taxi polyline
-uses connected points from `incheonAirfield.json`'s taxiways. The wide gate apron, 737 taxi clearance corridor
-and the short runway 15R connector are authored simulator pavement, explicitly
-separate from mapped airport data. Their geometry is shared by the rendered
-pavement and terrain/contact surface. This is fictional training scenery, not a
-surveyed gate, current clearance, operational airport route or traffic service.
-The landing-traffic call is scripted; no live runway-occupancy detection is implied.
+G1 is an authored gate placement within source Apron 1, not a surveyed stand ID.
+Its bridge docks at the 737 forward port door and retracts before pushback.
+Apron 1 and Apron 2 boundaries come from complete OpenStreetMap multipolygon
+relations 3917465 and 3156115. The original bounding-box snapshot omitted member
+ways and the airfield builder ignored relations. Supplementary frozen full-relation
+snapshots restore those members, with checksums and versions recorded in
+`public/scenery/incheon/apron-source-metadata.json`. Overlapping elements retain
+the same versions and coordinates as the original snapshot. Supplementary element
+timestamps must not be newer than the original snapshot cutoff. Open/incomplete
+rings are rejected and inner holes are preserved instead of filled.
+
+No authored apron rectangle, widened taxi corridor or runway-entry connector is
+added to rendering, ground contact or grading. Taxi vertices retain the mapped
+centreline coordinates. Departure uses runway 33L because its existing mapped
+connector provides a continuous path from the apron. The tug follows a reverse
+arc inside the source apron and hands over aligned with the taxi exit.
+
+These are OSM geometry boundaries, not surveyed accuracy or live operational
+clearances. Existing default widths remain where the original taxiway has no
+width tag; those defaults are not widened for this demo. Airport elevation remains
+the existing modeled 7 m. The landing-traffic call is scripted.
 
 There is one initial gate reset through the normal preset lifecycle. A visible
 737-sized tractor animates its wheels and beacon, retracts its coupling and drives clear after disconnect. It supplies bounded horizontal towing forces and a heading-restoring moment
@@ -28,7 +42,7 @@ tug and release automation. P restarts the selected departure profile.
 ## Verification
 
 ```sh
-node --test tests/incheonDeparture.test.js tests/incheonDemo.test.js tests/departureRadio.test.js tests/departureJetBridge.test.js
+node --test tests/incheonDeparture.test.js tests/incheonDemo.test.js tests/departureRadio.test.js tests/departureJetBridge.test.js tests/incheonAprons.test.js
 npm run check
 npm test
 npm run build
@@ -46,6 +60,7 @@ chrome-session --project flight3d node scripts/verify-departure-gate.mjs
 `APP_URL` and `ARTIFACT_DIR` override the URL and `.cache/incheon-departure`
 artifact directory. The harness checks desktop/mobile menu selection and overflow,
 flies the complete departure with deterministic physics, captures each stage,
+checks every grounded wheel against the source pavement on every physics step,
 checks gear integrity / absence of crashes and invalid positions, verifies the
 climb-thrust handoff, and restarts/cancels to verify tug cleanup and input release.
 It closes only its own tab. Review the PNGs and `results.json` alongside the exit
