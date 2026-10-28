@@ -5,7 +5,7 @@ import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { CessnaDemoScenario } from '../src/director/scenarios/CessnaDemoScenario.js';
 import { cityRoute, buildingClearance } from '../src/director/scenarios/cessnaRoutes.js';
 import { demoProfiles, resolveDemoProfile } from '../src/director/demoProfiles.js';
-import { CESSNA_172 } from '../src/config/aircraftConfigs.js';
+import { CESSNA_172, F16_FALCON } from '../src/config/aircraftConfigs.js';
 import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { EngineModel } from '../src/physics/EngineModel.js';
 import { LandingGear } from '../src/physics/LandingGear.js';
@@ -36,6 +36,28 @@ describe('aircraft-specific demos', () => {
     assert.equal(resolveDemoProfile('C172', 'lukla', 'classic').id, 'scenic');
     assert.equal(resolveDemoProfile('B738', 'coastal', 'maneuvers').id, 'classic');
     assert.equal(demoProfiles('C172', 'lukla')[0].labelKey, 'demo.c172.canyon');
+  });
+
+  it('routes the F16 only to its loaded Lukla low pass and cancels cleanly', () => {
+    const sim = simulator('lukla'); sim.currentAircraftId = 'F16';
+    sim.aero = new Aerodynamics(F16_FALCON);
+    sim.engines = new EngineModel(F16_FALCON);
+    sim.gear = new LandingGear(F16_FALCON);
+    sim.currentTerrain.isLoaded = false;
+    const d = new DemoFlightDirector(sim); d.start();
+    assert.equal(d.getActiveScenario(), d.f16Scenario);
+    assert.equal(d.waitingForTerrain, true);
+    assert.deepEqual(demoProfiles('F16', 'lukla').map(p => p.id), ['low-pass']);
+    assert.deepEqual(demoProfiles('F16', 'coastal'), []);
+    sim.currentTerrain.isLoaded = true; d.update(0.1);
+    assert.equal(d.f16Scenario.result.status, 'running');
+    assert.equal(sim.gear.gearState, 0);
+    assert.ok(sim.linearVelocity.length() > 140);
+    d.stop();
+    assert.equal(d.f16Scenario.result.status, 'cancelled');
+    assert.equal(sim.controls.aircraftControlsDisabled, false);
+    assert.equal(d.start('coastal'), false);
+    assert.equal(d.isActive, false);
   });
 
   it('flies the single-engine control law without producing NaN', () => {

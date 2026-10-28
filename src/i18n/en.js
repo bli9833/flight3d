@@ -1,4 +1,9 @@
 export default {
+  "demo.f16.lukla": "F-16 · Lukla valley low pass",
+  "demo.f16.lukla.briefing": "Airborne start · Fast Lukla valley pass and climb-out. Esc takes control.",
+  "demo.f16.stage": "Lukla valley low pass",
+  "demo.f16.complete": "F-16 demo complete · Manual control",
+  "demo.f16.failed": "F-16 demo stopped",
   "departure.speaker.pilot": "Pilot",
   "departure.speaker.apron": "Apron",
   "departure.speaker.crew": "Ground crew",

@@ -1,5 +1,7 @@
 /** Demo choices are separate from manual spawn presets. */
 export function demoProfiles(aircraftId = 'B738', airport = 'coastal') {
+  if (aircraftId === 'F16') return airport === 'lukla'
+    ? [{ id: 'low-pass', labelKey: 'demo.f16.lukla', briefingKey: 'demo.f16.lukla.briefing' }] : [];
   if (aircraftId === 'B738' && airport === 'incheon') return [
     { id: 'incheon-departure', labelKey: 'departure.name', briefingKey: 'departure.briefing' },
   ];
@@ -24,5 +26,5 @@ export function demoProfiles(aircraftId = 'B738', airport = 'coastal') {
 
 export function resolveDemoProfile(aircraftId, airport, requested) {
   const choices = demoProfiles(aircraftId, airport);
-  return choices.find(choice => choice.id === requested) ?? choices[0];
+  return choices.find(choice => choice.id === requested) ?? choices[0] ?? { id: 'unavailable', labelKey: 'demo.f16.lukla', briefingKey: 'demo.f16.lukla.briefing' };
 }

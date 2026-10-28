@@ -1,4 +1,9 @@
 export default {
+  "demo.f16.lukla": "F-16 · 루클라 계곡 로우패스",
+  "demo.f16.lukla.briefing": "공중 출발 · 루클라 계곡 고속 통과 후 상승. Esc로 수동 조종.",
+  "demo.f16.stage": "루클라 계곡 로우패스",
+  "demo.f16.complete": "F-16 데모 완료 · 수동 조종",
+  "demo.f16.failed": "F-16 데모 중단",
   "departure.speaker.pilot": "조종사",
   "departure.speaker.apron": "계류장 관제",
   "departure.speaker.crew": "지상요원",
