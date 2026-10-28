@@ -63,6 +63,12 @@ import {
   DEFAULT_SCENARIO,
   isScenarioAvailable,
 } from './config/scenarioRegistry.js';
+import {
+  loadSavedFlightSelection,
+  saveSavedAirport,
+  saveSavedAircraft,
+  saveSavedScenario,
+} from './config/flightSelection.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 import { initBuildInfo } from './ui/BuildInfo.js';
@@ -110,6 +116,7 @@ const inputLatency = installInputLatencyMonitor();
 class FlightSimulator {
   async initialize() {
     await startupStage(0, 'startup.scene');
+    const savedSelection = loadSavedFlightSelection();
     this.container = document.getElementById('canvas-container');
     this.inputLatency = inputLatency;
 
@@ -144,16 +151,9 @@ class FlightSimulator {
 
     await startupStage(1, 'startup.aircraft');
 
-    // 3. Boeing 737 Aircraft 3D Model
-    this.aircraft = new Boeing737(
-      this.pfdCanvas,
-      this.ndCanvas,
-      this.eicasCanvas,
-      this.mcpCanvas,
-      this.isfdCanvas,
-      this.cduCanvas
-    );
-    this.aircraftInstances = new Map([['B738', this.aircraft]]);
+    // 3. Aircraft 3D Model
+    this.aircraft = this.buildAircraftInstance(savedSelection.aircraft);
+    this.aircraftInstances = new Map([[savedSelection.aircraft, this.aircraft]]);
     this.scene.add(this.aircraft.group);
     this.cockpitOcclusion = new CockpitOcclusion(this.scene, this.camera, this.aircraft.cockpit);
     try {
@@ -211,7 +211,7 @@ class FlightSimulator {
     this.neonCity.group.visible = false;
     this.scene.add(this.neonCity.group);
 
-    this.activeAirport = 'lukla'; // 'coastal' | 'lukla' | 'incheon'; initControls flips to coastal below
+    this.activeAirport = null; // initUI and setAirport below configure the active airport
     this.currentTerrain = this.terrain;
     this.currentAirport = this.airport;
 
@@ -239,7 +239,7 @@ class FlightSimulator {
     this.cameraSystem.onResetLook = () => {
       this.showToast(() => t('camera.view.centered'));
     };
-    this.loadAircraftConfig(BOEING_737_800);
+    this.loadAircraftConfig(AIRCRAFT_REGISTRY[savedSelection.aircraft] || BOEING_737_800);
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
     this.shadowDemo = new CockpitShadowDemo(this, () => this.updateShadowDemoUi());
@@ -255,9 +255,9 @@ class FlightSimulator {
       isDemoWaiting: () => this.demoDirector.waitingForTerrain === true,
       onStateChange: () => this.syncFlowUi(),
     });
-    this.lobby = { airport: 'coastal', preset: 'runway', aircraft: 'B738' };
-    this.currentAircraftId = 'B738';
-    this.lastPresetType = 'runway';
+    this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft };
+    this.currentAircraftId = savedSelection.aircraft;
+    this.lastPresetType = savedSelection.scenario;
 
     // 7. Collision Detection & Explosion & Tire Smoke Particle Systems
     this.collisionDetector = new CollisionDetector(
@@ -369,7 +369,7 @@ class FlightSimulator {
 
     this.initControls();
     this.initUI();
-    this.setAirport('coastal');
+    await this.setAirport(savedSelection.airport);
 
     // Resize handler
     window.addEventListener('resize', () => this.handleResize());
@@ -532,6 +532,9 @@ class FlightSimulator {
   /** Leave the lobby: stop the cinematic and spawn the player at their choice. */
   fly() {
     if (this.airportLoading || this.lobbySelectionPending) return;
+    saveSavedAirport(this.activeAirport || this.lobby.airport);
+    saveSavedAircraft(this.currentAircraftId || this.lobby.aircraft);
+    saveSavedScenario(this.lobby.preset);
     this.devRunner.stop();
     this.shadowDemo.stop();
     const wantsDemo = this.lobby.preset === 'demo';
@@ -762,6 +765,7 @@ class FlightSimulator {
     if (this.lobby) {
       this.lobby.aircraft = aircraftId;
     }
+    saveSavedAircraft(aircraftId);
 
     // Each model is built once per session: re-constructing the 737 (geometry, cockpit
     // boolean cuts, per-vertex light-transfer binding, instrument canvases) on every
@@ -1215,8 +1219,9 @@ class FlightSimulator {
         if (request === this.airportRequest) {
           this.showToast(() => t('incheon.load.failed'));
           // The menu already shows this airport as chosen; put the selection back.
-          this.lobby.airport = this.activeAirport;
+          this.lobby.airport = this.activeAirport || 'coastal';
           this.lobbyScreen?.refresh();
+          if (!this.activeAirport) await this.setAirport('coastal');
         }
         return;
       } finally {
@@ -1303,6 +1308,8 @@ class FlightSimulator {
 
     this.lobby.airport = id;
     if (!isScenarioAvailable(id, this.lobby.preset)) this.lobby.preset = DEFAULT_SCENARIO;
+    saveSavedAirport(id);
+    saveSavedScenario(this.lobby.preset);
     // A new airport re-spawns the aircraft below, so any flight held behind the
     // menu is no longer the one to return to: release it and let the cinematic back.
     this.gameFlow.abandonResumableFlight();
@@ -2328,16 +2335,19 @@ class FlightSimulator {
       onDemoProfile: id => { this.lobby.demoProfile = id; },
       onAirport: id => {
         this.lobby.airport = id;
+        saveSavedAirport(id);
         this.lobbyScreen?.refresh();
         this.queueLobbySelection();
       },
       onPreset: type => {
         this.lobby.preset = type;
+        saveSavedScenario(type);
         this.lobbyScreen.refresh();
       },
       onTime: hours => this.setTimeOfDay(hours),
       onAircraft: id => {
         this.lobby.aircraft = id;
+        saveSavedAircraft(id);
         this.lobbyScreen?.refresh();
         this.queueLobbySelection();
       },
