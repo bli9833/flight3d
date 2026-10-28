@@ -111,11 +111,11 @@ describe('Plane-Agnostic Core Infrastructure', () => {
 
       const nose = gear.contacts.find(c => c.id === 'nose');
       assert.ok(nose, 'Nose gear exists');
-      assert.strictEqual(nose.localPos.z, -4.5, 'F-16 nose gear is at z=-4.5m');
+      assert.strictEqual(nose.localPos.z, -2.35, 'F-16 nose contact matches the mounted GLB wheel');
       assert.strictEqual(nose.isSteerable, true);
 
       const mainLeft = gear.contacts.find(c => c.id === 'mainLeft');
-      assert.strictEqual(mainLeft.localPos.x, -1.2, 'F-16 wheel track is narrower than airliner');
+      assert.strictEqual(mainLeft.localPos.x, -1.1, 'F-16 wheel track is narrower than airliner');
     });
 
     it('should support fast or fixed gear transit times', () => {
@@ -161,7 +161,7 @@ describe('Plane-Agnostic Core Infrastructure', () => {
       cameraSystem.loadAircraftConfig(F16_FALCON);
       assert.strictEqual(cameraSystem.chaseDistance, 18.0);
       assert.strictEqual(cameraSystem.chaseHeight, 4.5);
-      assert.strictEqual(cameraSystem.cockpitHeadOffset.z, -2.8);
+      assert.strictEqual(cameraSystem.cockpitHeadOffset.z, -3.0);
 
       // Switch to Cessna 172 (light trainer with 3D cockpit)
       cameraSystem.loadAircraftConfig(CESSNA_172);

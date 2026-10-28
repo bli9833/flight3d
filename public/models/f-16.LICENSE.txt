@@ -1,0 +1,19 @@
+F-16 Fighting Falcon - Fighter Jet - Free
+Author: bohmerang (https://sketchfab.com/bohmerang)
+Original: https://sketchfab.com/3d-models/f-16-fighting-falcon-fighter-jet-free-f0b00989e5634764848ef2c235c64db5
+License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+Noncommercial use only. Adaptations must retain the applicable share-alike license.
+No endorsement by the original creator is implied.
+
+User-selected distribution (pinned revision):
+https://huggingface.co/spaces/cutechicken/3D-Airforce-Simulator/resolve/52946cce65ee642917704c8c4b266a5ee1c04b74/models/f-16.glb
+Author, source and license are also embedded in the GLB asset.extras metadata.
+The GLB is distributed unchanged.
+
+Runtime adaptations by Flight3d contributors:
+- Mount in metres at 9.96 m wingspan, oriented -Z forward.
+- Split the merged deployed gear mesh into three legs and animate their pivots
+  from the simulator's gear extension state; this is an approximate runtime
+  articulation, not an animation supplied by the original artist.
+- Adjust transparent glass and HUD materials for first-person visibility.

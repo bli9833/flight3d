@@ -532,6 +532,7 @@ export default {
   "lobby.airport": "공항",
   "lobby.aircraft": "기체",
   "aircraft.b738": "✈️ 보잉 737",
+  "aircraft.f16": "F-16 Fighting Falcon",
   "aircraft.c172": "🛩️ 세스나 172",
   "notice.aircraft": "기체 변경: {name}",
   "lobby.spawn": "시나리오",

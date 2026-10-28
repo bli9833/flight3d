@@ -407,7 +407,7 @@ async function main() {
     const aircraftBreakups = await evalJs(`(() => {
       const sim = window.simulator;
       const results = [];
-      for (const id of ['B738', 'C172']) {
+      for (const id of ['B738', 'C172', 'F16']) {
         sim.setAircraft(id);
         sim.setPreset('runway');
         sim.cameraSystem.userModeSelected = false;
@@ -444,7 +444,7 @@ async function main() {
     if (aircraftBreakups.some(r => r.pieces < 4 || !r.outside || !r.restored)) {
       throw new Error('Aircraft breakup/reset failed: ' + JSON.stringify(aircraftBreakups));
     }
-    console.log('Both loaded aircraft breakup/cockpit exit/reset:', JSON.stringify(aircraftBreakups));
+    console.log('All loaded aircraft breakup/cockpit exit/reset:', JSON.stringify(aircraftBreakups));
 
     const fallback = await evalJs(`(() => {
       const sim = window.simulator;
