@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { DEPARTURE_CONNECTOR, DEPARTURE_STAND } from '../config/incheonDeparture.js';
 import airfield from '../config/incheonAirfield.json' with { type: 'json' };
 import { pointInRing, segmentDistance } from './incheonDressing.js';
 
@@ -9,7 +10,7 @@ export class IncheonFlightSurface {
   constructor(source) {
     this.source = source;
     this.isLoaded = true;
-    this.surfaces = airfield.surfaces.map(s => ({ ...s, bounds: [
+    this.surfaces = [...airfield.surfaces, DEPARTURE_CONNECTOR, DEPARTURE_STAND].map(s => ({ ...s, bounds: [
       Math.min(...s.points.map(p=>p[0])), Math.min(...s.points.map(p=>p[1])),
       Math.max(...s.points.map(p=>p[0])), Math.max(...s.points.map(p=>p[1])),
     ] }));

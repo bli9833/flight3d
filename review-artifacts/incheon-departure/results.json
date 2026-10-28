@@ -1,0 +1,128 @@
+{
+  "browserExceptions": 0,
+  "observedPushbackSeconds": 38,
+  "result": {
+    "status": "completed",
+    "airborne": true,
+    "stages": [
+      "gate",
+      "pushback",
+      "disconnect",
+      "taxi",
+      "hold",
+      "lineup",
+      "clearance",
+      "takeoff"
+    ],
+    "radio": [
+      "Pilot: Incheon Apron, Sky 123, ready for pushback. Apron: Sky 123, pushback approved. Ground crew: Tug connected.",
+      "Ground crew: Brakes released, commencing pushback. Pilot: Pushback acknowledged.",
+      "Ground crew: Pushback complete. Set parking brake. Pilot: Brake set. Ground crew: Tug disconnected, all equipment clear.",
+      "Pilot: Ground, Sky 123, ready to taxi. Ground: Taxi via the simulation route to runway 15R. Hold short. Pilot: Taxi to 15R, hold short, Sky 123.",
+      "Pilot: Incheon Tower, Sky 123, holding short runway 15R, ready for departure. Tower: Hold short, landing traffic. Pilot: Holding short, Sky 123.",
+      "Tower: Sky 123, runway 15R, line up and wait. Pilot: Runway 15R, line up and wait, Sky 123.",
+      "Tower: Sky 123, runway 15R, cleared for takeoff. Pilot: Runway 15R, cleared for takeoff, Sky 123.",
+      "Pilot: Takeoff clearance confirmed. Accelerating, rotating and climbing."
+    ],
+    "taxiPoints": 116,
+    "elapsedSeconds": 1083.9666666666633
+  },
+  "stages": [
+    {
+      "time": 0,
+      "stage": 50,
+      "position": [
+        90.62,
+        8.35,
+        -191.86
+      ],
+      "speedKnots": 0
+    },
+    {
+      "time": 4,
+      "stage": 51,
+      "position": [
+        90.62,
+        8.35,
+        -191.86
+      ],
+      "speedKnots": 0
+    },
+    {
+      "time": 42,
+      "stage": 52,
+      "position": [
+        101.231312473216,
+        8.352698100724787,
+        -148.719584020921
+      ],
+      "speedKnots": 0
+    },
+    {
+      "time": 48,
+      "stage": 53,
+      "position": [
+        101.22399534122444,
+        8.352795339847994,
+        -148.7547003554278
+      ],
+      "speedKnots": 0.2021516496137897
+    },
+    {
+      "time": 986,
+      "stage": 54,
+      "position": [
+        -1671.2646845625782,
+        8.35158395240245,
+        -3656.9980640113517
+      ],
+      "speedKnots": 0
+    },
+    {
+      "time": 994,
+      "stage": 55,
+      "position": [
+        -1671.165703404399,
+        8.352785650265275,
+        -3657.0613888157404
+      ],
+      "speedKnots": 0.47457301359836784
+    },
+    {
+      "time": 1048,
+      "stage": 56,
+      "position": [
+        -1560.760276412664,
+        8.351599226908384,
+        -3627.1084659827643
+      ],
+      "speedKnots": 0
+    },
+    {
+      "time": 1054,
+      "stage": 57,
+      "position": [
+        -1559.2710695220603,
+        8.352538743927532,
+        -3624.9611654719356
+      ],
+      "speedKnots": 7.196005986840809
+    },
+    {
+      "time": 1082,
+      "stage": -1,
+      "position": [
+        -1024.7894226290207,
+        87.30882364751182,
+        -2870.812117503384
+      ],
+      "speedKnots": 92.91262194215896
+    }
+  ],
+  "gearIntact": true,
+  "noCrashes": true,
+  "screenshots": [
+    "gate.png",
+    "airborne.png"
+  ]
+}

@@ -1,3 +1,4 @@
+import { IncheonDepartureScenario } from './scenarios/IncheonDepartureScenario.js';
 import { IncheonCessnaScenario } from './scenarios/IncheonCessnaScenario.js';
 import { t, bindText } from '../i18n/index.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
@@ -49,6 +50,7 @@ export class DemoFlightDirector {
     this.luklaScenario = new LuklaCircuitScenario(this, simulator);
     this.coastalScenario = new CoastalDemoScenario(this, simulator);
     this.incheonCessnaScenario = new IncheonCessnaScenario(this, simulator);
+    this.incheonDepartureScenario = new IncheonDepartureScenario(this, simulator);
     this.cessnaScenario = new CessnaDemoScenario(this, simulator);
     this.cessnaProximityScenario = new CessnaProximityScenario(this, simulator);
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
@@ -80,7 +82,8 @@ export class DemoFlightDirector {
 
   getActiveScenario() {
     if (this.activeDemoAircraft === 'C172') {
-      if (this.activeDemoAirport === 'incheon') return this.incheonCessnaScenario;
+      if (this.activeDemoAirport === 'incheon') return this.profile === 'incheon-departure'
+        ? this.incheonDepartureScenario : this.incheonCessnaScenario;
       return this.profile === 'proximity' ? this.cessnaProximityScenario : this.cessnaScenario;
     }
     return this.activeDemoAirport === 'lukla' ? this.luklaScenario : this.coastalScenario;
@@ -235,7 +238,8 @@ export class DemoFlightDirector {
 
     if (this.activeDemoAircraft === 'C172') {
       if (this.activeDemoAirport === 'incheon') {
-        this.setStage(IncheonCessnaScenario.STAGES.TAKEOFF);
+        this.setStage(this.profile === 'incheon-departure'
+          ? IncheonDepartureScenario.STAGES.GATE : IncheonCessnaScenario.STAGES.TAKEOFF);
       } else if (this.profile === 'proximity') {
         this.setStage(CessnaProximityScenario.STAGES.SHIP_BUZZ);
       } else {
