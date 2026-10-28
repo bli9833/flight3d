@@ -38,8 +38,13 @@ export class F16 {
   constructor() {
     this.group = new THREE.Group();
     this.group.name = 'Aircraft_F16';
+    // AircraftBreakup traverses this hierarchy, including the cockpit and the
+    // currently visible gear. Keep it below the world-pose root as on other GLBs.
+    this.gltfGroup = new THREE.Group();
+    this.gltfGroup.name = 'GLTF_F16';
+    this.group.add(this.gltfGroup);
     this.lightsGroup = new THREE.Group();
-    this.group.add(this.lightsGroup);
+    this.gltfGroup.add(this.lightsGroup);
     this.lightsOn = true;
     this.useGltf = false;
     this.loadingGltf = true;
@@ -54,7 +59,7 @@ export class F16 {
       toggleYokes() { return this.yokesVisible; },
     };
     // The cockpit stays in the complete airframe, so exterior views also show it.
-    this.group.add(this.cockpit.group);
+    this.gltfGroup.add(this.cockpit.group);
     this.cockpit.group.add(this.cockpit.gltfCockpitGroup);
     this.ready = new GLTFLoader().loadAsync(`${import.meta.env?.BASE_URL ?? '/'}models/f-16.glb`)
       .then(gltf => this.installModel(gltf.scene))
@@ -98,14 +103,14 @@ export class F16 {
         this.installGear(mesh);
       } else if (name.startsWith('F-16-landingOff_')) {
         this.stowedGear = mesh;
-        this.group.add(mesh);
+        this.gltfGroup.add(mesh);
       } else if (name.startsWith('F-16-landingOnLight_')) {
         this.landingLight = mesh;
         this.lightsGroup.add(mesh);
       } else if (name.startsWith('F-16-cockpit_') || name.startsWith('F-16-hud_')) {
         this.cockpit.gltfCockpitGroup.add(mesh);
       } else {
-        this.group.add(mesh);
+        this.gltfGroup.add(mesh);
       }
     }
     this.modelLoaded = this.useGltf = true;
@@ -125,7 +130,7 @@ export class F16 {
       const leg = new THREE.Mesh(geometry, mesh.material);
       leg.castShadow = leg.receiveShadow = true;
       group.add(leg);
-      this.group.add(group);
+      this.gltfGroup.add(group);
       this.gearLegs[id] = group;
     }
     mesh.geometry.dispose();

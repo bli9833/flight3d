@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { F16, F16_SCALE, F16_CENTER_X, splitF16Gear } from '../src/aircraft/F16.js';
+import { AircraftBreakup } from '../src/effects/AircraftBreakup.js';
+import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { F16_FALCON } from '../src/config/aircraftConfigs.js';
 import { CollisionDetector, F16_COLLISION_PROBES } from '../src/physics/CollisionDetector.js';
 
@@ -48,6 +51,8 @@ test('supplied F16 gear separates into three nonempty legs without losing triang
 test('gear retracts and extends repeatedly from continuous telemetry without accumulating rotation', () => {
   const aircraft = Object.create(F16.prototype);
   aircraft.group = new THREE.Group();
+  aircraft.gltfGroup = new THREE.Group();
+  aircraft.group.add(aircraft.gltfGroup);
   aircraft.gearLegs = {};
   aircraft.gearExtension = 1;
   aircraft.lightsOn = true;
@@ -73,4 +78,75 @@ test('F16 uses its own contact envelope, cockpit, and noncommercial source attri
   assert.ok(gltf.nodes.some(n => n.name.startsWith('F-16-cockpit')));
   assert.equal(gltf.asset.extras.author.split(' ')[0], 'bohmerang');
   assert.match(gltf.asset.extras.license, /CC-BY-NC-SA-4.0/);
+});
+
+async function loadUntexturedAsset() {
+  // Preserve the actual GLB hierarchy and geometry; only omit DOM image decoding.
+  const asset = structuredClone(gltf);
+  asset.materials = asset.materials.map(({ name, alphaMode, doubleSided }) => ({ name, alphaMode, doubleSided }));
+  delete asset.images;
+  delete asset.textures;
+  delete asset.samplers;
+  const text = Buffer.from(JSON.stringify(asset));
+  const padded = Buffer.concat([text, Buffer.alloc((4 - text.length % 4) % 4, 0x20)]);
+  const header = Buffer.from(bytes.subarray(0, 20));
+  const binary = bytes.subarray(20 + jsonLength);
+  header.writeUInt32LE(20 + padded.length + binary.length, 8);
+  header.writeUInt32LE(padded.length, 12);
+  const buffer = Buffer.concat([header, padded, binary]);
+  return new GLTFLoader().parseAsync(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength), '');
+}
+
+test('loaded F16 breaks into complete wreckage and restores its aircraft/camera across repeated crashes', async t => {
+  const loaded = await loadUntexturedAsset();
+  t.mock.method(GLTFLoader.prototype, 'loadAsync', async () => loaded);
+  const aircraft = new F16();
+  await aircraft.ready;
+  assert.equal(aircraft.modelLoaded, true);
+  const scene = new THREE.Scene();
+  scene.add(aircraft.group);
+  const breakup = new AircraftBreakup(scene);
+  const camera = new THREE.PerspectiveCamera(75, 0.6, 0.08, 45000);
+  const system = new CameraSystem(camera, null);
+  system.loadAircraftConfig(F16_FALCON);
+  const vertices = object => {
+    let count = 0;
+    object.traverseVisible(mesh => {
+      if (mesh.isMesh) count += mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count;
+    });
+    return count;
+  };
+  for (const [cycle, gearState] of [1, .35, 0].entries()) {
+    aircraft.group.position.set(7000 + cycle * 100, 500, 3000);
+    aircraft.group.rotation.set(.1, .7, .2);
+    aircraft.update(0, { gearState });
+    aircraft.setCockpitMode(true);
+    system.setMode(CameraSystem.MODES.COCKPIT, true);
+    aircraft.triggerCrashVisuals();
+    const expectedVertices = vertices(aircraft.group);
+    assert.ok(expectedVertices > 30000, 'actual airframe and cockpit geometry is present');
+    breakup.spawn(aircraft, new THREE.Vector3(50, -8, 0));
+    assert.equal(aircraft.group.visible, false, 'the intact F16 must leave the crash view');
+    assert.ok(breakup.pieces.length >= 4, 'crash must produce structural wreckage');
+    assert.equal(breakup.pieces.reduce((sum, piece) => sum + vertices(piece.object), 0), expectedVertices,
+      'cockpit, exterior, and currently visible gear must each appear exactly once');
+    assert.ok(breakup.target.distanceTo(aircraft.group.position) < 20, 'camera target follows this crash, not world origin or the previous crash');
+    system.beginCrashView(breakup);
+    assert.equal(system.mode, CameraSystem.MODES.CHASE);
+    assert.ok(camera.position.distanceTo(breakup.target) > breakup.radius);
+    assert.equal(system.setMode(CameraSystem.MODES.COCKPIT, true), false);
+    breakup.update(.25, { getHeight: () => 0 });
+    assert.ok(breakup.pieces.every(piece => piece.object.position.toArray().every(Number.isFinite)));
+    breakup.clear();
+    system.endCrashView();
+    aircraft.resetCrashVisuals();
+    assert.equal(aircraft.group.visible, true);
+    assert.equal(aircraft.isCrashed, false);
+    assert.equal(system.mode, CameraSystem.MODES.COCKPIT);
+    assert.equal(system.crashView, null);
+    assert.equal(breakup.pieces.length, 0);
+    assert.deepEqual(scene.children, [aircraft.group], 'reset removes generated wreckage only');
+    aircraft.update(0, { gearState: 1 });
+    assert.ok(Object.values(aircraft.gearLegs).every(leg => leg.visible && leg.rotation.x === 0 && leg.rotation.z === 0));
+  }
 });
