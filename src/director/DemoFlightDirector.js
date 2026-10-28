@@ -1,4 +1,5 @@
 import { F16LuklaScenario } from './scenarios/F16LuklaScenario.js';
+import { F16CanyonChaseScenario } from './scenarios/F16CanyonChaseScenario.js';
 import { IncheonDepartureScenario } from './scenarios/IncheonDepartureScenario.js';
 import { IncheonCessnaScenario } from './scenarios/IncheonCessnaScenario.js';
 import { t, bindText } from '../i18n/index.js';
@@ -53,6 +54,7 @@ export class DemoFlightDirector {
     this.incheonCessnaScenario = new IncheonCessnaScenario(this, simulator);
     this.incheonDepartureScenario = new IncheonDepartureScenario(this, simulator);
     this.f16Scenario = new F16LuklaScenario(this, simulator);
+    this.f16CanyonScenario = new F16CanyonChaseScenario(this, simulator);
     this.cessnaScenario = new CessnaDemoScenario(this, simulator);
     this.cessnaProximityScenario = new CessnaProximityScenario(this, simulator);
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
@@ -83,7 +85,9 @@ export class DemoFlightDirector {
   }
 
   getActiveScenario() {
-    if (this.activeDemoAircraft === 'F16') return this.f16Scenario;
+    if (this.activeDemoAircraft === 'F16') {
+      return this.profile === 'canyon-chase' ? this.f16CanyonScenario : this.f16Scenario;
+    }
     if (this.activeDemoAirport === 'incheon' && this.activeDemoAircraft === 'B738') return this.incheonDepartureScenario;
     if (this.activeDemoAircraft === 'C172') {
       if (this.activeDemoAirport === 'incheon') return this.incheonCessnaScenario;
@@ -241,7 +245,11 @@ export class DemoFlightDirector {
     }
 
     if (this.activeDemoAircraft === 'F16') {
-      this.setStage(F16LuklaScenario.STAGES.ESTABLISH);
+      if (this.profile === 'canyon-chase') {
+        this.setStage(F16CanyonChaseScenario.STAGES.INGRESS);
+      } else {
+        this.setStage(F16LuklaScenario.STAGES.ESTABLISH);
+      }
     } else if (this.activeDemoAirport === 'incheon' && this.activeDemoAircraft === 'B738') {
       this.setStage(IncheonDepartureScenario.STAGES.GATE);
     } else if (this.activeDemoAircraft === 'C172') {

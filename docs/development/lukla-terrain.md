@@ -29,8 +29,8 @@ alignment reference, **not surveyed threshold coordinates**. The previous origin
 27.6878 N, 86.7314 E was near the northeast end rather than the runway midpoint.
 
 Both assets are reprojected to a WGS84 azimuthal equidistant grid centered there.
-World X is east; world Z is south. DEM rows run north to south. The 22 km square
-contains 513 × 513 Float32 little-endian samples at 42.96875 m spacing; the source
+World X is east; world Z is south. DEM rows run north to south. The 44 km square
+contains 1025 × 1025 Float32 little-endian samples at 42.96875 m spacing; the source
 is one arc second (nominal 30 m). The main render mesh remains about 86 m, with a
 10 m local airport mesh. That local tessellation adds no new measured detail.
 Texture UVs map the same local-meter square; a Web Mercator tile mosaic is no
