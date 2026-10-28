@@ -355,7 +355,7 @@ describe('C172 piston sound and lifecycle', () => {
     const update = (height, vsi) => audio.update(0.1, pistonState(70, {onGround:false,radioAltFt:height,vsiFpm:vsi}), false);
     update(600,-500); update(490,-500);
     update(1200,700); update(490,-500);
-    assert.deepEqual(calls, ['500','500']);
+    assert.deepEqual(calls, ['Five hundred, five hundred', 'Five hundred, five hundred']);
     audio.reset(); assert.equal(audio.calledAltitudes.size,0);
   }));
 
@@ -465,4 +465,75 @@ describe('warning audio arbitration', () => {
     assert.equal(audio.warningGain.gain.value, 0);
     audio.reset(); assert.equal(audio.alertId, null);
   }));
+});
+
+describe('GPWS voice authenticity', () => {
+  it('pins English speech and a pronouncer cadence regardless of OS locale', () => {
+    const previous = globalThis.window, previousUtterance = globalThis.SpeechSynthesisUtterance;
+    const enGb = { name: 'Daniel', lang: 'en-GB', localService: true };
+    const enUsGoogle = { name: 'Google US English', lang: 'en-US', localService: false };
+    const ko = { name: 'Seulgi', lang: 'ko-KR', localService: true };
+    const spoken = [];
+    class FakeUtterance {
+      constructor(text) { this.text = text; }
+      set voice(v) { this._voice = v; }
+    }
+    const synth = {
+      onvoiceschanged: null,
+      getVoices: () => [ko, enGb, enUsGoogle],
+      speak(u) { spoken.push({ text: u.text, voice: u._voice, lang: u.lang, rate: u.rate, pitch: u.pitch }); },
+      cancel() {},
+    };
+    globalThis.window = { AudioContext: createMockAudioContext(), speechSynthesis: synth };
+    globalThis.SpeechSynthesisUtterance = FakeUtterance;
+    try {
+      const audio = new FlightAudio();
+      audio.loadAircraftConfig(BOEING_737_800); audio.init();
+      audio.playGpwsCallout('Terrain, terrain. Pull up, pull up');
+      assert.equal(spoken.length, 1);
+      const call = spoken[0];
+      assert.equal(call.voice, enUsGoogle, 'network Google en-US is preferred over local en-GB');
+      assert.equal(call.lang, 'en-US');
+      assert.ok(call.rate <= 1 && call.pitch <= 0.6, 'measured low-pitch pronouncer cadence');
+      audio.playGpwsCallout('Sink rate, sink rate');
+      assert.equal(spoken.length, 2);
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+      if (previousUtterance === undefined) delete globalThis.SpeechSynthesisUtterance; else globalThis.SpeechSynthesisUtterance = previousUtterance;
+    }
+  });
+
+  it('reselects once voices load late, and stays silent-safe without English voices', () => {
+    const previous = globalThis.window, previousUtterance = globalThis.SpeechSynthesisUtterance;
+    const enUs = { name: 'Zira', lang: 'en-US', localService: true };
+    let voices = [];
+    const spoken = [];
+    class FakeUtterance {
+      constructor(text) { this.text = text; }
+      set voice(v) { this._voice = v; }
+    }
+    const synth = {
+      onvoiceschanged: null,
+      getVoices: () => voices,
+      speak(u) { spoken.push({ voice: u._voice, lang: u.lang }); },
+      cancel() {},
+    };
+    globalThis.window = { AudioContext: createMockAudioContext(), speechSynthesis: synth };
+    globalThis.SpeechSynthesisUtterance = FakeUtterance;
+    try {
+      const audio = new FlightAudio();
+      audio.loadAircraftConfig(BOEING_737_800); audio.init();
+      audio.playGpwsCallout('Five hundred, five hundred');
+      assert.equal(spoken.length, 1, 'falls back to locale default with no voice list');
+      assert.equal(spoken[0].voice, undefined);
+      assert.equal(typeof synth.onvoiceschanged, 'function');
+      voices = [enUs];
+      synth.onvoiceschanged();
+      audio.playGpwsCallout('Five hundred, five hundred');
+      assert.equal(spoken[1].voice, enUs, 'late-loading voices are picked on the next callout');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+      if (previousUtterance === undefined) delete globalThis.SpeechSynthesisUtterance; else globalThis.SpeechSynthesisUtterance = previousUtterance;
+    }
+  });
 });

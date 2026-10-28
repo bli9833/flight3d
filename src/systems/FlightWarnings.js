@@ -66,14 +66,14 @@ export class FlightWarnings {
         const sink = Math.max(0, -vsi), impactTime = this.closure > 1 ? ra / this.closure : Infinity;
         if (ra > 10 && ra < 2450 && sink > 1500 + ra * 2 ||
             ra > 10 && impactTime < (landing ? 3 : 8) && (!landing || sink > 1000) || terrainAheadSeconds < 8)
-          add('pull-up', 'PULL UP', 100, this.id === 'F16' ? 'Pull up, pull up' : 'Whoop whoop, pull up');
+          add('pull-up', 'PULL UP', 100, this.id === 'F16' ? 'Pull up, pull up' : 'Terrain, terrain. Pull up, pull up');
         else if (ra > 30 && ra < 2450 && sink > 1000 + ra * 1.2)
-          add('sink-rate', 'SINK RATE', 80);
+          add('sink-rate', 'SINK RATE', 80, this.id === 'B738' ? 'Sink rate, sink rate' : undefined);
         else if (ra > 30 && impactTime < 15 && !landing || terrainAheadSeconds < 15)
           add('terrain', 'TERRAIN', 90, 'Terrain, terrain');
         if (!this.departure && vsi < -100 && ra > 30) {
-          if (ra < 500 && s.gearState < 0.95) add('gear', this.id === 'F16' ? 'GEAR DOWN' : 'TOO LOW GEAR', 65);
-          else if (this.id === 'B738' && ra < 200 && s.flapDegree < p.landingFlap) add('flaps', 'TOO LOW FLAPS', 60);
+          if (ra < 500 && s.gearState < 0.95) add('gear', this.id === 'F16' ? 'GEAR DOWN' : 'TOO LOW GEAR', 65, this.id === 'B738' ? 'Too low gear' : undefined);
+          else if (this.id === 'B738' && ra < 200 && s.flapDegree < p.landingFlap) add('flaps', 'TOO LOW FLAPS', 60, 'Too low flaps');
         }
         if (this.departure && ra > 30 && ra < 1500 && vsi < -200 && this.peakAltitude - s.altitudeFt > Math.max(20, ra * 0.1))
           add('dont-sink', "DON'T SINK", 75);
