@@ -425,3 +425,32 @@ describe('Exterior camera distance attenuation in the audio graph', () => {
     }
   });
 });
+
+
+describe('warning audio arbitration', () => {
+  it('preempts altitude callouts, repeats urgent alerts, and cancels on recovery', () => withPiston((audio) => {
+    audio.loadAircraftConfig(BOEING_737_800);
+    const spoken = []; audio.playGpwsCallout = text => spoken.push(text);
+    const warning = { id: 'pull-up', voice: 'Whoop whoop, pull up' };
+    const state = pistonState(70, { onGround: false, radioAltFt: 490, vsiFpm: -1500, warnings: [warning] });
+    audio.update(0.1, state, true);
+    audio.update(0.1, state, true);
+    assert.deepEqual(spoken, ['Whoop whoop, pull up']);
+    audio.update(4, state, true);
+    assert.equal(spoken.length, 2);
+    audio.update(0.1, { ...state, warnings: [], radioAltFt: 480 }, true);
+    assert.equal(audio.alertId, undefined);
+  }));
+  it('sounds overspeed clacker and engine caution chime, then restores the horn frequency', () => withPiston(audio => {
+    audio.loadAircraftConfig(BOEING_737_800);
+    const state = pistonState(70, { onGround: false, warnings: [{ id: 'overspeed' }] });
+    audio.update(0.1, state, true);
+    assert.equal(audio.warningOsc.frequency.value, 800);
+    audio.update(0.1, { ...state, warnings: [{ id: 'engine' }] }, true);
+    assert.equal(audio.warningGain.gain.value, 0.25);
+    audio.update(0.5, { ...state, warnings: [] }, true);
+    assert.equal(audio.warningOsc.frequency.value, 680);
+    assert.equal(audio.warningGain.gain.value, 0);
+    audio.reset(); assert.equal(audio.alertId, null);
+  }));
+});

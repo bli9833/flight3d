@@ -1,3 +1,4 @@
+import { FlightWarnings, terrainConflictSeconds } from './systems/FlightWarnings.js';
 import { AircraftBreakup } from './effects/AircraftBreakup.js';
 import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
@@ -560,6 +561,8 @@ class FlightSimulator {
 
   loadAircraftConfig(config = BOEING_737_800) {
     this.currentAircraftConfig = config;
+    this.flightWarnings ??= new FlightWarnings();
+    this.flightWarnings.configure(config.id);
     this.audio?.loadAircraftConfig(config);
     if (this.aero?.loadConfig) this.aero.loadConfig(config);
     if (this.engines?.loadConfig) this.engines.loadConfig(config);
@@ -780,6 +783,7 @@ class FlightSimulator {
     this.shadowDemo?.stop();
     this.lastPresetType = type;
     this.audio?.reset();
+    this.flightWarnings?.reset();
     if (!isDemoInternal) this.loadAircraftConfig(this.currentAircraftConfig || BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
@@ -1553,6 +1557,10 @@ class FlightSimulator {
       parkBrake: Boolean(this.controls.parkingBrake || (gearResult.onGround && this.controls.brakes > 0.8 && Atmosphere.msToKnots(groundSpeed) < 1.0))
     };
 
+    this.telemetry.warnings = this.isCrashed ? [] : this.flightWarnings.update(dt, this.telemetry,
+      terrainConflictSeconds(this.position, this.linearVelocity, this.currentTerrain,
+        this.telemetry.gearState > 0.95 && this.telemetry.flapDegree >= (this.currentAircraftConfig.id === 'B738' ? 15 : 0)));
+
     // 11. Touchdown Tire Smoke & Landing Contact Gate
     const gsKnots = Atmosphere.msToKnots(groundSpeed);
     let genuineLandingTouchdown = false;
@@ -1639,6 +1647,8 @@ class FlightSimulator {
   triggerCrash(crashResult, impactVelocity = this.linearVelocity) {
     if (this.isCrashed) return;
     this.isCrashed = true;
+    this.flightWarnings.reset();
+    this.telemetry.warnings = [];
     this.crashResult = crashResult;
 
     // 1. Spawn Visual Explosion Particles, Fireball, Smoke & Dynamic Light Flash
@@ -1979,6 +1989,13 @@ class FlightSimulator {
     if (elGForce) elGForce.textContent = `${this.telemetry.gForce.toFixed(2)} G`;
     if (elStall) {
       elStall.style.display = this.telemetry.isStalled ? 'block' : 'none';
+    }
+    const warning = document.getElementById('hud-warning');
+    if (warning) {
+      const alert = this.isCrashed ? null : this.telemetry.warnings?.[0];
+      warning.textContent = alert?.text || '';
+      warning.hidden = !alert;
+      warning.style.color = alert?.priority >= 85 ? '#ff5555' : '#ffbe55';
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
     this.updateAutopilotUI();
