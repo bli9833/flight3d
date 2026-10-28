@@ -150,3 +150,26 @@ test('loaded F16 breaks into complete wreckage and restores its aircraft/camera 
     assert.ok(Object.values(aircraft.gearLegs).every(leg => leg.visible && leg.rotation.x === 0 && leg.rotation.z === 0));
   }
 });
+
+test('F16 cockpit stays on its centerline through portrait resize, snap and aircraft changes', () => {
+  const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.08, 1000);
+  const system = new CameraSystem(camera, { addEventListener() {}, style: {} });
+  const aircraft = new THREE.Object3D();
+  aircraft.updateMatrixWorld(true);
+  system.loadAircraftConfig(F16_FALCON);
+  system.setMode(CameraSystem.MODES.COCKPIT, true);
+  for (const aspect of [16 / 9, 390 / 844, 16 / 9]) {
+    camera.aspect = aspect;
+    system.snapToTarget(aircraft);
+    assert.equal(camera.position.x, 0);
+    system.update(1 / 60, aircraft, { onGround: true });
+    assert.equal(camera.position.x, 0);
+  }
+  camera.aspect = 390 / 844;
+  system.loadAircraftConfig({ id: 'B738' });
+  system.snapToTarget(aircraft);
+  assert.equal(camera.position.x, -0.34, 'other aircraft retain portrait framing');
+  system.loadAircraftConfig(F16_FALCON);
+  system.snapToTarget(aircraft);
+  assert.equal(camera.position.x, 0);
+});

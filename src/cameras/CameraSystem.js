@@ -42,6 +42,7 @@ export class CameraSystem {
     // Cockpit Head Dynamics & Look-Around
     this.photoCockpit = false; // Default to high-fidelity 3D Virtual Cockpit with GLTF asset
     this.supportsPhotoCockpit = true; // Enabled for Boeing 737; disabled for 3D-only cockpits (e.g. C172)
+    this.cockpitPortraitEyeX = -0.34;
     this.cockpitHeadOffset = new THREE.Vector3(-0.39, 0.85, -12.35); // Captain eye
     this.headGForceOffset = new THREE.Vector3();
     this.touchJoltOffset = 0;
@@ -682,6 +683,7 @@ export class CameraSystem {
 
   loadAircraftConfig(config = {}) {
     const cockpit = config.cockpit || {};
+    this.cockpitPortraitEyeX = cockpit.portraitEyeX ?? -0.34;
     const aero = config.aerodynamics || {};
     const span = aero.wingspanM ?? 35.8;
 
@@ -758,7 +760,7 @@ export class CameraSystem {
     if (this.mode === CameraSystem.MODES.COCKPIT) {
       const eyeLocal = this.cockpitHeadOffset.clone();
       if (this.camera && this.camera.aspect < 1.0) {
-        eyeLocal.x = -0.34;
+        eyeLocal.x = this.cockpitPortraitEyeX;
         eyeLocal.y += 0.03;
       }
       const eyeWorld = eyeLocal.applyMatrix4(aircraftMesh.matrixWorld);
@@ -1210,7 +1212,7 @@ export class CameraSystem {
 
         const eyeLocal = this.cockpitHeadOffset.clone();
         if (this.camera && this.camera.aspect < 1.0) {
-          eyeLocal.x = -0.34;
+          eyeLocal.x = this.cockpitPortraitEyeX;
           eyeLocal.y += 0.03;
         }
         if (this.photoCockpit && this.supportsPhotoCockpit) {
