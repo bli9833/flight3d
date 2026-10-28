@@ -93,6 +93,11 @@ export class Aerodynamics {
     this.CLa = aero.claPerRad || 5.65;
     this.alphaStallClean = THREE.MathUtils.degToRad(aero.alphaStallDeg || 15.5);
     this.CD0 = aero.cd0Clean || 0.0185;
+    this.stallWarningConfig = config.stallWarning || { marginDeg: 2.0 };
+    this.warningReferenceMass = mass.maxTakeoffWeightKg || this.mass;
+    this.isStallWarning = false;
+    // Optional gear-handle input; standalone callers fall back to gear position.
+    this.gearHandleDown = undefined;
 
     this.Cm0 = aero.cm0 || -0.02;
     this.Cma = aero.cma || -0.85;
@@ -217,9 +222,25 @@ export class Aerodynamics {
     this.stallSeverity = this.separation;
     const stallAnnunciationValid = tas > 15.0;
     this.isStalled = stallAnnunciationValid && this.separation > 0.1;
-    // Stick-shaker margin: sensed AoA within ~2 degrees below the break angle
-    this.isPreStall = stallAnnunciationValid && !this.isStalled &&
-      absAlpha >= alphaStall - THREE.MathUtils.degToRad(2.0);
+    // Real positive-AoA warning sensors are separate from the magnitude-based
+    // separation diagnostic. Inverted attitude alone does not reverse AoA.
+    const warning = this.stallWarningConfig;
+    let warningAlpha = alphaStall - THREE.MathUtils.degToRad(warning.marginDeg ?? 2.0);
+    if (warning.type === 'pneumaticHorn') {
+      // Calibrate a fixed AoA threshold to the POH's 5–10 kt warning margin
+      // in reference 1g flight. Never gate the horn on IAS: accelerated stalls
+      // must still warn. Use the current model's attached-flow CLmax.
+      const clMax = cl0 + this.CLa * alphaStall;
+      const referenceVs = Math.sqrt(2 * this.warningReferenceMass * Atmosphere.G0 /
+        (1.225 * this.wingArea * clMax));
+      const speedRatio = referenceVs / (referenceVs + warning.referenceMarginKnots / 1.94384);
+      warningAlpha = (clMax * speedRatio * speedRatio - cl0) / this.CLa;
+    } else if (warning.type === 'lowSpeed' && (this.gearHandleDown ?? gearState > 0.5)) {
+      warningAlpha = THREE.MathUtils.degToRad(warning.gearDownAlphaDeg);
+    }
+    this.stallWarningAlphaDeg = THREE.MathUtils.radToDeg(warningAlpha);
+    this.isStallWarning = stallAnnunciationValid && this.alpha > warningAlpha;
+    this.isPreStall = this.isStallWarning && !this.isStalled;
 
     // Lift is a continuous function of the separation state:
     // - clCapped: linear curve truncated at the stall break (CLmax), C0-continuous
@@ -401,6 +422,8 @@ export class Aerodynamics {
     result.isStalled = this.isStalled;
     result.isPreStall = this.isPreStall;
     result.stallSeverity = this.stallSeverity;
+    result.isStallWarning = this.isStallWarning;
+    result.stallWarningAlphaDeg = this.stallWarningAlphaDeg;
     result.separation = this.separation;
     result.buffetVibration = this.buffetVibration;
     result.gForce = this.gForce;
