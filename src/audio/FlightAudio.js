@@ -1,3 +1,4 @@
+import { DepartureRadio } from './DepartureRadio.js';
 import { pistonSoundState } from './pistonSoundState.js';
 import { exteriorDistanceGain, exteriorAirCutoff } from './distanceAcoustics.js';
 import { t } from '../i18n/index.js';
@@ -16,6 +17,12 @@ export class FlightAudio {
     this.isInitialized = false;
 
     this.volume = 1.0;
+
+    this.departureRadio = new DepartureRadio({
+      context: () => this.ctx, output: () => this.masterGain,
+      muted: () => this.isMuted || this.volume === 0,
+      baseUrl: import.meta.env?.BASE_URL ?? '/',
+    });
 
     // Callout tracking
     this.lastRadioAlt = 9999;
@@ -53,6 +60,7 @@ export class FlightAudio {
     this.calledAltitudes.clear();
     this.stallBeepTime = 0;
     this.cancelSpeech();
+    this.departureRadio.stop();
     if (this.packGain) this.packGain.gain.setTargetAtTime(this.isPiston ? 0 : 0.16, this.ctx.currentTime, 0.04);
     if (this.warningGain) this.warningGain.gain.setValueAtTime(0, this.ctx.currentTime);
   }
@@ -450,6 +458,11 @@ export class FlightAudio {
     } catch (e) {}
   }
 
+  playDepartureRadio(stage) {
+    this.ensureContextRunning();
+    return this.departureRadio.play(stage);
+  }
+
   playGpwsCallout(text) {
     if (this.isMuted || this.effectiveVolume === 0 || this.isPiston || this.crashed) return;
     if ('speechSynthesis' in window) {
@@ -468,13 +481,13 @@ export class FlightAudio {
     if (this.volume > 0.0) {
       this.isMuted = false;
     }
-    if (this.volume === 0) this.cancelSpeech();
+    if (this.volume === 0) { this.cancelSpeech(); this.departureRadio.stop(); }
     this.applyMasterGain();
   }
 
   setMuted(muted) {
     this.isMuted = !!muted;
-    if (this.isMuted) this.cancelSpeech();
+    if (this.isMuted) { this.cancelSpeech(); this.departureRadio.stop(); }
     this.applyMasterGain();
   }
 
@@ -613,6 +626,7 @@ export class FlightAudio {
   playExplosion(isWater = false) {
     this.crashed = true;
     this.cancelSpeech();
+    this.departureRadio.stop();
     if (this.ctx) {
       for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain']) {
         this[name]?.gain.setValueAtTime(0, this.ctx.currentTime);

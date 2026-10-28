@@ -1,6 +1,7 @@
 {
+  "aircraft": "B738",
   "browserExceptions": 0,
-  "observedPushbackSeconds": 38,
+  "observedPushbackSeconds": 36,
   "result": {
     "status": "completed",
     "airborne": true,
@@ -15,17 +16,17 @@
       "takeoff"
     ],
     "radio": [
-      "Pilot: Incheon Apron, Sky 123, ready for pushback. Apron: Sky 123, pushback approved. Ground crew: Tug connected.",
-      "Ground crew: Brakes released, commencing pushback. Pilot: Pushback acknowledged.",
-      "Ground crew: Pushback complete. Set parking brake. Pilot: Brake set. Ground crew: Tug disconnected, all equipment clear.",
-      "Pilot: Ground, Sky 123, ready to taxi. Ground: Taxi via the simulation route to runway 15R. Hold short. Pilot: Taxi to 15R, hold short, Sky 123.",
-      "Pilot: Incheon Tower, Sky 123, holding short runway 15R, ready for departure. Tower: Hold short, landing traffic. Pilot: Holding short, Sky 123.",
-      "Tower: Sky 123, runway 15R, line up and wait. Pilot: Runway 15R, line up and wait, Sky 123.",
-      "Tower: Sky 123, runway 15R, cleared for takeoff. Pilot: Runway 15R, cleared for takeoff, Sky 123.",
-      "Pilot: Takeoff clearance confirmed. Accelerating, rotating and climbing."
+      "조종사: Incheon Apron, Sky 123, ready for pushback. 계류장 관제: Sky 123, pushback approved. 지상요원: Tug connected.",
+      "지상요원: Brakes released, commencing pushback. 조종사: Pushback acknowledged.",
+      "지상요원: Pushback complete. Set parking brake. 조종사: Brake set. 지상요원: Tug disconnected, all equipment clear.",
+      "조종사: Ground, Sky 123, ready to taxi. 지상 관제: Taxi via the simulation route to runway 15R. Hold short. 조종사: Taxi to 15R, hold short, Sky 123.",
+      "조종사: Incheon Tower, Sky 123, holding short runway 15R, ready for departure. 관제탑: Hold short, landing traffic. 조종사: Holding short, Sky 123.",
+      "관제탑: Sky 123, runway 15R, line up and wait. 조종사: Runway 15R, line up and wait, Sky 123.",
+      "관제탑: Sky 123, runway 15R, cleared for takeoff. 조종사: Runway 15R, cleared for takeoff, Sky 123.",
+      "조종사: Takeoff clearance confirmed. Accelerating, rotating and climbing."
     ],
     "taxiPoints": 116,
-    "elapsedSeconds": 1083.9666666666633
+    "elapsedSeconds": 961.8499999992896
   },
   "stages": [
     {
@@ -33,7 +34,7 @@
       "stage": 50,
       "position": [
         90.62,
-        8.35,
+        10.5,
         -191.86
       ],
       "speedKnots": 0
@@ -43,18 +44,18 @@
       "stage": 51,
       "position": [
         90.62,
-        8.35,
+        10.5,
         -191.86
       ],
       "speedKnots": 0
     },
     {
-      "time": 42,
+      "time": 40,
       "stage": 52,
       "position": [
-        101.231312473216,
-        8.352698100724787,
-        -148.719584020921
+        101.24244235379848,
+        10.447816282437923,
+        -148.67842235259337
       ],
       "speedKnots": 0
     },
@@ -62,67 +63,53 @@
       "time": 48,
       "stage": 53,
       "position": [
-        101.22399534122444,
-        8.352795339847994,
-        -148.7547003554278
+        101.24243661061172,
+        10.447873043821808,
+        -148.6784457101805
       ],
-      "speedKnots": 0.2021516496137897
+      "speedKnots": 0.001051205543764516
     },
     {
-      "time": 986,
-      "stage": 54,
-      "position": [
-        -1671.2646845625782,
-        8.35158395240245,
-        -3656.9980640113517
-      ],
-      "speedKnots": 0
-    },
-    {
-      "time": 994,
+      "time": 860,
       "stage": 55,
       "position": [
-        -1671.165703404399,
-        8.352785650265275,
-        -3657.0613888157404
+        -1637.8392703164989,
+        10.450632508535527,
+        -3674.8958069422492
       ],
-      "speedKnots": 0.47457301359836784
+      "speedKnots": 11.698342997242442
     },
     {
-      "time": 1048,
+      "time": 900,
       "stage": 56,
       "position": [
-        -1560.760276412664,
-        8.351599226908384,
-        -3627.1084659827643
+        -1523.710477161414,
+        10.463428673777932,
+        -3570.5874519769936
       ],
       "speedKnots": 0
     },
     {
-      "time": 1054,
+      "time": 920,
       "stage": 57,
       "position": [
-        -1559.2710695220603,
-        8.352538743927532,
-        -3624.9611654719356
+        -1309.065653155051,
+        10.501171247088733,
+        -3266.6238199606228
       ],
-      "speedKnots": 7.196005986840809
+      "speedKnots": 95.78990661302666
     },
     {
-      "time": 1082,
+      "time": 960,
       "stage": -1,
       "position": [
-        -1024.7894226290207,
-        87.30882364751182,
-        -2870.812117503384
+        851.227865698016,
+        382.74274527631354,
+        -217.46881665422927
       ],
-      "speedKnots": 92.91262194215896
+      "speedKnots": 221.65443632598866
     }
   ],
   "gearIntact": true,
-  "noCrashes": true,
-  "screenshots": [
-    "gate.png",
-    "airborne.png"
-  ]
+  "noCrashes": true
 }
