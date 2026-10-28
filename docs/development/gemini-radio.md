@@ -23,3 +23,26 @@ and compression; it does not add static or push-to-talk clicks.
 
 References: [speech generation](https://ai.google.dev/gemini-api/docs/generate-content/speech-generation),
 [pricing](https://ai.google.dev/gemini-api/docs/pricing).
+
+## Full departure assets
+
+After approving the audition, regenerate all eight bundled stage clips with:
+
+```sh
+node scripts/build-gemini-departure-radio.mjs
+```
+
+The full generator uses the same model and radio processing. Charon voices the
+pilot, Fenrir the ground crew, and Kore the controllers. Exchanges use at most
+two speakers per request; the three-speaker gate exchange is split into two
+requests. Requests are spaced at least 22 seconds apart. Successful clean WAVs
+are cached by model and request hash in `.cache/gemini-departure/`, so rerunning
+after a quota failure reuses completed synthesis. No retries or paid fallback
+occur. Public assets and their provenance manifest are replaced only once all
+stages succeed. Generated clean takes stay local for comparison. The legacy
+`build-departure-radio.mjs` remains an explicit Flite alternative; running it
+overwrites the Gemini clips with Flite output.
+
+When the local audition manifest exactly matches the clearance transcript,
+voices and model, the generator reuses those approved clean takes for the
+clearance stage instead of making another synthesis request.

@@ -76,11 +76,13 @@ cancellation, and offline rendering of all eight decoded clips. Set `SCREENSHOTS
 for a physics-only run if GPU screenshot capture is slow.
 
 Voice assets are already bundled; no runtime TTS, OS voice installation or API key
-is needed. To regenerate original dialogue locally, use FFmpeg with its Flite
-filter and run `node scripts/build-departure-radio.mjs`. The manifest records the
+is needed. Current clips use Gemini 2.5 Flash TTS: Charon (pilot), Fenrir (crew)
+and Kore (controllers). To regenerate, set `GEMINI_API_KEY` in the authoring
+environment and run `node scripts/build-gemini-departure-radio.mjs` with FFmpeg
+installed. See [Gemini authoring](gemini-radio.md). The manifest records the
 transcript, speaker voice and duration. Attribution is in
 `public/audio/departure/LICENSE.txt`. Generated speech is band-limited to
-320–3100 Hz; it is synthetic dialogue, not a recording of live controllers.
+300–3200 Hz and compressed; it is synthetic dialogue, not a recording of live controllers.
 
 The gate harness checks desktop/mobile selection, the 737 bridge docking and
 clearance sequence, visible tractor movement after uncoupling, wheel animation
