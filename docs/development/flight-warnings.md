@@ -53,3 +53,13 @@ HUD text, warning-voice dispatch and nonzero OfflineAudioContext output (RMS
 terrain encounter. Speech dispatch was intercepted for deterministic assertions;
 OS voice playback/listening quality has not been accepted. The browser screenshots
 and JSON are written to `.cache/flight-warnings/` and are not committed.
+
+
+Review regressions: engine warnings inspect only installed engines using
+`propulsion.numEngines`; the single-engine compatibility `engine2.failed` flag
+is excluded. Departure loss monitoring also ends below 1500ft after reaching
+300ft and either five seconds of level flight (within ±100fpm) or a configured
+descent. This retains initial climb-loss warnings while allowing low circuits
+to enter approach and rearming gear/flap cautions. These phase thresholds are
+simulator tuning values. Regression tests use real EngineModel output for all
+three aircraft and continuous low-circuit / approach / reset sequences.

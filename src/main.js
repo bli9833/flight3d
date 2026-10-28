@@ -562,7 +562,7 @@ class FlightSimulator {
   loadAircraftConfig(config = BOEING_737_800) {
     this.currentAircraftConfig = config;
     this.flightWarnings ??= new FlightWarnings();
-    this.flightWarnings.configure(config.id);
+    this.flightWarnings.configure(config);
     if (this.telemetry) this.telemetry.warnings = [];
     this.audio?.loadAircraftConfig(config);
     if (this.aero?.loadConfig) this.aero.loadConfig(config);

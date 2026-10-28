@@ -5,12 +5,18 @@ const PROFILES = {
   F16: { vne: 800, mach: 2.05, bank: 85, terrain: true, landingFlap: 0 },
 };
 export class FlightWarnings {
-  constructor(id = 'B738') { this.configure(id); }
-  configure(id) { this.id = id; this.profile = PROFILES[id] || PROFILES.B738; this.reset(); }
+  constructor(config = 'B738') { this.configure(config); }
+  configure(config) {
+    this.id = typeof config === 'string' ? config : config.id;
+    this.profile = PROFILES[this.id] || PROFILES.B738;
+    this.numEngines = config.propulsion?.numEngines ?? (this.id === 'C172' || this.id === 'F16' ? 1 : 2);
+    this.reset();
+  }
   reset() {
     this.result = [];
     this.active = new Map(); this.previous = null; this.closure = 0;
     this.departure = false; this.peakAltitude = null; this.wasGrounded = false;
+    this.peakRadioAlt = 0; this.levelTime = 0;
   }
   update(dt, s, terrainAheadSeconds = Infinity) {
     if (!(dt > 0) || !Number.isFinite(dt)) return this.result || [];
@@ -25,13 +31,22 @@ export class FlightWarnings {
       this.closure += (measured - this.closure) * (1 - Math.exp(-dt / 0.5));
     } else this.closure = 0;
     this.previous = validHeight ? ra : null;
-    if (s.onGround) { this.departure = false; this.peakAltitude = null; this.wasGrounded = true; }
+    if (s.onGround) {
+      this.departure = false; this.peakAltitude = null; this.wasGrounded = true;
+      this.peakRadioAlt = 0; this.levelTime = 0;
+    }
     if (airborne && this.wasGrounded && validHeight && ra > 30) {
       this.departure = true; this.wasGrounded = false;
     }
     if (this.departure && Number.isFinite(s.altitudeFt)) {
       this.peakAltitude = Math.max(this.peakAltitude ?? s.altitudeFt, s.altitudeFt);
-      if (ra > 1500) this.departure = false;
+      if (validHeight) this.peakRadioAlt = Math.max(this.peakRadioAlt, ra);
+      this.levelTime = Math.abs(vsi) <= 100 ? this.levelTime + dt : 0;
+      // Keep initial climb-loss protection. A settled circuit or configured
+      // descent after climb-out is an approach even below the altitude ceiling.
+      const configuredApproach = vsi < -100 && s.gearState > 0.95 && s.flapDegree >= (p.landingFlap ?? 0);
+      if (ra > 1500 || this.peakRadioAlt >= 300 && (this.levelTime >= 5 || configuredApproach))
+        this.departure = false;
     }
     if (this.id === 'B738' && s.onGround && s.throttle > 0.7 && s.iasKnots > 60 &&
         (s.flapDegree < 1 || s.flapDegree > 25 || s.spoilers > 0.1 || s.parkBrake))
@@ -43,7 +58,7 @@ export class FlightWarnings {
         add('overspeed', 'OVERSPEED', 85, this.id === 'F16' ? 'Limit' : null);
       if (Math.abs(s.rollDeg) > p.bank + (validHeight && ra > 1000 ? 10 : 0))
         add('bank', 'BANK ANGLE', 50, this.id === 'B738' ? 'Bank angle, bank angle' : null);
-      if (s.engine1?.failed || s.engine2?.failed) add('engine', 'ENGINE FAILURE', 70, this.id === 'F16' ? 'Engine' : null);
+      if (s.engine1?.failed || this.numEngines > 1 && s.engine2?.failed) add('engine', 'ENGINE FAILURE', 70, this.id === 'F16' ? 'Engine' : null);
       if (p.terrain && validHeight && Number.isFinite(vsi)) {
         const landing = s.gearState > 0.95 && s.flapDegree >= p.landingFlap;
         // Mode 1 stays active in landing configuration. Mode 2 is relaxed near a normal landing.

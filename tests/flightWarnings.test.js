@@ -68,3 +68,51 @@ test('prediction sees rising terrain but allows a configured runway approach', (
   assert.ok(terrainConflictSeconds(p, v, { getHeight: x => x * 0.3 }, true) < 8);
   assert.equal(terrainConflictSeconds(p, { x: 0, y: 0, z: 0 }, { getHeight: () => 0 }, false), Infinity);
 });
+
+test('real engine model ignores absent engines but detects installed engine failures', async () => {
+  const { EngineModel } = await import('../src/physics/EngineModel.js');
+  const { AIRCRAFT_REGISTRY } = await import('../src/config/aircraftConfigs.js');
+  for (const config of Object.values(AIRCRAFT_REGISTRY)) {
+    const engines = new EngineModel(config), warnings = new FlightWarnings(config);
+    const sensed = () => ({ ...normal, iasKnots: 100, ...engines.update(0.1, 1000, 50, 0.9) });
+    assert.ok(!ids(warnings.update(0.1, sensed())).includes('engine'), config.id);
+    engines.setEngineFailure(0, true);
+    assert.ok(ids(warnings.update(0.1, sensed())).includes('engine'), `${config.id} engine 1`);
+    engines.setEngineFailure(0, false); warnings.reset();
+    if (config.propulsion.numEngines > 1) {
+      engines.setEngineFailure(1, true);
+      assert.ok(ids(warnings.update(0.1, sensed())).includes('engine'), `${config.id} engine 2`);
+    }
+  }
+});
+
+test('low circuit transitions from takeoff to normal configured approach before 1500ft', () => {
+  const w = new FlightWarnings();
+  w.update(0.25, { ...normal, onGround:true, radioAltFt:0, altitudeFt:0 });
+  for (let height = 5; height <= 1000; height += 5)
+    w.update(0.25, { ...normal, radioAltFt:height, altitudeFt:height, vsiFpm:1200 });
+  for (let height = 997.5; height >= 150; height -= 2.5) {
+    const alerts = w.update(0.25, { ...normal, radioAltFt:height, altitudeFt:height, vsiFpm:-600 });
+    assert.ok(!ids(alerts).includes('dont-sink'), `normal approach at ${height}ft`);
+  }
+  assert.equal(w.departure, false);
+});
+
+test('low circuit level-off rearms gear and flap warnings; reset permits another takeoff warning', () => {
+  const w = new FlightWarnings();
+  const state = { ...normal, gearState:0, flapDegree:0 };
+  w.update(0.25, { ...state, onGround:true, radioAltFt:0, altitudeFt:0 });
+  for (let height = 5; height <= 600; height += 5)
+    w.update(0.25, { ...state, radioAltFt:height, altitudeFt:height, vsiFpm:1200 });
+  for (let i = 0; i < 24; i++) w.update(0.25, { ...state, radioAltFt:600, altitudeFt:600 });
+  for (let height = 597.5; height >= 150; height -= 2.5)
+    w.update(0.25, { ...state, radioAltFt:height, altitudeFt:height, vsiFpm:-600 });
+  assert.ok(ids(w.result).includes('gear'));
+  for (let i = 0; i < 5; i++)
+    w.update(0.25, { ...state, radioAltFt:150, altitudeFt:150, vsiFpm:-600, gearState:1 });
+  assert.ok(ids(w.result).includes('flaps'));
+  w.reset();
+  w.update(0.25, { ...normal, onGround:true, radioAltFt:0, altitudeFt:0 });
+  w.update(0.25, { ...normal, radioAltFt:150, altitudeFt:150, vsiFpm:800 });
+  assert.ok(ids(w.update(0.25, { ...normal, radioAltFt:110, altitudeFt:110, vsiFpm:-500 })).includes('dont-sink'));
+});
