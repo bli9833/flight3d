@@ -1,143 +1,159 @@
 {
   "gate": {
     "file": "gate.wav",
-    "duration": 8.650068,
+    "duration": 7.541917,
+    "provider": "Gemini",
+    "model": "gemini-2.5-flash-preview-tts",
     "lines": [
       {
         "speaker": "pilot",
-        "voice": "rms",
+        "voice": "Charon",
         "text": "Incheon Apron, Sky 123, ready for pushback."
       },
       {
         "speaker": "apron",
-        "voice": "slt",
+        "voice": "Kore",
         "text": "Sky 123, pushback approved."
       },
       {
         "speaker": "crew",
-        "voice": "awb",
+        "voice": "Fenrir",
         "text": "Tug connected."
       }
     ]
   },
   "pushback": {
     "file": "pushback.wav",
-    "duration": 5.095057,
+    "duration": 3.270958,
+    "provider": "Gemini",
+    "model": "gemini-2.5-flash-preview-tts",
     "lines": [
       {
         "speaker": "crew",
-        "voice": "awb",
+        "voice": "Fenrir",
         "text": "Brakes released, commencing pushback."
       },
       {
         "speaker": "pilot",
-        "voice": "rms",
+        "voice": "Charon",
         "text": "Pushback acknowledged."
       }
     ]
   },
   "disconnect": {
     "file": "disconnect.wav",
-    "duration": 7.035057,
+    "duration": 5.030958,
+    "provider": "Gemini",
+    "model": "gemini-2.5-flash-preview-tts",
     "lines": [
       {
         "speaker": "crew",
-        "voice": "awb",
+        "voice": "Fenrir",
         "text": "Pushback complete. Set parking brake."
       },
       {
         "speaker": "pilot",
-        "voice": "rms",
+        "voice": "Charon",
         "text": "Brake set."
       },
       {
         "speaker": "crew",
-        "voice": "awb",
+        "voice": "Fenrir",
         "text": "Tug disconnected, all equipment clear."
       }
     ]
   },
   "taxi": {
     "file": "taxi.wav",
-    "duration": 12.710068,
+    "duration": 12.150958,
+    "provider": "Gemini",
+    "model": "gemini-2.5-flash-preview-tts",
     "lines": [
       {
         "speaker": "pilot",
-        "voice": "rms",
+        "voice": "Charon",
         "text": "Ground, Sky 123, ready to taxi."
       },
       {
         "speaker": "ground",
-        "voice": "slt",
+        "voice": "Kore",
         "text": "Taxi via the simulation route to runway 33L. Hold short."
       },
       {
         "speaker": "pilot",
-        "voice": "rms",
+        "voice": "Charon",
         "text": "Taxi to 33L, hold short, Sky 123."
       }
     ]
   },
   "hold": {
     "file": "hold.wav",
-    "duration": 12.080091,
+    "duration": 7.630958,
+    "provider": "Gemini",
+    "model": "gemini-2.5-flash-preview-tts",
     "lines": [
       {
         "speaker": "pilot",
-        "voice": "rms",
+        "voice": "Charon",
         "text": "Incheon Tower, Sky 123, holding short runway 33L, ready for departure."
       },
       {
         "speaker": "tower",
-        "voice": "slt",
+        "voice": "Kore",
         "text": "Hold short, landing traffic."
       },
       {
         "speaker": "pilot",
-        "voice": "rms",
+        "voice": "Charon",
         "text": "Holding short, Sky 123."
       }
     ]
   },
   "lineup": {
     "file": "lineup.wav",
-    "duration": 8.810023,
+    "duration": 7.150958,
+    "provider": "Gemini",
+    "model": "gemini-2.5-flash-preview-tts",
     "lines": [
       {
         "speaker": "tower",
-        "voice": "slt",
+        "voice": "Kore",
         "text": "Sky 123, runway 33L, line up and wait."
       },
       {
         "speaker": "pilot",
-        "voice": "rms",
+        "voice": "Charon",
         "text": "Runway 33L, line up and wait, Sky 123."
       }
     ]
   },
   "clearance": {
     "file": "clearance.wav",
-    "duration": 9.36,
+    "duration": 8.421917,
+    "provider": "Gemini",
+    "model": "gemini-2.5-flash-preview-tts",
     "lines": [
       {
         "speaker": "tower",
-        "voice": "slt",
+        "voice": "Kore",
         "text": "Sky 123, runway 33L, cleared for takeoff."
       },
       {
         "speaker": "pilot",
-        "voice": "rms",
+        "voice": "Charon",
         "text": "Runway 33L, cleared for takeoff, Sky 123."
       }
     ]
   },
   "takeoff": {
     "file": "takeoff.wav",
-    "duration": 5.08,
+    "duration": 4.830958,
+    "provider": "Gemini",
+    "model": "gemini-2.5-flash-preview-tts",
     "lines": [
       {
         "speaker": "pilot",
-        "voice": "rms",
+        "voice": "Charon",
         "text": "Takeoff clearance confirmed. Accelerating, rotating and climbing."
       }
     ]

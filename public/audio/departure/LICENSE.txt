@@ -1,6 +1,6 @@
-Flight3d original scripted dialogue, synthesized locally using CMU Flite voices rms (pilot), awb (ground crew) and slt (controllers). Audio filtered to 320–3100 Hz with FFmpeg. No engine or voice-model binaries are redistributed.
+Current WAV assets: Flight3d original scripted dialogue, synthesized using Google Gemini 2.5 Flash TTS. Voices: Charon (pilot), Fenrir (ground crew), Kore (controllers). Audio filtered to 300–3200 Hz and compressed with FFmpeg. These are generated fictional exchanges, not recordings of real controllers. Provider terms: https://ai.google.dev/gemini-api/terms . No voice-model binaries or credentials are redistributed.
 
-Upstream Flite notice, retained for attribution:
+Historical Flite attribution retained for the optional legacy generator and earlier revisions (rms, awb, slt):
 
 All other files are under following license:
 ===========================================
