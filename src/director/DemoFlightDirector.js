@@ -84,9 +84,9 @@ export class DemoFlightDirector {
 
   getActiveScenario() {
     if (this.activeDemoAircraft === 'F16') return this.f16Scenario;
+    if (this.activeDemoAirport === 'incheon' && this.activeDemoAircraft === 'B738') return this.incheonDepartureScenario;
     if (this.activeDemoAircraft === 'C172') {
-      if (this.activeDemoAirport === 'incheon') return this.profile === 'incheon-departure'
-        ? this.incheonDepartureScenario : this.incheonCessnaScenario;
+      if (this.activeDemoAirport === 'incheon') return this.incheonCessnaScenario;
       return this.profile === 'proximity' ? this.cessnaProximityScenario : this.cessnaScenario;
     }
     return this.activeDemoAirport === 'lukla' ? this.luklaScenario : this.coastalScenario;
@@ -175,7 +175,7 @@ export class DemoFlightDirector {
   }
 
   start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
-    if ((targetAirport || this.sim.activeAirport) === 'incheon' && this.sim.currentAircraftId !== 'C172') return false;
+    if ((targetAirport || this.sim.activeAirport) === 'incheon' && !['B738', 'C172'].includes(this.sim.currentAircraftId)) return false;
     if (this.sim.currentAircraftId === 'F16' && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
     this.sim.devRunner?.stop();
     if (this.isActive) this.stop();
@@ -242,10 +242,11 @@ export class DemoFlightDirector {
 
     if (this.activeDemoAircraft === 'F16') {
       this.setStage(F16LuklaScenario.STAGES.ESTABLISH);
+    } else if (this.activeDemoAirport === 'incheon' && this.activeDemoAircraft === 'B738') {
+      this.setStage(IncheonDepartureScenario.STAGES.GATE);
     } else if (this.activeDemoAircraft === 'C172') {
       if (this.activeDemoAirport === 'incheon') {
-        this.setStage(this.profile === 'incheon-departure'
-          ? IncheonDepartureScenario.STAGES.GATE : IncheonCessnaScenario.STAGES.TAKEOFF);
+        this.setStage(IncheonCessnaScenario.STAGES.TAKEOFF);
       } else if (this.profile === 'proximity') {
         this.setStage(CessnaProximityScenario.STAGES.SHIP_BUZZ);
       } else {

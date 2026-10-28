@@ -1,3 +1,4 @@
+import { FlightWarnings, terrainConflictSeconds } from './systems/FlightWarnings.js';
 import { AircraftBreakup } from './effects/AircraftBreakup.js';
 import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
@@ -305,6 +306,7 @@ class FlightSimulator {
       gForce: 1.0,
       isStalled: false,
       isPreStall: false,
+      isStallWarning: false,
       gearState: 1.0,
       isTransit: false,
       flapDegree: 5,
@@ -482,6 +484,7 @@ class FlightSimulator {
   /** Apply the game-flow state to the DOM: menu visibility, input blocking. */
   syncFlowUi() {
     const state = this.gameFlow.state;
+    this.audio?.departureRadio.setPaused(state !== FLOW.FLIGHT);
     document.body.dataset.flow = state;
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
     this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active);
@@ -560,6 +563,9 @@ class FlightSimulator {
 
   loadAircraftConfig(config = BOEING_737_800) {
     this.currentAircraftConfig = config;
+    this.flightWarnings ??= new FlightWarnings();
+    this.flightWarnings.configure(config);
+    if (this.telemetry) this.telemetry.warnings = [];
     this.audio?.loadAircraftConfig(config);
     if (this.aero?.loadConfig) this.aero.loadConfig(config);
     if (this.engines?.loadConfig) this.engines.loadConfig(config);
@@ -780,6 +786,8 @@ class FlightSimulator {
     this.shadowDemo?.stop();
     this.lastPresetType = type;
     this.audio?.reset();
+    this.flightWarnings?.reset();
+    this.telemetry.warnings = [];
     if (!isDemoInternal) this.loadAircraftConfig(this.currentAircraftConfig || BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
@@ -1395,6 +1403,8 @@ class FlightSimulator {
       this.showToast(() => t('emergency.landing.stopped.select.a.preset.to'));
     }
 
+    this.aero.gearHandleDown = this.gear.targetGearState > 0.5;
+
     // 5. Aerodynamic Forces & Moments
     const aeroResult = this.aero.computeAero(
       dt,
@@ -1517,6 +1527,7 @@ class FlightSimulator {
       gForce: Math.max(-2.5, Math.min(5.5, measuredGForce)),
       isStalled: aeroResult.isStalled,
       isPreStall: aeroResult.isPreStall,
+      isStallWarning: aeroResult.isStallWarning,
       stallSeverity: aeroResult.stallSeverity,
       buffetVibration: aeroResult.buffetVibration,
       engine1: engineData.engine1,
@@ -1552,6 +1563,10 @@ class FlightSimulator {
       demoActive: Boolean(this.demoDirector?.isActive),
       parkBrake: Boolean(this.controls.parkingBrake || (gearResult.onGround && this.controls.brakes > 0.8 && Atmosphere.msToKnots(groundSpeed) < 1.0))
     };
+
+    this.telemetry.warnings = this.isCrashed ? [] : this.flightWarnings.update(dt, this.telemetry,
+      terrainConflictSeconds(this.position, this.linearVelocity, this.currentTerrain,
+        this.telemetry.gearState > 0.95 && this.telemetry.flapDegree >= (this.currentAircraftConfig.id === 'B738' ? 15 : 0)));
 
     // 11. Touchdown Tire Smoke & Landing Contact Gate
     const gsKnots = Atmosphere.msToKnots(groundSpeed);
@@ -1639,6 +1654,8 @@ class FlightSimulator {
   triggerCrash(crashResult, impactVelocity = this.linearVelocity) {
     if (this.isCrashed) return;
     this.isCrashed = true;
+    this.flightWarnings.reset();
+    this.telemetry.warnings = [];
     this.crashResult = crashResult;
 
     // 1. Spawn Visual Explosion Particles, Fireball, Smoke & Dynamic Light Flash
@@ -1979,6 +1996,13 @@ class FlightSimulator {
     if (elGForce) elGForce.textContent = `${this.telemetry.gForce.toFixed(2)} G`;
     if (elStall) {
       elStall.style.display = this.telemetry.isStalled ? 'block' : 'none';
+    }
+    const warning = document.getElementById('hud-warning');
+    if (warning) {
+      const alert = this.isCrashed ? null : this.telemetry.warnings?.[0];
+      warning.textContent = alert?.text || '';
+      warning.hidden = !alert;
+      warning.style.color = alert?.priority >= 85 ? '#ff5555' : '#ffbe55';
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
     this.updateAutopilotUI();

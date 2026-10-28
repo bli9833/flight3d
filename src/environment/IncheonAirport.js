@@ -1,6 +1,7 @@
+import { createDepartureJetBridge } from './DepartureJetBridge.js';
 import * as THREE from 'three';
 import { createDepartureStand } from './DepartureStand.js';
-import { DEPARTURE_CONNECTOR, DEPARTURE_STAND } from '../config/incheonDeparture.js';
+import { DEPARTURE_CONNECTOR, DEPARTURE_STAND, DEPARTURE_TAXI_PAVEMENT } from '../config/incheonDeparture.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { colourIncheonGround, createIncheonGroundTexture } from './IncheonGround.js';
 import { IncheonTraffic } from './IncheonTraffic.js';
@@ -36,6 +37,8 @@ export async function loadIncheonAirport(base) {
   const group=new THREE.Group();
   const height=(x,z)=>terrain.getHeight(x,z);
   group.add(createDepartureStand(INCHEON_AIRFIELD.elevationM));
+  const departureBridge = createDepartureJetBridge(INCHEON_AIRFIELD.elevationM);
+  group.add(departureBridge.group);
   const groundMaterial=new THREE.MeshLambertMaterial({vertexColors:true,map:createIncheonGroundTexture(),alphaMap:mask,alphaTest:.5});
   for(const geometry of [terrainGeometry(12000,480,height,true)]) {
     colourIncheonGround(geometry);
@@ -68,7 +71,7 @@ export async function loadIncheonAirport(base) {
     if (!pavementBatches.has(color)) pavementBatches.set(color, []);
     pavementBatches.get(color).push(flat);
   };
-  for(const surface of [...INCHEON_AIRFIELD.surfaces, DEPARTURE_CONNECTOR, DEPARTURE_STAND]) {
+  for(const surface of [...INCHEON_AIRFIELD.surfaces, DEPARTURE_CONNECTOR, DEPARTURE_STAND, DEPARTURE_TAXI_PAVEMENT]) {
     const geometry=surface.area?new THREE.ShapeGeometry(shape(surface.points)):ribbon(surface.points,surface.width);
     if(surface.area)geometry.rotateX(-Math.PI/2);
     geometry.translate(0,INCHEON_AIRFIELD.elevationM+.015,0);
@@ -108,7 +111,7 @@ export async function loadIncheonAirport(base) {
     && !colliders.some(c=>x>=c.bounds.min.x-1 && x<=c.bounds.max.x+1 && z>=c.bounds.min.z-1 && z<=c.bounds.max.z+1
       && (pointInRing(x,z,c.points) || c.points.slice(1).some((b,i)=>segmentDistance(x,z,c.points[i],b)<1))));
   group.add(traffic.mesh);
-  return {terrain,group,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,
+  return {terrain,group,departureBridge,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,
     towerCab:tower.cab,
     resetTraffic(){traffic.reset();},
     update(dt,position,time,options={}){traffic.update(dt,options.cameraPosition??position,options.quality,options.paused);},

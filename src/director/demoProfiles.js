@@ -2,10 +2,12 @@
 export function demoProfiles(aircraftId = 'B738', airport = 'coastal') {
   if (aircraftId === 'F16') return airport === 'lukla'
     ? [{ id: 'low-pass', labelKey: 'demo.f16.lukla', briefingKey: 'demo.f16.lukla.briefing' }] : [];
+  if (aircraftId === 'B738' && airport === 'incheon') return [
+    { id: 'incheon-departure', labelKey: 'departure.name', briefingKey: 'departure.briefing' },
+  ];
   if (aircraftId === 'C172') {
     if (airport === 'incheon') return [
       { id: 'incheon-tour', labelKey: 'demo.incheon.name', briefingKey: 'demo.incheon.briefing' },
-      { id: 'incheon-departure', labelKey: 'departure.name', briefingKey: 'departure.briefing' },
     ];
     if (airport === 'lukla') {
       return [

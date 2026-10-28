@@ -1,3 +1,4 @@
+import { DepartureRadio } from './DepartureRadio.js';
 import { pistonSoundState } from './pistonSoundState.js';
 import { exteriorDistanceGain, exteriorAirCutoff } from './distanceAcoustics.js';
 import { t } from '../i18n/index.js';
@@ -17,6 +18,12 @@ export class FlightAudio {
 
     this.volume = 1.0;
 
+    this.departureRadio = new DepartureRadio({
+      context: () => this.ctx, output: () => this.masterGain,
+      muted: () => this.isMuted || this.volume === 0,
+      baseUrl: import.meta.env?.BASE_URL ?? '/',
+    });
+
     // Callout tracking
     this.lastRadioAlt = 9999;
     this.calledAltitudes = new Set();
@@ -25,6 +32,7 @@ export class FlightAudio {
   }
 
   loadAircraftConfig(config = {}) {
+    this.aircraftId = config.id || 'B738';
     const settings = config.audio || {};
     this.profile = {
       engineType: settings.engineType || 'jet',
@@ -49,10 +57,14 @@ export class FlightAudio {
 
   reset() {
     this.crashed = false;
+    this.alertId = null;
+    this.alertTimer = 0;
+    this.alertElapsed = 0;
     this.lastRadioAlt = 9999;
     this.calledAltitudes.clear();
     this.stallBeepTime = 0;
     this.cancelSpeech();
+    this.departureRadio.stop();
     if (this.packGain) this.packGain.gain.setTargetAtTime(this.isPiston ? 0 : 0.16, this.ctx.currentTime, 0.04);
     if (this.warningGain) this.warningGain.gain.setValueAtTime(0, this.ctx.currentTime);
   }
@@ -450,6 +462,11 @@ export class FlightAudio {
     } catch (e) {}
   }
 
+  playDepartureRadio(stage) {
+    this.ensureContextRunning();
+    return this.departureRadio.play(stage);
+  }
+
   playGpwsCallout(text) {
     if (this.isMuted || this.effectiveVolume === 0 || this.isPiston || this.crashed) return;
     if ('speechSynthesis' in window) {
@@ -468,13 +485,13 @@ export class FlightAudio {
     if (this.volume > 0.0) {
       this.isMuted = false;
     }
-    if (this.volume === 0) this.cancelSpeech();
+    if (this.volume === 0) { this.cancelSpeech(); this.departureRadio.stop(); }
     this.applyMasterGain();
   }
 
   setMuted(muted) {
     this.isMuted = !!muted;
-    if (this.isMuted) this.cancelSpeech();
+    if (this.isMuted) { this.cancelSpeech(); this.departureRadio.stop(); }
     this.applyMasterGain();
   }
 
@@ -574,16 +591,18 @@ export class FlightAudio {
       this.playTouchdownThump(sinkRate);
     }
 
-    // 5. Stall Warning Horn (+ quieter stick-shaker chirp approaching the stall)
+    // 5. Sensor warning is independent of the physical separation diagnostic.
+    const stallWarning = state.isStallWarning ?? (state.isStalled || state.isPreStall);
+    // Existing synthesized timbres approximate the warning devices.
     if (this.isPiston) {
-      const horn = !state.onGround && (state.isStalled || state.isPreStall);
+      const horn = !state.onGround && stallWarning;
       this.warningGain.gain.setValueAtTime(horn ? 0.30 : 0, now);
-    } else if (state.isStalled) {
+    } else if (stallWarning && state.isStalled && !state.onGround) {
       this.stallBeepTime += dt;
       // Pulsing tone: 4 beeps per second
       const beepActive = (this.stallBeepTime % 0.25) < 0.14;
       this.warningGain.gain.setValueAtTime(beepActive ? 0.50 : 0.0, now);
-    } else if (state.isPreStall && !state.onGround) {
+    } else if (stallWarning && !state.onGround) {
       this.stallBeepTime += dt;
       // Shaker activation: rapid low-volume double chirp
       const chirpActive = (this.stallBeepTime % 0.3) < 0.05 || ((this.stallBeepTime % 0.3) > 0.09 && (this.stallBeepTime % 0.3) < 0.14);
@@ -593,9 +612,31 @@ export class FlightAudio {
       this.warningGain.gain.setValueAtTime(0.0, now);
     }
 
+    const alert = state.warnings?.[0];
+    this.alertTimer += dt;
+    this.alertElapsed += dt;
+    if (alert?.id !== this.alertId) {
+      if (this.alertId || alert) this.cancelSpeech();
+      this.alertId = alert?.id;
+      this.alertTimer = 99;
+      this.alertElapsed = 0;
+    }
+    if (alert?.voice && this.alertTimer >= 4) {
+      this.cancelSpeech();
+      this.playGpwsCallout(alert.voice);
+      this.alertTimer = 0;
+    }
+    if ((alert?.id === 'overspeed' || alert?.id === 'takeoff-config') && !this.isPiston) {
+      this.warningOsc.frequency.setValueAtTime(800, now);
+      this.warningGain.gain.setValueAtTime((this.alertElapsed % 0.16) < 0.08 ? 0.35 : 0, now);
+    } else if (alert?.id === 'engine' && this.aircraftId === 'B738' && this.alertElapsed < 0.18) {
+      this.warningOsc.frequency.setValueAtTime(1000, now);
+      this.warningGain.gain.setValueAtTime(0.25, now);
+    } else this.warningOsc.frequency.setValueAtTime(680, now);
+
     // 6. Boeing GPWS Altitude Voice Callouts
     const rAlt = state.radioAltFt;
-    if (!this.isPiston && rAlt !== undefined && !state.onGround && state.vsiFpm < -100) {
+    if (this.aircraftId === 'B738' && !alert && rAlt !== undefined && !state.onGround && state.vsiFpm < -100) {
       const callouts = [500, 100, 50, 40, 30, 20, 10];
       for (const call of callouts) {
         if (this.lastRadioAlt > call && rAlt <= call && !this.calledAltitudes.has(call)) {
@@ -613,6 +654,7 @@ export class FlightAudio {
   playExplosion(isWater = false) {
     this.crashed = true;
     this.cancelSpeech();
+    this.departureRadio.stop();
     if (this.ctx) {
       for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain']) {
         this[name]?.gain.setValueAtTime(0, this.ctx.currentTime);
