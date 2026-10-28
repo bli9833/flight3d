@@ -63,3 +63,7 @@ descent. This retains initial climb-loss warnings while allowing low circuits
 to enter approach and rearming gear/flap cautions. These phase thresholds are
 simulator tuning values. Regression tests use real EngineModel output for all
 three aircraft and continuous low-circuit / approach / reset sequences.
+
+Warning arbitration uses the authoritative `isStallWarning` sensor, with the
+legacy flags only as a fallback; retained physical separation does not hold a
+recovered stall alert or suppress other alerts.

@@ -116,3 +116,12 @@ test('low circuit level-off rearms gear and flap warnings; reset permits another
   w.update(0.25, { ...normal, radioAltFt:150, altitudeFt:150, vsiFpm:800 });
   assert.ok(ids(w.update(0.25, { ...normal, radioAltFt:110, altitudeFt:110, vsiFpm:-500 })).includes('dont-sink'));
 });
+
+
+test('warning arbitration follows the stall sensor rather than retained separation', () => {
+  const w = new FlightWarnings();
+  assert.deepEqual(w.update(0.1, { ...normal, isStalled:true, isStallWarning:false }), []);
+  assert.equal(w.update(0.1, { ...normal, isStalled:false, isStallWarning:true })[0].id, 'stall');
+  for (let i = 0; i < 10; i++) w.update(0.1, { ...normal, isStalled:true, isStallWarning:false });
+  assert.deepEqual(w.result, []);
+});

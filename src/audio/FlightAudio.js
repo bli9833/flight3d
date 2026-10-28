@@ -591,16 +591,18 @@ export class FlightAudio {
       this.playTouchdownThump(sinkRate);
     }
 
-    // 5. Stall Warning Horn (+ quieter stick-shaker chirp approaching the stall)
+    // 5. Sensor warning is independent of the physical separation diagnostic.
+    const stallWarning = state.isStallWarning ?? (state.isStalled || state.isPreStall);
+    // Existing synthesized timbres approximate the warning devices.
     if (this.isPiston) {
-      const horn = !state.onGround && (state.isStalled || state.isPreStall);
+      const horn = !state.onGround && stallWarning;
       this.warningGain.gain.setValueAtTime(horn ? 0.30 : 0, now);
-    } else if (state.isStalled && !state.onGround) {
+    } else if (stallWarning && state.isStalled && !state.onGround) {
       this.stallBeepTime += dt;
       // Pulsing tone: 4 beeps per second
       const beepActive = (this.stallBeepTime % 0.25) < 0.14;
       this.warningGain.gain.setValueAtTime(beepActive ? 0.50 : 0.0, now);
-    } else if (state.isPreStall && !state.onGround) {
+    } else if (stallWarning && !state.onGround) {
       this.stallBeepTime += dt;
       // Shaker activation: rapid low-volume double chirp
       const chirpActive = (this.stallBeepTime % 0.3) < 0.05 || ((this.stallBeepTime % 0.3) > 0.09 && (this.stallBeepTime % 0.3) < 0.14);

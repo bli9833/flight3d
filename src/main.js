@@ -306,6 +306,7 @@ class FlightSimulator {
       gForce: 1.0,
       isStalled: false,
       isPreStall: false,
+      isStallWarning: false,
       gearState: 1.0,
       isTransit: false,
       flapDegree: 5,
@@ -1402,6 +1403,8 @@ class FlightSimulator {
       this.showToast(() => t('emergency.landing.stopped.select.a.preset.to'));
     }
 
+    this.aero.gearHandleDown = this.gear.targetGearState > 0.5;
+
     // 5. Aerodynamic Forces & Moments
     const aeroResult = this.aero.computeAero(
       dt,
@@ -1524,6 +1527,7 @@ class FlightSimulator {
       gForce: Math.max(-2.5, Math.min(5.5, measuredGForce)),
       isStalled: aeroResult.isStalled,
       isPreStall: aeroResult.isPreStall,
+      isStallWarning: aeroResult.isStallWarning,
       stallSeverity: aeroResult.stallSeverity,
       buffetVibration: aeroResult.buffetVibration,
       engine1: engineData.engine1,

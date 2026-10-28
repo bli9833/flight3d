@@ -74,6 +74,9 @@ export const BOEING_737_800 = {
     flapAngles: [0, 1, 5, 15, 20, 30, 40]
   },
 
+  // See docs/development/stall-warning.md for sources and approximation limits.
+  stallWarning: { type: 'stickShaker', marginDeg: 2.0 },
+
   // 3. Propulsion System (Twin Turbofans)
   propulsion: {
     numEngines: 2,
@@ -196,6 +199,8 @@ export const F16_FALCON = {
 
     flapAngles: [0, 20]
   },
+
+  stallWarning: { type: 'lowSpeed', marginDeg: 2.0, gearDownAlphaDeg: 15.0 },
 
   // 3. Propulsion System (Single Afterburning Turbofan)
   propulsion: {
@@ -326,6 +331,8 @@ export const CESSNA_172 = {
 
     flapAngles: [0, 10, 20, 30]
   },
+
+  stallWarning: { type: 'pneumaticHorn', referenceMarginKnots: 7.5 },
 
   // 3. Propulsion System (Single Piston Engine)
   propulsion: {

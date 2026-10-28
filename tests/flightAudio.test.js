@@ -337,6 +337,18 @@ describe('C172 piston sound and lifecycle', () => {
     assert.equal(audio.warningGain.gain.value, 0, 'ground horn inhibited');
   }));
 
+  it('uses the sensor warning independently of separated flow and clears on ground', () => withPiston(audio => {
+    for (const config of [CESSNA_172, BOEING_737_800]) {
+      audio.loadAircraftConfig(config);
+      audio.update(0.01, pistonState(70, { onGround: false, isStallWarning: true }), true);
+      assert.ok(audio.warningGain.gain.value > 0, 'early sensor warning is audible');
+      audio.update(0.01, pistonState(70, { onGround: false, isStallWarning: false, isStalled: true }), true);
+      assert.equal(audio.warningGain.gain.value, 0, 'reattachment memory must not latch horn');
+      audio.update(0.01, pistonState(70, { onGround: true, isStallWarning: true, isStalled: true }), true);
+      assert.equal(audio.warningGain.gain.value, 0);
+    }
+  }));
+
   it('rearms Boeing altitude callouts after climbing and clears them on a preset reset', () => withPiston(audio => {
     audio.loadAircraftConfig(BOEING_737_800);
     const calls = []; audio.playGpwsCallout = value => calls.push(value);

@@ -52,7 +52,8 @@ export class FlightWarnings {
         (s.flapDegree < 1 || s.flapDegree > 25 || s.spoilers > 0.1 || s.parkBrake))
       add('takeoff-config', 'TAKEOFF CONFIG', 80, null);
     if (airborne) {
-      if (s.isStalled || s.isPreStall) add('stall', 'STALL', 95, null);
+      const stallWarning = s.isStallWarning ?? (s.isStalled || s.isPreStall);
+      if (stallWarning) add('stall', 'STALL', 95, null);
       const overspeed = this.active.has('overspeed');
       if (s.iasKnots > p.vne - (overspeed ? 5 : 0) || s.mach > (p.mach ?? Infinity) - (overspeed ? 0.01 : 0))
         add('overspeed', 'OVERSPEED', 85, this.id === 'F16' ? 'Limit' : null);
