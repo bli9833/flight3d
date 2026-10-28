@@ -1,4 +1,10 @@
 export default {
+  "demo.f16.lukla": "F-16 · Lukla valley low pass",
+  "demo.f16.lukla.briefing": "Airborne start · Fast Lukla valley pass and climb-out. Esc takes control.",
+  "demo.f16.stage": "Lukla valley low pass",
+  "demo.f16.complete": "F-16 demo complete · Manual control",
+  "demo.f16.failed": "F-16 demo stopped",
+
   "departure.name": "Incheon gate → pushback → takeoff",
   "departure.briefing": "C172 automatic departure: tug pushback, taxi, tower radio captions and runway 15R takeoff. Gate and runway connector are simulated.",
   "departure.complete": "Departure complete · manual control",

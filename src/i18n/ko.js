@@ -1,4 +1,10 @@
 export default {
+  "demo.f16.lukla": "F-16 · 루클라 계곡 로우패스",
+  "demo.f16.lukla.briefing": "공중 출발 · 루클라 계곡 고속 통과 후 상승. Esc로 수동 조종.",
+  "demo.f16.stage": "루클라 계곡 로우패스",
+  "demo.f16.complete": "F-16 데모 완료 · 수동 조종",
+  "demo.f16.failed": "F-16 데모 중단",
+
   "departure.name": "인천 탑승구 → 푸시백 → 이륙",
   "departure.briefing": "C172 자동 출발: 견인차 푸시백 → 택싱 → 관제탑 교신 → 15R 이륙. 교신은 자막으로 자동 진행됩니다. 게이트와 연결 유도로는 가상 설정입니다.",
   "departure.complete": "출발 완료 · 조종을 이어받으세요",

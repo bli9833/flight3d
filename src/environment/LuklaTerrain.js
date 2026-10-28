@@ -1,3 +1,4 @@
+import { luklaSurfaceMaterial } from './luklaSurfaceMaterial.js';
 import * as THREE from 'three';
 import grid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 
@@ -72,13 +73,7 @@ export class LuklaTerrain {
     this.textureLoader = new THREE.TextureLoader();
     this.satelliteTexture = null;
 
-    const defaultColorMat = new THREE.MeshStandardMaterial({
-      color: 0x5a6358,
-      roughness: 0.92,
-      metalness: 0.05,
-      flatShading: false,
-      side: THREE.DoubleSide
-    });
+    const defaultColorMat = luklaSurfaceMaterial();
 
     this.mesh = new THREE.Mesh(this.geometry, defaultColorMat);
     this.mesh.receiveShadow = true;
@@ -129,13 +124,9 @@ export class LuklaTerrain {
           tex.anisotropy = 8;
           this.satelliteTexture = tex;
 
-          this.mesh.material = new THREE.MeshStandardMaterial({
-            map: tex,
-            roughness: 0.88,
-            metalness: 0.05,
-            flatShading: false,
-            side: THREE.DoubleSide
-          });
+          const previousMaterial = this.mesh.material;
+          this.mesh.material = luklaSurfaceMaterial(tex);
+          previousMaterial.dispose();
           this.mesh.material.needsUpdate = true;
           if (this.localTerraceMesh) {
             this.localTerraceMesh.material = this.mesh.material;

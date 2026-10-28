@@ -71,3 +71,14 @@ all rights reserved
 
 Runway alignment: © OpenStreetMap contributors. Imagery: Esri and its World
 Imagery contributors; attribution is available from the linked service.
+
+## Near-surface rendering
+
+The satellite imagery retains its georeferenced UVs. `luklaSurfaceMaterial.js`
+adds distance-faded, metre-scale procedural color variation and surface-gradient
+bump shading. Steep slopes receive stronger rock strata; gentler slopes retain
+a grass tint. Three-dimensional local-metre sampling avoids stretched detail on
+cliffs and seams between the regional and airport terrace meshes. This detail
+is an artistic surface treatment, not additional surveyed geometry: DEM heights,
+collision queries, airport grading and mesh density are unchanged. The detail
+fades between 250 and 2200 metres to retain the distant satellite appearance.

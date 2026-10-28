@@ -79,3 +79,17 @@ APP_URL=http://127.0.0.1:5189/ ARTIFACT_DIR=.cache/incheon-demo \
 [Browser acceptance evidence](../../review-artifacts/incheon-cessna-demo/README.md)
 records two complete 476.63-second circuits, intact gear and the runway stop,
 plus mobile menu, restart, camera override and cancellation checks.
+
+## F-16 Lukla low pass
+
+Select **Lukla → F-16 → Demo flight**. The demo waits for the DEM, starts
+southwest of runway 24 at 280 KIAS with gear retracted, flies a straight valley
+pass, then climbs before the opposing ridge and hands back powered controls.
+It uses normal physics and collision checks after the initial spawn. Chase,
+cockpit and flyby cuts respect a manually selected camera; P restarts and Esc
+cancels. Other airports do not offer an F-16 demo.
+
+With Vite on 5186, run `chrome-session --project flight3d node
+scripts/verify-f16-lukla.mjs`. The harness checks completion, finite F-16 flight,
+no sampled crashes/stalls, clearance and control release, and captures flight
+frames and a close terrain view in `.cache/f16-lukla`.

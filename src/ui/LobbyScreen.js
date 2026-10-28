@@ -98,7 +98,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
         bindText(span, () => t(scenarioLabelKey(getAirport(), type) ?? 'lobby.spawn'));
       }
     }
-    if ((aircraft === 'F16' || airport === 'incheon' && aircraft !== 'C172') && getPreset() === 'demo') onPreset('runway');
+    if ((aircraft === 'F16' && airport !== 'lukla' || airport === 'incheon' && aircraft !== 'C172') && getPreset() === 'demo') onPreset('runway');
     const preset = getPreset();
     if (demoGroup) demoGroup.hidden = preset !== 'demo';
     if (demoSelect) {
@@ -120,7 +120,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
       const button = document.getElementById(scenario.lobbyButtonId);
       if (!button) continue;
       button.classList.toggle('active', type === preset);
-      button.style.display = isScenarioAvailable(airport, type) && !((aircraft === 'F16' || airport === 'incheon' && aircraft !== 'C172') && type === 'demo') ? '' : 'none';
+      button.style.display = isScenarioAvailable(airport, type) && !((aircraft === 'F16' && airport !== 'lukla' || airport === 'incheon' && aircraft !== 'C172') && type === 'demo') ? '' : 'none';
     }
     if (briefingEl) {
       bindText(briefingEl, () => lobbyBriefing(getAirport(), getPreset()).join('\n'));

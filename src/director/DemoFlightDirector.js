@@ -1,3 +1,4 @@
+import { F16LuklaScenario } from './scenarios/F16LuklaScenario.js';
 import { IncheonDepartureScenario } from './scenarios/IncheonDepartureScenario.js';
 import { IncheonCessnaScenario } from './scenarios/IncheonCessnaScenario.js';
 import { t, bindText } from '../i18n/index.js';
@@ -51,6 +52,7 @@ export class DemoFlightDirector {
     this.coastalScenario = new CoastalDemoScenario(this, simulator);
     this.incheonCessnaScenario = new IncheonCessnaScenario(this, simulator);
     this.incheonDepartureScenario = new IncheonDepartureScenario(this, simulator);
+    this.f16Scenario = new F16LuklaScenario(this, simulator);
     this.cessnaScenario = new CessnaDemoScenario(this, simulator);
     this.cessnaProximityScenario = new CessnaProximityScenario(this, simulator);
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
@@ -81,6 +83,7 @@ export class DemoFlightDirector {
   }
 
   getActiveScenario() {
+    if (this.activeDemoAircraft === 'F16') return this.f16Scenario;
     if (this.activeDemoAircraft === 'C172') {
       if (this.activeDemoAirport === 'incheon') return this.profile === 'incheon-departure'
         ? this.incheonDepartureScenario : this.incheonCessnaScenario;
@@ -173,6 +176,7 @@ export class DemoFlightDirector {
 
   start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
     if ((targetAirport || this.sim.activeAirport) === 'incheon' && this.sim.currentAircraftId !== 'C172') return false;
+    if (this.sim.currentAircraftId === 'F16' && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
     this.sim.devRunner?.stop();
     if (this.isActive) this.stop();
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
@@ -236,7 +240,9 @@ export class DemoFlightDirector {
       this.audioInitiated = true;
     }
 
-    if (this.activeDemoAircraft === 'C172') {
+    if (this.activeDemoAircraft === 'F16') {
+      this.setStage(F16LuklaScenario.STAGES.ESTABLISH);
+    } else if (this.activeDemoAircraft === 'C172') {
       if (this.activeDemoAirport === 'incheon') {
         this.setStage(this.profile === 'incheon-departure'
           ? IncheonDepartureScenario.STAGES.GATE : IncheonCessnaScenario.STAGES.TAKEOFF);
