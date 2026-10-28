@@ -53,6 +53,21 @@ try {
   await capture('menu-mobile');
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'), 'no mobile overflow');
   await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await evaluate(`(()=>{
+    const s=window.simulator, original=s.integratePhysics.bind(s);
+    window.__pavementAudit={checkedContacts:0,offPavementTicks:0,byStage:{},samples:[]};
+    s.integratePhysics=function(dt){
+      const result=original(dt);
+      if(s.demoDirector.isActive)for(const contact of s.gear.contacts){
+        if(contact.isGrounded)window.__pavementAudit.checkedContacts++;
+        if(contact.isGrounded && !s.currentAirport.isOnRunway(contact.worldPos.x,contact.worldPos.z)){
+          const audit=window.__pavementAudit;audit.offPavementTicks++;const key=[s.demoDirector.currentStage,s.demoDirector.incheonDepartureScenario.index,contact.id].join(':');audit.byStage[key]=(audit.byStage[key]??0)+1;
+          if(audit.samples.length<40)audit.samples.push({stage:s.demoDirector.currentStage,index:s.demoDirector.incheonDepartureScenario.index,contact:contact.id,x:contact.worldPos.x,z:contact.worldPos.z,position:s.position.toArray(),heading:s.telemetry.headingDeg});
+        }
+      }
+      return result;
+    };
+  })()`);
   await evaluate(`document.getElementById('btn-fly').click()`);
   let previous;
   for (let sec=0;sec<1800;) {
@@ -65,9 +80,13 @@ try {
     if (!sample.active) break;
     sec += seconds;
   }
+  const audit=await evaluate('window.__pavementAudit');
+  fs.writeFileSync(path.join(dir,'pavement-audit.json'),JSON.stringify(audit,null,2));
   const last=results.at(-1);
   assert.equal(last.result.status, 'completed');
   assert.ok(last.result.airborne, 'physical liftoff');
+  assert.ok(audit.checkedContacts>10000,'pavement audit actually inspected grounded contacts');
+  assert.equal(audit.offPavementTicks,0,'all grounded wheels stay on source-mapped pavement at every physics step');
   assert.deepEqual(last.result.stages, ['gate','pushback','disconnect','taxi','hold','lineup','clearance','takeoff']);
   assert.ok(results.every(s=>!s.crashed&&!s.incident&&s.pos.every(Number.isFinite)), 'no crash, gear incident or invalid pose');
   assert.ok(last.gear.every(s=>s==='normal'), 'gear intact');

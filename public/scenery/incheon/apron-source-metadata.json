@@ -1,0 +1,27 @@
+{
+  "snapshots": [
+    {
+      "file": "apron1-source.osm.json.gz",
+      "url": "https://api.openstreetmap.org/api/0.6/relation/3917465/full.json",
+      "retrievedAt": "2026-10-28T07:18:39.172Z",
+      "sha256": "db71a249111f8f642a01e1e94f537b8c49c269c92079bf8aa77e9e216051b18a",
+      "rawBytes": 41618,
+      "relationId": 3917465,
+      "relationVersion": 4,
+      "relationTimestamp": "2016-06-12T18:02:21Z"
+    },
+    {
+      "file": "apron2-source.osm.json.gz",
+      "url": "https://api.openstreetmap.org/api/0.6/relation/3156115/full.json",
+      "retrievedAt": "2026-10-28T07:18:39.181Z",
+      "sha256": "d0b87d26472c0c3b44dcb95efa250f31d5f8bf7a17193178b52f1f43d8f71577",
+      "rawBytes": 6332,
+      "relationId": 3156115,
+      "relationVersion": 2,
+      "relationTimestamp": "2016-06-12T18:02:21Z"
+    }
+  ],
+  "attribution": "© OpenStreetMap contributors",
+  "license": "ODbL-1.0",
+  "note": "Complete relation snapshots supplement missing member ways in the original map bounding-box snapshot. All overlapping element versions match the original frozen source."
+}

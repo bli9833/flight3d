@@ -1,7 +1,6 @@
 import { createDepartureJetBridge } from './DepartureJetBridge.js';
 import * as THREE from 'three';
 import { createDepartureStand } from './DepartureStand.js';
-import { DEPARTURE_CONNECTOR, DEPARTURE_STAND, DEPARTURE_TAXI_PAVEMENT } from '../config/incheonDeparture.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { colourIncheonGround, createIncheonGroundTexture } from './IncheonGround.js';
 import { IncheonTraffic } from './IncheonTraffic.js';
@@ -13,6 +12,11 @@ import { terrainGeometry, placeBuilding } from '../previews/incheonGeometry.js';
 import { createCityGround, createBuildingMaterials, createTexturedBuildings, createPlantingInstances } from '../previews/incheonCityAssets.js';
 
 function shape(points) { return new THREE.Shape(points.slice(0,-1).map(([x,z])=>new THREE.Vector2(x,-z))); }
+function pavementShape(surface) {
+  const outline = shape(surface.points);
+  for (const ring of surface.holes ?? []) outline.holes.push(new THREE.Path(ring.slice(0,-1).map(([x,z])=>new THREE.Vector2(x,-z))));
+  return outline;
+}
 function ribbon(points,width,dashed=false) {
   const v=[];
   for(let i=1;i<points.length;i++) {
@@ -71,8 +75,8 @@ export async function loadIncheonAirport(base) {
     if (!pavementBatches.has(color)) pavementBatches.set(color, []);
     pavementBatches.get(color).push(flat);
   };
-  for(const surface of [...INCHEON_AIRFIELD.surfaces, DEPARTURE_CONNECTOR, DEPARTURE_STAND, DEPARTURE_TAXI_PAVEMENT]) {
-    const geometry=surface.area?new THREE.ShapeGeometry(shape(surface.points)):ribbon(surface.points,surface.width);
+  for(const surface of INCHEON_AIRFIELD.surfaces) {
+    const geometry=surface.area?new THREE.ShapeGeometry(pavementShape(surface)):ribbon(surface.points,surface.width);
     if(surface.area)geometry.rotateX(-Math.PI/2);
     geometry.translate(0,INCHEON_AIRFIELD.elevationM+.015,0);
     batch(surface.kind==='runway'?0x55595a:0x92968e,geometry);

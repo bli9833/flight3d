@@ -16,21 +16,21 @@ export const DEPARTURE_RADIO = {
   ],
   taxi: [
     ['pilot', 'Ground, Sky 123, ready to taxi.'],
-    ['ground', 'Taxi via the simulation route to runway 15R. Hold short.'],
-    ['pilot', 'Taxi to 15R, hold short, Sky 123.'],
+    ['ground', 'Taxi via the simulation route to runway 33L. Hold short.'],
+    ['pilot', 'Taxi to 33L, hold short, Sky 123.'],
   ],
   hold: [
-    ['pilot', 'Incheon Tower, Sky 123, holding short runway 15R, ready for departure.'],
+    ['pilot', 'Incheon Tower, Sky 123, holding short runway 33L, ready for departure.'],
     ['tower', 'Hold short, landing traffic.'],
     ['pilot', 'Holding short, Sky 123.'],
   ],
   lineup: [
-    ['tower', 'Sky 123, runway 15R, line up and wait.'],
-    ['pilot', 'Runway 15R, line up and wait, Sky 123.'],
+    ['tower', 'Sky 123, runway 33L, line up and wait.'],
+    ['pilot', 'Runway 33L, line up and wait, Sky 123.'],
   ],
   clearance: [
-    ['tower', 'Sky 123, runway 15R, cleared for takeoff.'],
-    ['pilot', 'Runway 15R, cleared for takeoff, Sky 123.'],
+    ['tower', 'Sky 123, runway 33L, cleared for takeoff.'],
+    ['pilot', 'Runway 33L, cleared for takeoff, Sky 123.'],
   ],
   takeoff: [['pilot', 'Takeoff clearance confirmed. Accelerating, rotating and climbing.']],
 };

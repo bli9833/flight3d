@@ -14,7 +14,7 @@ try {
   for (const [stage, lines] of Object.entries(DEPARTURE_RADIO)) {
     const chunks = [];
     for (const [i, [speaker, text]] of lines.entries()) {
-      const spoken = text.replaceAll('123', 'one two three').replaceAll('15R', 'one five right');
+      const spoken = text.replaceAll('123', 'one two three').replaceAll('33L', 'three three left');
       const textFile = path.join(temp, `${stage}-${i}.txt`);
       const wav = path.join(temp, `${stage}-${i}.wav`);
       fs.writeFileSync(textFile, spoken);

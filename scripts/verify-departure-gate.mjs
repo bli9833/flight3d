@@ -59,7 +59,7 @@ try {
   assert.equal(await evaluate('window.simulator.currentAirport.departureBridge.extension'),0);
   assert.equal(await evaluate('window.simulator.demoDirector.currentStage'),51);
   await capture('bridge-clear-pushback');
-  for(let i=0;i<40;i++){if(await evaluate('window.simulator.demoDirector.currentStage===52'))break;await evaluate('window.simulator.stepSimulation(1)');}
+  for(let i=0;i<80;i++){if(await evaluate('window.simulator.demoDirector.currentStage===52'))break;await evaluate('window.simulator.stepSimulation(1)');}
   assert.equal(await evaluate('window.simulator.demoDirector.currentStage'),52);
   const initial=await evaluate('window.simulator.demoDirector.incheonDepartureScenario.tug.position.toArray()');
   await evaluate('window.simulator.stepSimulation(5)');
