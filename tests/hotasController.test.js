@@ -1,0 +1,384 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import { HotasController, applyDeadzone, identifyGamepadType } from '../src/controls/HotasController.js';
+
+describe('HotasController - Device Identification & Deadzone', () => {
+  it('correctly applies centered deadzone and smooth scaling', () => {
+    assert.strictEqual(applyDeadzone(0.0, 0.05), 0.0);
+    assert.strictEqual(applyDeadzone(0.04, 0.05), 0.0);
+    assert.strictEqual(applyDeadzone(-0.04, 0.05), 0.0);
+
+    // Smooth scaling from deadzone threshold to 1.0
+    const half = applyDeadzone(0.525, 0.05);
+    assert.ok(Math.abs(half - 0.5) < 0.01, `Expected ~0.5, got ${half}`);
+
+    assert.strictEqual(applyDeadzone(1.0, 0.05), 1.0);
+    assert.strictEqual(applyDeadzone(-1.0, 0.05), -1.0);
+  });
+
+  it('identifies T.Flight Hotas One across various OS and browser string formats', () => {
+    // Linux / Chrome
+    assert.strictEqual(
+      identifyGamepadType({ id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)' }),
+      'hotas-one'
+    );
+    // Windows / Firefox
+    assert.strictEqual(
+      identifyGamepadType({ id: '044f-b68b-T.Flight Hotas One' }),
+      'hotas-one'
+    );
+    // Generic name
+    assert.strictEqual(
+      identifyGamepadType({ id: 'Thrustmaster T-Flight Hotas One Flight Stick' }),
+      'hotas-one'
+    );
+    // Fallback T.Flight models
+    assert.strictEqual(
+      identifyGamepadType({ id: 'T.Flight Hotas 4 (Vendor: 044f Product: b10a)' }),
+      'hotas-tflight'
+    );
+    assert.strictEqual(
+      identifyGamepadType({ id: 'T.Flight Hotas X (Vendor: 044f Product: b108)' }),
+      'hotas-tflight'
+    );
+    // Generic flight stick
+    assert.strictEqual(
+      identifyGamepadType({ id: 'Logitech Extreme 3D Pro Flight Joystick' }),
+      'flight-stick'
+    );
+    // Standard gamepad
+    assert.strictEqual(
+      identifyGamepadType({ id: 'Xbox 360 Controller (XInput STANDARD GAMEPAD)', mapping: 'standard' }),
+      'standard-gamepad'
+    );
+  });
+});
+
+describe('HotasController - T.Flight Hotas One Flight Axes', () => {
+  function createMockControls() {
+    return {
+      pitchTrim: 2.0,
+      pitchTrimRate: 0.0,
+      throttle: 0.0,
+      parkingBrake: false,
+      inputBlocked: false,
+      aircraftControlsDisabled: false,
+      setParkingBrake(val) { this.parkingBrake = Boolean(val); },
+      onUserInteract() {},
+    };
+  }
+
+  function createHotasGamepad(axes = [0, 0, 0, 0, 0], buttons = []) {
+    return {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [...axes],
+      buttons: buttons.map(b => (typeof b === 'number' ? { pressed: b > 0.5, value: b } : { pressed: Boolean(b?.pressed), value: b?.value ?? 0 })),
+    };
+  }
+
+  it('maps roll (aileron) and pitch (elevator) axes accurately with sign conventions', () => {
+    const controls = createMockControls();
+    let mockGamepad = createHotasGamepad([0.8, -0.6, 0, 0, 0]);
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+
+    // Initial update
+    hotas.update(1 / 60);
+
+    // Roll: stick right (+0.8) -> aileron > 0.7
+    assert.ok(hotas.aileron > 0.7, `Expected positive roll, got ${hotas.aileron}`);
+
+    // Pitch: stick forward (-0.6, dive) -> elevator < -0.5
+    assert.ok(hotas.elevator < -0.5, `Expected negative pitch for dive, got ${hotas.elevator}`);
+
+    // Stick back (+0.75, climb) and stick left (-0.5)
+    mockGamepad = createHotasGamepad([-0.5, 0.75, 0, 0, 0]);
+    hotas.update(1 / 60);
+    assert.ok(hotas.aileron < -0.4, `Expected negative roll, got ${hotas.aileron}`);
+    assert.ok(hotas.elevator > 0.7, `Expected positive pitch for climb, got ${hotas.elevator}`);
+  });
+
+  it('handles dual-rudder inputs (twist stick vs throttle rocker) with maximum deflection arbitration', () => {
+    const controls = createMockControls();
+    // Twist stick (+0.6 right), rocker at center (0.0)
+    let mockGamepad = createHotasGamepad([0, 0, 0, 0.6, 0]);
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+
+    hotas.update(1 / 60);
+    assert.ok(hotas.rudder > 0.5, `Expected rudder from twist, got ${hotas.rudder}`);
+
+    // Pilot now uses throttle rocker (-0.9 left), overriding slight twist (+0.2)
+    mockGamepad = createHotasGamepad([0, 0, 0, 0.2, -0.9]);
+    hotas.update(1 / 60);
+    assert.ok(hotas.rudder < -0.8, `Expected rudder from rocker paddle to override, got ${hotas.rudder}`);
+  });
+
+  it('maps throttle lever (axis 2) from idle (backward, +1.0) to full TOGA (forward, -1.0)', () => {
+    const controls = createMockControls();
+    // Throttle fully back (+1.0) -> 0.0 (Idle)
+    let mockGamepad = createHotasGamepad([0, 0, 1.0, 0, 0]);
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.throttle, 0.0);
+    assert.strictEqual(controls.throttle, 0.0);
+    assert.strictEqual(hotas.hasThrottleControl, true);
+
+    // Push lever forward to mid-power (0.0) -> 50% thrust
+    mockGamepad = createHotasGamepad([0, 0, 0.0, 0, 0]);
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.throttle, 0.5);
+    assert.strictEqual(controls.throttle, 0.5);
+
+    // Push lever fully forward (-1.0) -> 100% TOGA thrust
+    mockGamepad = createHotasGamepad([0, 0, -1.0, 0, 0]);
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.throttle, 1.0);
+    assert.strictEqual(controls.throttle, 1.0);
+  });
+
+  it('maps main trigger (button 0) to proportional wheel brakes', () => {
+    const controls = createMockControls();
+    const buttons = [0]; // Trigger released
+    let mockGamepad = createHotasGamepad([0, 0, 1.0, 0, 0], buttons);
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.brakes, 0.0);
+
+    // Pull trigger halfway (0.5)
+    mockGamepad = createHotasGamepad([0, 0, 1.0, 0, 0], [0.5]);
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.brakes, 0.5);
+
+    // Full brake pull (1.0)
+    mockGamepad = createHotasGamepad([0, 0, 1.0, 0, 0], [1.0]);
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.brakes, 1.0);
+  });
+});
+
+describe('HotasController - Buttons & Systems Actions', () => {
+  it('triggers edge-sensitive systems callbacks without repeating while held', () => {
+    let spoilersToggled = 0;
+    let gearToggled = 0;
+    let reverserToggled = 0;
+    let flapsCycled = 0;
+    let cameraCycled = 0;
+    let cameraReset = 0;
+    let lightsToggled = 0;
+    let parkingBrakeToggled = 0;
+    let engineFailureCycled = 0;
+
+    const controls = {
+      pitchTrim: 2.0,
+      pitchTrimRate: 0.0,
+      parkingBrake: false,
+      inputBlocked: false,
+      aircraftControlsDisabled: false,
+      setParkingBrake(val) {
+        this.parkingBrake = val;
+        parkingBrakeToggled++;
+      },
+      onToggleSpoilers: () => spoilersToggled++,
+      onToggleGear: () => gearToggled++,
+      onToggleReverser: () => reverserToggled++,
+      onCycleFlaps: (dir) => flapsCycled += dir,
+      onCycleCamera: () => cameraCycled++,
+      onResetLook: () => cameraReset++,
+      onToggleLights: () => lightsToggled++,
+      onCycleEngineFailure: () => engineFailureCycled++,
+    };
+
+    // Buttons array:
+    // 0: Trigger, 1: Spoilers, 2: Gear, 3: Reverser, 4: Flap Retract, 5: Flap Extend,
+    // 6: Parking Brake, 7: Camera, 8: Reset Look, 9: Lights, 10: Engine Failure
+    const buttons = new Array(16).fill(0);
+    let mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [0, 0, 0, 0, 0],
+      buttons: buttons.map(b => ({ pressed: b > 0.5, value: b })),
+    };
+
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+    hotas.update(1 / 60);
+
+    // Press Gear (Button 2) and Flap Extend (Button 5)
+    buttons[2] = 1;
+    buttons[5] = 1;
+    mockGamepad.buttons = buttons.map(b => ({ pressed: b > 0.5, value: b }));
+    hotas.update(1 / 60);
+
+    assert.strictEqual(gearToggled, 1);
+    assert.strictEqual(flapsCycled, 1);
+
+    // Keep holding buttons on next frame: should NOT fire again
+    hotas.update(1 / 60);
+    assert.strictEqual(gearToggled, 1);
+    assert.strictEqual(flapsCycled, 1);
+
+    // Release buttons
+    buttons[2] = 0;
+    buttons[5] = 0;
+    mockGamepad.buttons = buttons.map(b => ({ pressed: b > 0.5, value: b }));
+    hotas.update(1 / 60);
+
+    // Press Spoilers (1), Reverser (3), Flaps Retract (4), Parking Brake (6), Camera (7), Reset (8), Lights (9), Engine (10)
+    buttons[1] = 1;
+    buttons[3] = 1;
+    buttons[4] = 1;
+    buttons[6] = 1;
+    buttons[7] = 1;
+    buttons[8] = 1;
+    buttons[9] = 1;
+    buttons[10] = 1;
+    mockGamepad.buttons = buttons.map(b => ({ pressed: b > 0.5, value: b }));
+    hotas.update(1 / 60);
+
+    assert.strictEqual(spoilersToggled, 1);
+    assert.strictEqual(reverserToggled, 1);
+    assert.strictEqual(flapsCycled, 0); // 1 + (-1) = 0
+    assert.strictEqual(parkingBrakeToggled, 1);
+    assert.strictEqual(cameraCycled, 1);
+    assert.strictEqual(cameraReset, 1);
+    assert.strictEqual(lightsToggled, 1);
+    assert.strictEqual(engineFailureCycled, 1);
+  });
+
+  it('adjusts pitch trim smoothly with POV Hat Up / Down while held', () => {
+    let timeDelta = 0;
+    const controls = {
+      pitchTrim: 2.0,
+      pitchTrimRate: 0.0,
+      inputBlocked: false,
+      aircraftControlsDisabled: false,
+      onCycleTimeOfDay: (d) => timeDelta += d,
+    };
+
+    const buttons = new Array(16).fill(0);
+    // Button 12 = Hat Up (Trim nose down)
+    buttons[12] = 1;
+    let mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [0, 0, 0, 0, 0],
+      buttons: buttons.map(b => ({ pressed: b > 0.5, value: b })),
+    };
+
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+    hotas.update(0.5); // 0.5s held
+    assert.ok(controls.pitchTrim < 2.0, `Pitch trim should have decreased, got ${controls.pitchTrim}`);
+    assert.strictEqual(controls.pitchTrimRate, -1.0);
+
+    // Switch to Button 13 = Hat Down (Trim nose up)
+    buttons[12] = 0;
+    buttons[13] = 1;
+    mockGamepad.buttons = buttons.map(b => ({ pressed: b > 0.5, value: b }));
+    hotas.update(1.0);
+    assert.ok(controls.pitchTrim > 2.0, `Pitch trim should have increased, got ${controls.pitchTrim}`);
+    assert.strictEqual(controls.pitchTrimRate, 1.0);
+
+    // Hat Right (15) changes time of day
+    buttons[13] = 0;
+    buttons[15] = 1;
+    mockGamepad.buttons = buttons.map(b => ({ pressed: b > 0.5, value: b }));
+    hotas.update(1 / 60);
+    assert.strictEqual(timeDelta, 1.5);
+  });
+
+  it('respects inputBlocked by suppressing flight surfaces and action buttons', () => {
+    let gearToggled = 0;
+    const controls = {
+      pitchTrim: 2.0,
+      pitchTrimRate: 0.0,
+      inputBlocked: true,
+      aircraftControlsDisabled: false,
+      onToggleGear: () => gearToggled++,
+    };
+
+    const buttons = new Array(16).fill(0);
+    buttons[2] = 1; // Gear button pressed
+    const mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [0.8, -0.7, 0, 0.5, 0], // Big deflections
+      buttons: buttons.map(b => ({ pressed: b > 0.5, value: b })),
+    };
+
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+    hotas.update(1 / 60);
+
+    assert.strictEqual(gearToggled, 0, 'Gear toggle must be blocked');
+    assert.strictEqual(hotas.elevator, 0.0, 'Elevator output must be zeroed when blocked');
+    assert.strictEqual(hotas.aileron, 0.0, 'Aileron output must be zeroed when blocked');
+    assert.strictEqual(hotas.rudder, 0.0, 'Rudder output must be zeroed when blocked');
+  });
+
+  it('respects aircraftControlsDisabled by permitting camera, lights, time and audio but disabling flight controls', () => {
+    let gearToggled = 0;
+    let cameraCycled = 0;
+    let lightsToggled = 0;
+
+    const controls = {
+      pitchTrim: 2.0,
+      pitchTrimRate: 0.0,
+      inputBlocked: false,
+      aircraftControlsDisabled: true,
+      onToggleGear: () => gearToggled++,
+      onCycleCamera: () => cameraCycled++,
+      onToggleLights: () => lightsToggled++,
+    };
+
+    const buttons = new Array(16).fill(0);
+    buttons[2] = 1; // Gear (flight action)
+    buttons[7] = 1; // Camera (utility action)
+    buttons[9] = 1; // Lights (utility action)
+    const mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [0.9, 0.9, 0, 0.9, 0],
+      buttons: buttons.map(b => ({ pressed: b > 0.5, value: b })),
+    };
+
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+    hotas.update(1 / 60);
+
+    assert.strictEqual(gearToggled, 0, 'Flight action must be ignored during demo');
+    assert.strictEqual(cameraCycled, 1, 'Camera action should be allowed during demo');
+    assert.strictEqual(lightsToggled, 1, 'Lights action should be allowed during demo');
+    assert.strictEqual(hotas.elevator, 0.0);
+    assert.strictEqual(hotas.aileron, 0.0);
+  });
+});
+
+describe('HotasController - Device Connection & Disconnection', () => {
+  it('notifies onDeviceConnected and onDeviceDisconnected callbacks', () => {
+    let connected = null;
+    let disconnected = null;
+
+    const controls = { onUserInteract() {} };
+    let mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [0, 0, 0, 0, 0],
+      buttons: [],
+    };
+
+    const hotas = new HotasController(controls, { getGamepads: () => (mockGamepad ? [mockGamepad] : []) });
+    hotas.onDeviceConnected = (dev) => { connected = dev; };
+    hotas.onDeviceDisconnected = (dev) => { disconnected = dev; };
+
+    // First frame polls and discovers device
+    hotas.update(1 / 60);
+    assert.ok(connected !== null);
+    assert.strictEqual(connected.type, 'hotas-one');
+    assert.strictEqual(connected.name, 'Thrustmaster T.Flight Hotas One');
+
+    // Next frame gamepad is disconnected
+    mockGamepad = null;
+    hotas.update(1 / 60);
+    assert.ok(disconnected !== null);
+    assert.strictEqual(disconnected.type, 'hotas-one');
+  });
+});

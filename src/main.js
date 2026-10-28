@@ -479,6 +479,19 @@ class FlightSimulator {
       this.updateAudioUI(state);
       this.showToast(() => t('sound.value', { value: this.audio.getVolumeState().text }));
     };
+
+    this.controls.onResetLook = () => {
+      this.cameraSystem.resetLook();
+      this.showToast(() => t('camera.view.centered'));
+    };
+
+    this.controls.onDeviceConnected = (device) => {
+      this.showToast(() => t('notice.hotasConnected', { name: device.name }));
+    };
+
+    this.controls.onDeviceDisconnected = (device) => {
+      this.showToast(() => t('notice.hotasDisconnected', { name: device.name }));
+    };
   }
 
   /** Apply the game-flow state to the DOM: menu visibility, input blocking. */

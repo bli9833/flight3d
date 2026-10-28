@@ -1,13 +1,14 @@
 import * as THREE from 'three';
+import { HotasController } from './HotasController.js';
 
 /**
  * Realistic Flight Control System
- * Supports keyboard, mouse yoke, and on-screen UI with aerodynamic control stiffness,
+ * Supports keyboard, mouse yoke, HOTAS / joystick (T.Flight Hotas One), and on-screen UI with aerodynamic control stiffness,
  * progressive throttle, trim adjustments, and input damping.
  */
 export class FlightControls {
-  constructor(domElement) {
-    this.domElement = domElement || document.body;
+  constructor(domElement, options = {}) {
+    this.domElement = domElement || (typeof document !== 'undefined' ? document.body : null);
 
     // Control Inputs (-1.0 to 1.0 or 0.0 to 1.0)
     this.elevator = 0.0;    // Pitch: stick back = positive (climb)
@@ -32,6 +33,13 @@ export class FlightControls {
     this.touchRudder = 0.0;
     this.touchBrakes = 0.0;
 
+    // HOTAS / Gamepad inputs
+    this.hotasElevator = 0.0;
+    this.hotasAileron = 0.0;
+    this.hotasRudder = 0.0;
+    this.hotasBrakes = 0.0;
+    this.hotas = new HotasController(this, options);
+
     // Keys pressed state
     this.keys = {};
 
@@ -55,10 +63,17 @@ export class FlightControls {
     this.onCycleEngineFailure = null;
     this.onCycleCamera = null;
     this.onSelectCamera = null;
+    this.onResetLook = null;
     this.onToggleLights = null;
     this.onCycleTimeOfDay = null;
     this.onToggleAudio = null;
     this.onResetPosition = null;
+    this.onUserInteract = null;
+    this.onDeviceConnected = null;
+    this.onDeviceDisconnected = null;
+
+    this.hotas.onDeviceConnected = (info) => this.onDeviceConnected?.(info);
+    this.hotas.onDeviceDisconnected = (info) => this.onDeviceDisconnected?.(info);
 
     this.initListeners();
   }
@@ -169,6 +184,13 @@ export class FlightControls {
   releaseAllKeys() {
     this.keys = {};
     this.pitchTrimRate = 0.0;
+    if (this.hotas) {
+      this.hotas.resetOutputs();
+      this.hotasElevator = 0.0;
+      this.hotasAileron = 0.0;
+      this.hotasRudder = 0.0;
+      this.hotasBrakes = 0.0;
+    }
   }
 
   setAircraftControlsDisabled(disabled) {
@@ -182,6 +204,14 @@ export class FlightControls {
   }
 
   update(dt, iasKnots = 140) {
+    if (this.hotas) {
+      this.hotas.update(dt);
+      this.hotasElevator = this.hotas.elevator;
+      this.hotasAileron = this.hotas.aileron;
+      this.hotasRudder = this.hotas.rudder;
+      this.hotasBrakes = this.hotas.brakes;
+    }
+
     if (this.aircraftControlsDisabled) {
       // In autonomous demo mode, user inputs are disabled.
       // Slew control surfaces purely towards virtual commands.
@@ -225,24 +255,30 @@ export class FlightControls {
       this.throttle = Math.max(0.0, this.throttle - dt * 0.35);
     }
 
-    // 2. Pitch Control (W/S or Down/Up Arrow or Touch)
-    // Positive elevator = pitch UP (pulling stick back / KeyS / ArrowDown / Touch Drag Down)
-    let targetElevator = this.virtualElevator !== null ? this.virtualElevator : this.touchElevator;
+    // 2. Pitch Control (W/S or Down/Up Arrow or Touch or HOTAS)
+    // Positive elevator = pitch UP (pulling stick back / KeyS / ArrowDown / Touch Drag Down / HOTAS Stick Back)
+    let targetElevator = this.virtualElevator !== null
+      ? this.virtualElevator
+      : (this.touchElevator + this.hotasElevator);
     if (this.keys['KeyS'] || this.keys['ArrowDown']) {
       targetElevator += 1.0; // Pitch UP
     }
     if (this.keys['KeyW'] || this.keys['ArrowUp']) {
       targetElevator -= 1.0; // Pitch DOWN
     }
+    targetElevator = Math.max(-1.0, Math.min(1.0, targetElevator));
 
-    // 3. Roll Control (A/D or Left/Right Arrow or Touch)
-    let targetAileron = this.virtualAileron !== null ? this.virtualAileron : this.touchAileron;
+    // 3. Roll Control (A/D or Left/Right Arrow or Touch or HOTAS)
+    let targetAileron = this.virtualAileron !== null
+      ? this.virtualAileron
+      : (this.touchAileron + this.hotasAileron);
     if (this.keys['KeyD'] || this.keys['ArrowRight']) {
       targetAileron += 1.0; // Bank RIGHT
     }
     if (this.keys['KeyA'] || this.keys['ArrowLeft']) {
       targetAileron -= 1.0; // Bank LEFT
     }
+    targetAileron = Math.max(-1.0, Math.min(1.0, targetAileron));
 
     // Mouse flight override
     if (this.mouseControl) {
@@ -250,14 +286,17 @@ export class FlightControls {
       targetAileron = Math.max(-1.0, Math.min(1.0, this.mouseX * 1.5));
     }
 
-    // 4. Yaw Rudder Control (Q/E or Touch)
-    let targetRudder = this.virtualRudder !== null ? this.virtualRudder : this.touchRudder;
+    // 4. Yaw Rudder Control (Q/E or Touch or HOTAS)
+    let targetRudder = this.virtualRudder !== null
+      ? this.virtualRudder
+      : (this.touchRudder + this.hotasRudder);
     if (this.keys['KeyE']) {
       targetRudder += 1.0; // Yaw RIGHT
     }
     if (this.keys['KeyQ']) {
       targetRudder -= 1.0; // Yaw LEFT
     }
+    targetRudder = Math.max(-1.0, Math.min(1.0, targetRudder));
 
     // Dynamic pressure stiffness: At high airspeed, aerodynamic air resistance stiffens control columns
     const stiffness = Math.max(0.40, 1.0 - Math.max(0, (iasKnots - 140) / 220.0) * 0.55);
@@ -295,13 +334,15 @@ export class FlightControls {
       this.parkingBrake = false;
     }
 
-    // 6. Wheel Brakes (Spacebar, Virtual/Touch Brakes, or Parking Brake)
+    // 6. Wheel Brakes (Spacebar, Virtual/Touch Brakes, HOTAS Trigger, or Parking Brake)
     if (this.keys['Space']) {
       this.brakes = 1.0;
     } else if (this.virtualBrakes !== null && this.virtualBrakes !== undefined) {
       this.brakes = this.virtualBrakes;
     } else if (this.touchBrakes > 0) {
       this.brakes = this.touchBrakes;
+    } else if (this.hotasBrakes > 0) {
+      this.brakes = this.hotasBrakes;
     } else if (this.parkingBrake) {
       this.brakes = 1.0;
     } else {
