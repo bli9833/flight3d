@@ -1,0 +1,145 @@
+{
+  "gate": {
+    "file": "gate.wav",
+    "duration": 8.650068,
+    "lines": [
+      {
+        "speaker": "pilot",
+        "voice": "rms",
+        "text": "Incheon Apron, Sky 123, ready for pushback."
+      },
+      {
+        "speaker": "apron",
+        "voice": "slt",
+        "text": "Sky 123, pushback approved."
+      },
+      {
+        "speaker": "crew",
+        "voice": "awb",
+        "text": "Tug connected."
+      }
+    ]
+  },
+  "pushback": {
+    "file": "pushback.wav",
+    "duration": 5.095057,
+    "lines": [
+      {
+        "speaker": "crew",
+        "voice": "awb",
+        "text": "Brakes released, commencing pushback."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "rms",
+        "text": "Pushback acknowledged."
+      }
+    ]
+  },
+  "disconnect": {
+    "file": "disconnect.wav",
+    "duration": 7.035057,
+    "lines": [
+      {
+        "speaker": "crew",
+        "voice": "awb",
+        "text": "Pushback complete. Set parking brake."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "rms",
+        "text": "Brake set."
+      },
+      {
+        "speaker": "crew",
+        "voice": "awb",
+        "text": "Tug disconnected, all equipment clear."
+      }
+    ]
+  },
+  "taxi": {
+    "file": "taxi.wav",
+    "duration": 12.710068,
+    "lines": [
+      {
+        "speaker": "pilot",
+        "voice": "rms",
+        "text": "Ground, Sky 123, ready to taxi."
+      },
+      {
+        "speaker": "ground",
+        "voice": "slt",
+        "text": "Taxi via the simulation route to runway 15R. Hold short."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "rms",
+        "text": "Taxi to 15R, hold short, Sky 123."
+      }
+    ]
+  },
+  "hold": {
+    "file": "hold.wav",
+    "duration": 12.195102,
+    "lines": [
+      {
+        "speaker": "pilot",
+        "voice": "rms",
+        "text": "Incheon Tower, Sky 123, holding short runway 15R, ready for departure."
+      },
+      {
+        "speaker": "tower",
+        "voice": "slt",
+        "text": "Hold short, landing traffic."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "rms",
+        "text": "Holding short, Sky 123."
+      }
+    ]
+  },
+  "lineup": {
+    "file": "lineup.wav",
+    "duration": 8.820045,
+    "lines": [
+      {
+        "speaker": "tower",
+        "voice": "slt",
+        "text": "Sky 123, runway 15R, line up and wait."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "rms",
+        "text": "Runway 15R, line up and wait, Sky 123."
+      }
+    ]
+  },
+  "clearance": {
+    "file": "clearance.wav",
+    "duration": 9.390068,
+    "lines": [
+      {
+        "speaker": "tower",
+        "voice": "slt",
+        "text": "Sky 123, runway 15R, cleared for takeoff."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "rms",
+        "text": "Runway 15R, cleared for takeoff, Sky 123."
+      }
+    ]
+  },
+  "takeoff": {
+    "file": "takeoff.wav",
+    "duration": 5.08,
+    "lines": [
+      {
+        "speaker": "pilot",
+        "voice": "rms",
+        "text": "Takeoff clearance confirmed. Accelerating, rotating and climbing."
+      }
+    ]
+  }
+}

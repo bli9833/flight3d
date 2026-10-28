@@ -119,11 +119,22 @@ export const DEPARTURE_TAXI_ROUTE = [
   [-1768.75, -3587.56],
   [-1668.94, -3658.56],
 ].map(([x, z]) => ({ x, z }));
-export const DEPARTURE_LINEUP_ROUTE = [[-1611.82, -3699.03], [-1559.21, -3624.78]].map(([x, z]) => ({ x, z }));
+export const DEPARTURE_LINEUP_ROUTE = [[-1611.82, -3699.03], [-1356.87, -3339.19]].map(([x, z]) => ({ x, z }));
 export const DEPARTURE_CONNECTOR = {
   id: 'simulation/departure-connector', kind: 'taxiway', width: 22, area: false,
   points: [[-1768.75, -3587.56], [-1668.94, -3658.56], [-1611.82, -3699.03]],
 };
 
 export const DEPARTURE_GATE = {"x": 90.62, "z": -191.86, "heading": -0.24119528084767608};
-export const DEPARTURE_STAND = { id: 'simulation/gate-stand', kind: 'taxiway', width: 30, area: false, points: [[90.62, -191.86], [101.37, -148.16]] };
+// A full-width apron is needed for the 737's turn out of the stand. A narrow
+// C172-sized lead-in leaves the main gear on ungraded ground during this turn.
+export const DEPARTURE_STAND = {
+  id: 'simulation/gate-apron', kind: 'apron', area: true,
+  points: [[30,-220],[230,-220],[230,-65],[30,-65],[30,-220]],
+};
+
+// Modeled 737 taxi corridor on the mapped centreline, including swept wheel clearance.
+export const DEPARTURE_TAXI_PAVEMENT = {
+  id: 'simulation/737-taxi-corridor', kind: 'taxiway', width: 40, area: false,
+  points: DEPARTURE_TAXI_ROUTE.map(({x,z}) => [x,z]),
+};
