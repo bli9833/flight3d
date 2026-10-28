@@ -281,3 +281,15 @@ The scenario checks that the loading screen covers scene construction, aircraft
 preloading, asset processing and shader preparation; it then verifies real mouse
 camera input and the retry screen after a forced WebGL initialization failure.
 The bar counts preparation stages, not downloaded bytes or estimated time.
+
+### C172 and F-16 tire contact
+
+With Vite on port 5281, run
+`chrome-session --project flight3d node scripts/verify-gear-ground-contact.mjs`.
+`APP_URL` and `ARTIFACT_DIR` override the server and `.cache/gear-ground-contact`
+output. The check loads both exterior GLBs with an already translated/rotated
+root, measures all three tires through unequal compression, release and reset,
+and verifies neutral tire bottoms within 5 mm of the world ground plane.
+It captures ground-level views of both aircraft. This is bounded geometry and
+rendering acceptance; it does not exercise a complete taxi, landing or terrain
+slope transition.

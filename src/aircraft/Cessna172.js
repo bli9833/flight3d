@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { CESSNA_172 } from '../config/aircraftConfigs.js';
+import { gearSupportHeight, tireContact } from './gearVisualContact.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
@@ -53,6 +55,7 @@ export class Cessna172 {
     this.gltfGroup.name = 'GLTF_Cessna172';
     this.gltfGroup.visible = false;
     this.group.add(this.gltfGroup);
+    this.visualGear = [];
     this.gltfControlSurfaces = [];
     this.gltfPropellers = [];
 
@@ -573,6 +576,7 @@ export class Cessna172 {
           }
 
           this.gltfGroup.add(this.gltfModel);
+          this.installVisualGear();
           this.useGltf = true;
           this.modelLoaded = true;
           this.loadingGltf = false;
@@ -605,8 +609,83 @@ export class Cessna172 {
     }
   }
 
+  installVisualGear() {
+    this.group.updateMatrixWorld(true);
+    const inverse = this.group.matrixWorld.clone().invert();
+    const assemblies = {
+      main: ['Object_15', 'Object_17', 'Object_19', 'Object_20'],
+      nose: ['Object_22', 'Object_24', 'Object_109', 'Object_110', 'Object_118'],
+    };
+    for (const [kind, names] of Object.entries(assemblies)) {
+      const parts = { nose: [], mainLeft: [], mainRight: [] };
+      for (const name of names) {
+        const source = this.gltfModel.getObjectByName(name);
+        if (!source) continue;
+        const geometry = source.geometry.index ? source.geometry.toNonIndexed() : source.geometry.clone();
+        geometry.applyMatrix4(inverse.clone().multiply(source.matrixWorld));
+        const positions = geometry.attributes.position;
+        for (const id of kind === 'nose' ? ['nose'] : ['mainLeft', 'mainRight']) {
+          const indices = [];
+          for (let i = 0; i < positions.count; i += 3) {
+            const x = positions.getX(i) + positions.getX(i + 1) + positions.getX(i + 2);
+            if (kind === 'nose' || (x < 0) === (id === 'mainLeft')) indices.push(i, i + 1, i + 2);
+          }
+          const part = geometry.clone();
+          part.setIndex(indices);
+          // Remove unused vertices so tire bounds describe this leg alone.
+          const mesh = new THREE.Mesh(part.toNonIndexed(), source.material);
+          part.dispose();
+          mesh.castShadow = mesh.receiveShadow = true;
+          mesh.userData.flexible = ['Object_15', 'Object_24', 'Object_118'].includes(name);
+          mesh.userData.tire = source.material.name === 'Tyre';
+          parts[id].push(mesh);
+        }
+        geometry.dispose();
+        source.visible = false;
+      }
+      for (const meshes of Object.values(parts)) {
+        const tire = meshes.find(m => m.userData.tire);
+        if (!tire) continue;
+        const contact = tireContact(tire.geometry);
+        for (const mesh of meshes) {
+          if (mesh.userData.flexible) {
+            mesh.geometry.computeBoundingBox();
+            mesh.userData.rest = mesh.geometry.attributes.position.array.slice();
+          }
+          this.gltfGroup.add(mesh);
+        }
+        this.visualGear.push({ contact, meshes, offset: null });
+      }
+    }
+    this.updateVisualGear({});
+  }
+
+  updateVisualGear(compressions) {
+    for (const gear of this.visualGear) {
+      const { contact, meshes } = gear;
+      const offset = gearSupportHeight(CESSNA_172.landingGear.contacts, compressions, contact.x, contact.z) - contact.y;
+      if (gear.offset === offset) continue;
+      gear.offset = offset;
+      for (const mesh of meshes) {
+        const rest = mesh.userData.rest;
+        if (!rest) { mesh.position.y = offset; continue; }
+        const p = mesh.geometry.attributes.position;
+        const top = mesh.geometry.boundingBox.max.y;
+        const bottom = mesh.geometry.boundingBox.min.y;
+        for (let i = 0; i < p.count; i++) {
+          p.setY(i, rest[i * 3 + 1] + offset * (top - rest[i * 3 + 1]) / (top - bottom));
+        }
+        p.needsUpdate = true;
+        mesh.geometry.computeVertexNormals();
+        mesh.geometry.computeBoundingSphere();
+      }
+    }
+  }
+
   update(dt, flightState = {}) {
     if (this.isCrashed) return;
+
+    this.updateVisualGear(flightState.compressions);
 
     const n1 = flightState.engine1?.n1 ?? flightState.engine1N1 ?? 25.0; // Piston engine RPM indicator
     const aileron = flightState.aileron ?? 0.0;

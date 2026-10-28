@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { F16_FALCON } from '../config/aircraftConfigs.js';
+import { gearSupportHeight, tireContact } from './gearVisualContact.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // The supplied asset is +X forward, with a 93.94-unit wingspan. Its authored
@@ -120,12 +122,15 @@ export class F16 {
 
   installGear(mesh) {
     for (const [id, geometry] of Object.entries(splitF16Gear(mesh.geometry))) {
+      const contact = tireContact(geometry);
       const bounds = geometry.boundingBox;
       const pivot = bounds.getCenter(new THREE.Vector3());
       pivot.y = bounds.max.y;
       const group = new THREE.Group();
       group.name = `F16_Gear_${id}`;
       group.position.copy(pivot);
+      group.userData.pivotY = pivot.y;
+      group.userData.tireContact = contact;
       geometry.translate(-pivot.x, -pivot.y, -pivot.z);
       const leg = new THREE.Mesh(geometry, mesh.material);
       leg.castShadow = leg.receiveShadow = true;
@@ -141,6 +146,9 @@ export class F16 {
     this.gearExtension = extension;
     const fold = (1 - extension) * Math.PI / 2;
     for (const [id, leg] of Object.entries(this.gearLegs)) {
+      const contact = leg.userData.tireContact;
+      leg.position.y = leg.userData.pivotY + extension * (
+        gearSupportHeight(F16_FALCON.landingGear.contacts, state.compressions, contact.x, contact.z) - contact.y);
       leg.visible = extension > 0.001;
       if (id === 'nose') leg.rotation.x = -fold;
       else leg.rotation.z = (id === 'mainLeft' ? -1 : 1) * fold;
