@@ -563,6 +563,7 @@ class FlightSimulator {
     this.currentAircraftConfig = config;
     this.flightWarnings ??= new FlightWarnings();
     this.flightWarnings.configure(config.id);
+    if (this.telemetry) this.telemetry.warnings = [];
     this.audio?.loadAircraftConfig(config);
     if (this.aero?.loadConfig) this.aero.loadConfig(config);
     if (this.engines?.loadConfig) this.engines.loadConfig(config);
@@ -784,6 +785,7 @@ class FlightSimulator {
     this.lastPresetType = type;
     this.audio?.reset();
     this.flightWarnings?.reset();
+    this.telemetry.warnings = [];
     if (!isDemoInternal) this.loadAircraftConfig(this.currentAircraftConfig || BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();

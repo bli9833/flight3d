@@ -38,6 +38,8 @@ try {
     sim.position.y = 5000; sim.linearVelocity.set(0, 0, -230);
     sim.stepSimulation(0.1);
     const liveIds = sim.telemetry.warnings.map(a => a.id);
+    sim.setPreset('runway', true);
+    const clearedOnReset = sim.telemetry.warnings.length === 0 && sim.flightWarnings.result.length === 0;
     const { FlightAudio } = await import('/src/audio/FlightAudio.js');
     const { BOEING_737_800 } = await import('/src/config/aircraftConfigs.js');
     const ctx = new OfflineAudioContext(1, 24000, 48000), audio = new FlightAudio();
@@ -54,9 +56,10 @@ try {
     audio.playGpwsCallout = text => voices.push(text);
     audio.update(0.1, { ...state, warnings:[{id:'pull-up',voice:'Whoop whoop, pull up'}] }, true);
     sim.telemetry.warnings = [{ id:'pull-up',text:'PULL UP',priority:100 }]; sim.updateHUD();
-    return { liveIds, energy, voices, hud:document.getElementById('hud-warning').textContent,
+    return { liveIds, clearedOnReset, energy, voices, hud:document.getElementById('hud-warning').textContent,
       visible:!document.getElementById('hud-warning').hidden, speechAvailable:'speechSynthesis' in window };
   });
+  assert.ok(result.clearedOnReset, 'preset reset clears model and telemetry even before a physics step');
   assert.ok(result.liveIds.includes('overspeed'), 'live physics produces overspeed');
   assert.ok(result.energy > 0.001, 'real Web Audio graph renders warning signal');
   assert.deepEqual(result.voices, ['Whoop whoop, pull up']);
