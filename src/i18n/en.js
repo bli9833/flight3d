@@ -511,6 +511,7 @@ export default {
   "lobby.airport": "Airport",
   "lobby.aircraft": "Aircraft",
   "aircraft.b738": "✈️ Boeing 737",
+  "aircraft.f16": "F-16 Fighting Falcon",
   "aircraft.c172": "🛩️ Cessna 172",
   "notice.aircraft": "Aircraft: {name}",
   "lobby.spawn": "Spawn scenario",

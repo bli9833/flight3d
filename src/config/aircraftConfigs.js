@@ -189,7 +189,7 @@ export const F16_FALCON = {
     clBeta: -0.08,
     clDa: 0.35,
     clP: -0.45,
-    cnBeta: 0.18,
+    cnBeta: -0.18,
     cnDr: -0.15,
     cnR: -0.25,
     adverseYaw: -0.010,
@@ -216,13 +216,18 @@ export const F16_FALCON = {
   // 4. Landing Gear & Ground Interaction
   landingGear: {
     isFixed: false,
+    bodySupportPoints: [
+      ['belly', [0, -0.9, 0]], ['nose', [0, 0, -7.8]],
+      ['tail', [0, 0, 8]], ['wingL', [-4.98, 0, 1.8]],
+      ['wingR', [4.98, 0, 1.8]], ['engineL', [0, -0.7, 7.5]],
+    ].map(([id, position], index) => ({ id, key: `${id}:${index}`, position, weight: 1 })),
     cgGroundHeightM: 1.85,
     gearTransitTimeSec: 5.0,
     contacts: [
       {
         id: 'nose',
         name: 'Nose Gear',
-        localPos: { x: 0.0, y: -1.6, z: -4.5 },
+        localPos: { x: 0.0, y: -1.65, z: -2.35 },
         wheelRadius: 0.25,
         restLength: 0.8,
         kSpring: 350000,
@@ -233,7 +238,7 @@ export const F16_FALCON = {
       {
         id: 'mainLeft',
         name: 'Left Main Gear',
-        localPos: { x: -1.2, y: -1.7, z: 1.2 },
+        localPos: { x: -1.1, y: -1.65, z: 1.65 },
         wheelRadius: 0.35,
         restLength: 0.8,
         kSpring: 450000,
@@ -243,7 +248,7 @@ export const F16_FALCON = {
       {
         id: 'mainRight',
         name: 'Right Main Gear',
-        localPos: { x: 1.2, y: -1.7, z: 1.2 },
+        localPos: { x: 1.1, y: -1.65, z: 1.65 },
         wheelRadius: 0.35,
         restLength: 0.8,
         kSpring: 450000,
@@ -259,7 +264,7 @@ export const F16_FALCON = {
   // 5. Cockpit Camera & Instrument Layout
   cockpit: {
     hasPhotoCockpit: false,
-    captainEyePos: { x: 0.0, y: 0.85, z: -2.8 },
+    captainEyePos: { x: 0.0, y: 1.2, z: -3.0 },
     defaultLookPitchRad: -0.10,
     defaultFov: 75.0,
     exteriorFov: 60.0,
@@ -267,8 +272,8 @@ export const F16_FALCON = {
     chaseHeight: 4.5,
     droneDistance: 14.0,
     droneHeight: 4.8,
-    gearCamOffset: { x: 1.0, y: -1.0, z: 2.5 },
-    gearLookTarget: { x: 0.0, y: -1.2, z: -1.0 }
+    gearCamOffset: { x: 3.0, y: -3.0, z: 5.0 },
+    gearLookTarget: { x: 0.0, y: -1.0, z: -0.3 }
   }
 };
 

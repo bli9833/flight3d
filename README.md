@@ -16,7 +16,7 @@
   <img src="cockpit_sunlight_showcase.png" alt="Flight3D Cockpit with Real-time Sunlight & Shadows" width="100%" />
 </p>
 
-**Flight3D** delivers desktop-grade flight simulation directly to your browser—zero installation required. Powered by a **continuous 6-DOF aerodynamic physics engine**, an authentic **PBR glass cockpit with real-time sunlight and window frame shadows**, an expanding multi-aircraft fleet (**Boeing 737-800** & **Cessna 172 Skyhawk**), and challenging global destinations ranging from **Pacific Coastal International** to Nepal's perilous high-altitude **Lukla Airport (VNLK)**.
+**Flight3D** delivers desktop-grade flight simulation directly to your browser—zero installation required. Powered by a **continuous 6-DOF aerodynamic physics engine**, an authentic **PBR glass cockpit with real-time sunlight and window frame shadows**, an expanding multi-aircraft fleet (**Boeing 737-800**, **Cessna 172 Skyhawk** & **F-16 Fighting Falcon**), and challenging global destinations ranging from **Pacific Coastal International** to Nepal's perilous high-altitude **Lukla Airport (VNLK)**.
 
 ---
 
@@ -49,6 +49,7 @@
 - **🔬 6-DOF Flight Dynamics:** Continuous aerodynamic state modeling with non-linear lift/drag polar, stall separation & hysteresis, wing-drop tendencies, and wingtip ground effect.
 - **✈️ Expanding Aircraft Fleet:**
   - **Boeing 737-800:** 66-ton airliner, CFM56-7B turbofans with spool-up delay, reverse thrust, and PCU hydraulic rate limits.
+  - **F-16 Fighting Falcon:** User-selected 3D cockpit model with telemetry-driven retractable gear; noncommercial asset license.
   - **Cessna 172 Skyhawk:** 1,050 kg high-wing general aviation trainer with Lycoming IO-360 engine and fixed tricycle gear.
 - **☀️ Real-time Cockpit Sunlight & Shadows:** Dynamic sun position casts crisp window frame, A-pillar, and yoke shadows across the instrument panel with ambient daylight occlusion.
 - **🗺️ Global Airfields & Terrain:**
@@ -148,4 +149,4 @@ flight3d/
 ## 📄 License
 
 Distributed under the [MIT License](LICENSE).
-External 3D models and sound assets follow their respective licenses in `src/environment/*LICENSE*.txt`.
+External 3D models and sound assets follow their respective licenses in `src/environment/*LICENSE*.txt` and `public/models/*.LICENSE.txt`. The F-16 asset by [bohmerang](https://sketchfab.com/bohmerang) is **CC BY-NC-SA 4.0 (noncommercial only)**; the MIT code license does not override its asset license. See [F-16 integration notes](docs/development/f16.md).

@@ -22,6 +22,15 @@ export const C172_COLLISION_PROBES = Object.freeze([
   { id: 'belly', pos: [0, -0.35, 0.0], radius: 0.7, descKey: 'belly.fuselage' }
 ]);
 
+export const F16_COLLISION_PROBES = Object.freeze([
+  { id: 'nose', pos: [0, 0, -7.7], radius: 0.3, descKey: 'nose.radome' },
+  { id: 'tail', pos: [0, 0, 7.8], radius: 0.5, descKey: 'tail.empennage' },
+  { id: 'fin', pos: [0, 3.2, 6.8], radius: 0.3, descKey: 'vertical.fin' },
+  { id: 'wingL', pos: [-4.8, 0, 1.8], radius: 0.3, descKey: 'left.wingtip' },
+  { id: 'wingR', pos: [4.8, 0, 1.8], radius: 0.3, descKey: 'right.wingtip' },
+  { id: 'belly', pos: [0, -0.7, 0], radius: 0.4, descKey: 'belly.fuselage' },
+]);
+
 /**
  * High-Performance Aircraft Collision & Obstacle Detector
  * Checks 6-DOF aircraft collision against:
@@ -58,7 +67,7 @@ export class CollisionDetector {
 
   loadAircraftConfig(config = {}) {
     const isC172 = config?.id === 'C172';
-    const probes = isC172 ? C172_COLLISION_PROBES : B738_COLLISION_PROBES;
+    const probes = config?.id === 'F16' ? F16_COLLISION_PROBES : isC172 ? C172_COLLISION_PROBES : B738_COLLISION_PROBES;
     this.probePoints = probes.map(p => ({
       id: p.id,
       pos: new THREE.Vector3(...p.pos),

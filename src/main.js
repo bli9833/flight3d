@@ -24,6 +24,7 @@ import { ISFDCanvas } from './aircraft/ISFDCanvas.js';
 import { CDUCanvas } from './aircraft/CDUCanvas.js';
 import { Boeing737 } from './aircraft/Boeing737.js';
 import { Cessna172 } from './aircraft/Cessna172.js';
+import { F16 } from './aircraft/F16.js';
 import { Terrain } from './environment/Terrain.js';
 import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality } from './config/renderQuality.js';
 import { WaterOcean } from './environment/WaterOcean.js';
@@ -634,6 +635,7 @@ class FlightSimulator {
    * second one ahead of the user's pick costs memory but cannot disturb the current view.
    */
   buildAircraftInstance(aircraftId) {
+    if (aircraftId === 'F16') return new F16();
     return aircraftId === 'C172'
       ? new Cessna172(this.pfdCanvas, this.ndCanvas)
       : new Boeing737(
