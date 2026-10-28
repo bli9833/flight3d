@@ -11,6 +11,8 @@ const normalBody = new THREE.Vector3();
 const torque = new THREE.Vector3();
 const inverse = new THREE.Quaternion();
 const velocity = new THREE.Vector3();
+const localArm = new THREE.Vector3();
+const ZERO_CG = Object.freeze({ x: 0, y: 0, z: 0 });
 
 export function bodyClearances(position, quaternion, height, points = BODY_SUPPORT_POINTS) {
   return points.map(probe => {
@@ -23,13 +25,15 @@ export function bodyClearances(position, quaternion, height, points = BODY_SUPPO
 // Position correction adds no kinetic energy; normal impulses cancel only closing
 // velocity, including rotation, using the same mass/inertia as the integrator.
 export function constrainBodyContact(position, quaternion, linearVelocity, angularVelocity,
-  mass, inverseInertia, height, terrainNormal, points = BODY_SUPPORT_POINTS) {
+  mass, inverseInertia, height, terrainNormal, points = BODY_SUPPORT_POINTS, cg = ZERO_CG) {
   inverse.copy(quaternion).invert();
   for (let iteration = 0; iteration < 4; iteration++) {
     let corrected = false;
     for (const probe of points) {
       arm.set(...probe.position).applyQuaternion(quaternion);
       point.copy(position).add(arm);
+      localArm.set(...probe.position).sub(cg);
+      arm.copy(localArm).applyQuaternion(quaternion);
       const penetration = height(point.x, point.z) - point.y;
       if (penetration <= BODY_PENETRATION_LIMIT) continue;
       corrected = true;
@@ -43,7 +47,7 @@ export function constrainBodyContact(position, quaternion, linearVelocity, angul
       const closing = velocity.dot(normal);
       if (closing >= 0) continue;
       normalBody.copy(normal).applyQuaternion(inverse);
-      torque.set(...probe.position).cross(normalBody);
+      torque.copy(localArm).cross(normalBody);
       const denominator = 1 / mass + torque.x ** 2 * inverseInertia.x
         + torque.y ** 2 * inverseInertia.y + torque.z ** 2 * inverseInertia.z;
       const impulse = -closing / denominator;

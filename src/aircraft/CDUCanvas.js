@@ -21,7 +21,7 @@ export class CDUCanvas {
 
     this.activeWpt = 'RW09L';
     this.distNm = 5.2;
-    this.v2Speed = 142;
+    this.takeoff = null;
     this.airportId = 'coastal';
 
     this.render();
@@ -33,8 +33,11 @@ export class CDUCanvas {
     this.render();
   }
 
-  updateData() {
-    const key = JSON.stringify([this.airportId, this.activeWpt, this.distNm, this.v2Speed]);
+  updateData(state = {}) {
+    this.takeoff = state.takeoff ?? null;
+    const p = this.takeoff;
+    const key = JSON.stringify([this.airportId, this.activeWpt, this.distNm,
+      p?.zeroFuelMassKg, p?.massKg, p?.vr, p?.v2]);
     if (key !== this.renderKey) {
       this.renderKey = key;
       this.render();
@@ -136,7 +139,9 @@ export class CDUCanvas {
     ctx.fillStyle = '#64748b';
     ctx.font = '11px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('------------------------', sx + sw * 0.5, sy + 162);
+    const p = this.takeoff;
+    ctx.fillText(p ? `ZFW ${(p.zeroFuelMassKg / 1000).toFixed(2)} / TOW~ ${(p.massKg / 1000).toFixed(2)} T`
+      : '------------------------', sx + sw * 0.5, sy + 162);
 
     // Bottom Navigation Prompts
     ctx.fillStyle = '#38bdf8';
@@ -150,7 +155,8 @@ export class CDUCanvas {
     ctx.fillStyle = '#22c55e';
     ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('NAV ARMED _', sx + 12, sy + 208);
+    ctx.fillText(p?.status === 'estimate' ? `V1 --  VR~ ${p.vr.toFixed(0)}  V2~ ${p.v2.toFixed(0)}`
+      : 'V1 / VR / V2 UNAVAILABLE', sx + 12, sy + 208);
 
     // 2. CDU Keypad Area (Bottom half, y: 250 to 500)
     // Mode Buttons: INIT REF, RTE, CLB, CRZ, DES, MENU, LEGS, DEP ARR, HOLD, PROG, EXEC

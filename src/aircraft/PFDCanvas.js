@@ -37,6 +37,8 @@ export class PFDCanvas {
   }
 
   updateData(state) {
+    this.takeoff = state.takeoff;
+    this.stallSpeedKnots = state.stallSpeedKnots;
     this.pitch = state.pitchDeg || 0;
     this.roll = state.rollDeg || 0;
     this.heading = (state.headingDeg || 0 + 360) % 360;
@@ -354,9 +356,10 @@ export class PFDCanvas {
       }
     }
 
-    // Low Speed Amber Minimum Maneuver Band & Red Stall Strip (0 to 125 knots)
-    const stallKts = 115;
-    const amberKts = 130;
+    // Estimated 1g boundary follows current loading/CG/configuration. Actual
+    // stall annunciation still comes from the live separation model.
+    const stallKts = this.stallSpeedKnots ?? 0;
+    const amberKts = stallKts * 1.13;
     const amberTopY = cy - (amberKts - currentIas) * pxPerKnot;
     const stallTopY = cy - (stallKts - currentIas) * pxPerKnot;
 
@@ -375,12 +378,11 @@ export class PFDCanvas {
       }
     }
 
-    // V-Speed Takeoff Reference Bugs (V1 = 128, Vr = 133, V2 = 142)
-    const vSpeeds = [
-      { kts: 128, label: '1' },
-      { kts: 133, label: 'R' },
-      { kts: 142, label: '2' }
-    ];
+    // Estimated VR/V2 only; V1 needs an accelerate-stop/runway model.
+    const vSpeeds = this.takeoff?.status === 'estimate' ? [
+      { kts: this.takeoff.vr, label: 'R~' },
+      { kts: this.takeoff.v2, label: '2~' }
+    ] : [];
     ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'right';
     vSpeeds.forEach(v => {

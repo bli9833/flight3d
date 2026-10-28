@@ -61,11 +61,10 @@ export class LuklaCircuitScenario {
         // ~1.6 t above the configured empty mass. Never inflate lift or braking.
         if (this.sim.aero?.loadConfig) {
           const base = BOEING_737_800.massProperties;
-          const ratio = 43000 / base.currentMassKg;
-          this.sim.aero.loadConfig({ ...BOEING_737_800, massProperties: {
-            ...base, currentMassKg: 43000,
-            Ixx: base.Ixx * ratio, Iyy: base.Iyy * ratio, Izz: base.Izz * ratio
-          } });
+          this.sim.aero.loadConfig({ ...BOEING_737_800,
+            massDistribution: { ...BOEING_737_800.massDistribution, initialFuelKg: 1587, initialPayloadKg: 0 },
+            massProperties: { ...base, currentMassKg: 43000 },
+          });
         }
         if (this.sim.setPreset) {
           this.sim.setPreset('cliff', true);

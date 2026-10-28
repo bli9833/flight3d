@@ -7,6 +7,7 @@ context, while the current implementation defines actual behavior.
 | --- | --- | --- |
 | Integration, reset, simulation timing | src/main.js; src/core/physicsTiming.js; src/config/simConfig.js; [physics core](physics-core.md) | npm test; relevant browser scenario |
 | Aircraft parameters | src/config/aircraftConfigs.js | physics tests; flight scenario |
+| Loading, fuel CG, inertia and trim | src/physics/MassProperties.js; TrimSolver.js; src/ui/LoadingPanel.js; [mass/CG model](mass-cg.md) | tests/massProperties.test.js; trimSolver.test.js; scripts/verify-mass-cg.html |
 | Lift, drag, atmosphere, engines | src/physics/Aerodynamics.js; Atmosphere.js; EngineModel.js | tests/aerodynamics.test.js; atmosphere.test.js; engine.test.js |
 | Gear, collision, touchdown | src/physics/LandingGear.js; CollisionDetector.js | tests/landingGear.test.js; collision.test.js; gearCamAndTouchdown.test.js; npm run test:crash |
 | Keyboard, gamepad, touch input | src/controls/FlightControls.js; TouchFlightControls.js; index.html; style.css | tests/flightControls.test.js; npm run test:mobile |

@@ -22,6 +22,8 @@ const scratchWheelLateral = new THREE.Vector3();
 const scratchFWheelWorld = new THREE.Vector3();
 const scratchFWheelBody = new THREE.Vector3();
 const scratchMoment = new THREE.Vector3();
+const scratchCgWorld = new THREE.Vector3();
+const ZERO_CG = Object.freeze({ x: 0, y: 0, z: 0 });
 const scratchBcLocal = new THREE.Vector3();
 const scratchBcPoint = new THREE.Vector3();
 const scratchBcNormal = new THREE.Vector3();
@@ -222,7 +224,7 @@ export class LandingGear {
    * @param {Function} [getTerrainNormal=null] (x, z) => THREE.Vector3 surface normal
    * @returns {{ forces: THREE.Vector3, moments: THREE.Vector3, onGround: boolean, touchdown: boolean }}
    */
-  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null, sampleIsOnRunway = null) {
+  advanceConfiguration(dt) {
     // Animate gear transit
     if (this.isFixed) {
       this.targetGearState = 1.0;
@@ -236,6 +238,11 @@ export class LandingGear {
       this.isTransit = false;
       this.gearState = this.targetGearState;
     }
+
+  }
+
+  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null, sampleIsOnRunway = null, cg = ZERO_CG, configurationAdvanced = false) {
+    if (!configurationAdvanced) this.advanceConfiguration(dt);
 
     const netForceWorld = new THREE.Vector3(0, 0, 0);
     const netMomentBody = new THREE.Vector3(0, 0, 0);
@@ -251,6 +258,7 @@ export class LandingGear {
     let catastrophicImpact = false;
     // World transformation matrices
     const worldQuat = aircraftMesh.quaternion;
+    const cgWorld = scratchCgWorld.copy(cg).applyQuaternion(worldQuat).add(aircraftMesh.position);
     const invWorldQuat = scratchInvQuat.copy(worldQuat).invert();
     const touchdownContacts = [];
 
@@ -296,7 +304,7 @@ export class LandingGear {
         c.compression = Math.min(c.restLength, normalPenetration);
 
         // Contact point velocity in world space = linearVel + angularVel x r
-        const rWorld = scratchRWorld.copy(c.worldPos).sub(aircraftMesh.position);
+        const rWorld = scratchRWorld.copy(c.worldPos).sub(cgWorld);
         const angVelWorld = scratchAngVelWorld.copy(angularVelocity).applyQuaternion(worldQuat);
         const contactVel = scratchContactVel.copy(linearVelocity).add(angVelWorld.cross(rWorld));
         const groundSpeed = Math.sqrt(linearVelocity.x * linearVelocity.x + linearVelocity.z * linearVelocity.z);
@@ -439,7 +447,7 @@ export class LandingGear {
         normal.copy(terrainNormal).normalize();
       }
       const depth = (groundH - point.y) * normal.y;
-      const arm = scratchBcArm.copy(point).sub(aircraftMesh.position);
+      const arm = scratchBcArm.copy(point).sub(cgWorld);
       const velocity = scratchBcVelocity.copy(angularVelocity).applyQuaternion(worldQuat).cross(arm).add(linearVelocity);
       const vNormal = velocity.dot(normal);
       // Sample imminent impacts before the post-integration constraint removes
@@ -452,7 +460,7 @@ export class LandingGear {
       const friction = Math.min(speed * 18000, load * 0.45);
       if (speed > 0) force.addScaledVector(tangent, -friction / speed);
       netForceWorld.add(force);
-      netMomentBody.add(scratchMoment.copy(local).cross(scratchFWheelBody.copy(force).applyQuaternion(invWorldQuat)));
+      netMomentBody.add(scratchMoment.copy(local).sub(cg).cross(scratchFWheelBody.copy(force).applyQuaternion(invWorldQuat)));
       groundedNow.add(probe.key);
       this.onGround = true;
       const firstContact = !this.bodyGrounded.has(probe.key);

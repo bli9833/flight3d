@@ -189,13 +189,14 @@ describe('live mass from fuel burn', () => {
   it('sheds each burned kilogram and restores the configured mass on refuel', () => {
     const aero = new Aerodynamics();
     const engines = new EngineModel();
+    engines.bindMassProperties(aero.massProperties);
     assert.strictEqual(aero.mass, 66000);
     assert.strictEqual(aero.massBaselineKg, 66000);
 
     engines.fuelKg = engines.fuelCapacityKg - 1200;
-    engines.shedBurnedFuelMass(aero);
+    aero.syncMassProperties();
     assert.strictEqual(aero.mass, 64800);
-    engines.shedBurnedFuelMass(aero);
+    aero.syncMassProperties();
     assert.strictEqual(aero.mass, 64800, 'a step with no new burn changes nothing');
 
     engines.refuel(aero);
@@ -206,14 +207,15 @@ describe('live mass from fuel burn', () => {
   it('keeps a mass a scenario loaded mid-flight instead of restoring the old burn onto it', () => {
     const aero = new Aerodynamics();
     const engines = new EngineModel();
+    engines.bindMassProperties(aero.massProperties);
 
     // Cruise at 66 t, burning ~5 t of the tanks.
     engines.fuelKg = engines.fuelCapacityKg - 5000;
-    engines.shedBurnedFuelMass(aero);
+    aero.syncMassProperties();
     assert.strictEqual(aero.mass, 61000);
 
-    // The Lukla circuit loads its own 43 t light-aircraft config, then enters a
-    // demo-internal preset, which refuels. The loaded baseline must win.
+    // A minimal scenario config replaces the ledger, then refuels. The new
+    // baseline must win; the full Lukla fuel/payload split has its own test.
     aero.loadConfig({ massProperties: { currentMassKg: 43000 } });
     assert.strictEqual(aero.mass, 43000);
     engines.refuel(aero);
@@ -222,7 +224,7 @@ describe('live mass from fuel burn', () => {
 
     // The remaining flight keeps shedding from the scenario baseline.
     engines.fuelKg = engines.fuelCapacityKg - 1000;
-    engines.shedBurnedFuelMass(aero);
+    aero.syncMassProperties();
     assert.strictEqual(aero.mass, 42000);
   });
 });

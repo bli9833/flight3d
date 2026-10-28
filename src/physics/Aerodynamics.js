@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { Atmosphere } from './Atmosphere.js';
 import { BOEING_737_800 } from '../config/aircraftConfigs.js';
 import { TRIM_WHEEL_AUTHORITY } from './trimWheel.js';
+import { MassProperties } from './MassProperties.js';
+import { longitudinalForces } from './longitudinalForces.js';
 
 export function createAeroResult() {
   return { forceWorld: new THREE.Vector3(), momentBody: new THREE.Vector3() };
@@ -14,6 +16,7 @@ export function createAeroResult() {
  */
 export class Aerodynamics {
   constructor(config = BOEING_737_800) {
+    this._longitudinal = {};
     this.loadConfig(config);
 
     // Dynamic Live Tuning Overrides
@@ -73,9 +76,13 @@ export class Aerodynamics {
 
     this.mass = mass.currentMassKg || 66000.0;
     // The mass this aircraft was configured with, before any fuel is burned.
-    // Live burn moves `mass` only, so a fresh segment can return to this
-    // baseline instead of re-adding weight a scenario just loaded itself.
+    // Compatibility metadata; the mass ledger owns reset and live fuel burn.
     this.massBaselineKg = this.mass;
+    this.massProperties = new MassProperties(config);
+    this.cg = this.massProperties.cg;
+    this.tailArmM = aero.tailArmM ?? 0;
+    this.tailAreaM2 = aero.tailAreaM2 ?? 1;
+    this.tailInducedFactor = aero.tailInducedFactor ?? 0.1;
     this.wingspan = aero.wingspanM || 35.8;
     this.wingArea = aero.wingAreaM2 || 124.6;
     this.meanChord = aero.meanChordM || 3.99;
@@ -88,6 +95,8 @@ export class Aerodynamics {
     this.invIxx = 1.0 / this.Ixx;
     this.invIyy = 1.0 / this.Iyy;
     this.invIzz = 1.0 / this.Izz;
+    this.syncMassProperties();
+    this.massBaselineKg = this.mass;
 
     this.CL0_clean = aero.cl0Clean || 0.22;
     this.CLa = aero.claPerRad || 5.65;
@@ -125,6 +134,22 @@ export class Aerodynamics {
     this.currentFlapAngle = this.flapAngles[this.flapsIndex];
   }
 
+  advanceFlaps(dt) {
+    const target = this.flapAngles[this.flapsIndex];
+    this.currentFlapAngle += (target - this.currentFlapAngle) * Math.min(1, dt * 0.4);
+  }
+
+  syncMassProperties() {
+    const state = this.massProperties;
+    this.mass = state.massKg;
+    this.Ixx = state.inertia.z;
+    this.Iyy = state.inertia.x;
+    this.Izz = state.inertia.y;
+    this.invIxx = state.inverseInertia.z;
+    this.invIyy = state.inverseInertia.x;
+    this.invIzz = state.inverseInertia.y;
+  }
+
   setFlapPosition(index) {
     this.flapsIndex = Math.max(0, Math.min(this.flapAngles.length - 1, index));
   }
@@ -152,10 +177,8 @@ export class Aerodynamics {
    * @param {number} engineThrustTotal (Newtons)
    * @param {number} gearState (0.0 to 1.0)
    */
-  computeAero(dt, aircraftMesh, linearVelocityWorld, angularVelocityBody, altitudeMeters, heightAboveGround, engineThrustTotal, gearState, result = createAeroResult()) {
-    // Smooth flap mechanical transition
-    const targetFlap = this.flapAngles[this.flapsIndex];
-    this.currentFlapAngle += (targetFlap - this.currentFlapAngle) * Math.min(1.0, dt * 0.4);
+  computeAero(dt, aircraftMesh, linearVelocityWorld, angularVelocityBody, altitudeMeters, heightAboveGround, engineThrustTotal, gearState, result = createAeroResult(), configurationAdvanced = false) {
+    if (!configurationAdvanced) this.advanceFlaps(dt);
 
     // Atmospheric properties at current altitude
     const atmos = Atmosphere.getConditions(altitudeMeters);
@@ -300,41 +323,10 @@ export class Aerodynamics {
     // Sideforce coefficient
     const cy = -0.75 * this.beta + 0.18 * this.rudder;
 
-    // Aerodynamic Force magnitudes (Newtons)
-    const liftForce = qDyn * this.wingArea * cl;
-    const dragForce = qDyn * this.wingArea * cd;
+    // Lateral force; the shared longitudinal model below combines the existing
+    // whole-aircraft CL/CD with the incremental tail before rotating to world.
     const sideForce = qDyn * this.wingArea * cy;
-
-    this.lift = liftForce;
-    this.drag = dragForce;
     this.sideForce = sideForce;
-
-    // Aerodynamic forces in wind axis:
-    // Lift is perpendicular to airspeed vector, Drag is parallel opposite to airspeed
-    // Transform Lift and Drag into aircraft body frame (x_b, y_b, z_b):
-    // In Three.js body frame:
-    // +X: Right wing
-    // +Y: Upward through cabin ceiling
-    // -Z: Forward through nose (+Z is backward towards tail)
-    // Relative wind blows along (+Z) with angle of attack alpha.
-    // Drag acts parallel to relative wind (retarding along +Z).
-    // Lift acts perpendicular to relative wind (lifting along +Y, tilted forward -Z with alpha).
-    const cosA = Math.cos(this.alpha);
-    const sinA = Math.sin(this.alpha);
-
-    // Total upward force along body +Y, kept as a scalar so the world-frame
-    // force can be allocated once instead of body vector + clone.
-    const upwardForce = liftForce * cosA + dragForce * sinA;
-
-    // Transform aerodynamic force to world frame
-    result.forceWorld.set(
-      sideForce,
-      upwardForce,
-      dragForce * cosA - liftForce * sinA  // Total longitudinal force along body +Z (+Z opposes forward motion)
-    ).applyQuaternion(aircraftMesh.quaternion);
-
-    // Calculate aerodynamic load factor: normal force in body Y / (mass * g0)
-    this.gForce = Math.max(-3.0, Math.min(6.0, (upwardForce / (this.mass * Atmosphere.G0))));
 
     // --- Aerodynamic Moments (Pitch, Roll, Yaw) in Body Frame ---
     // In Three.js body frame:
@@ -408,6 +400,19 @@ export class Aerodynamics {
       yawMoment,   // Rotation around Y (Yaw: negative yaw right)
       rollMoment   // Rotation around Z (Roll: negative roll right)
     );
+
+    const longitudinal = longitudinalForces(this, qDyn, this.alpha, cl, cd,
+      elevatorEffective, engineThrustTotal, this._longitudinal);
+    result.forceWorld.set(sideForce, longitudinal.y, longitudinal.z).applyQuaternion(aircraftMesh.quaternion);
+    result.momentBody.x += longitudinal.pitch - (qDyn * this.wingArea * this.meanChord *
+      (this.Cm0 + this.Cma * this.alpha - this.Cm_de * elevatorEffective) + thrustPitchMoment);
+    result.momentBody.y += this.cg.x * (longitudinal.z - engineThrustTotal) - this.cg.z * sideForce;
+    result.momentBody.z += this.cg.y * sideForce - this.cg.x * longitudinal.y;
+    this.lift = longitudinal.lift;
+    this.drag = longitudinal.drag;
+    this.gForce = Math.max(-3, Math.min(6, longitudinal.y / (this.mass * Atmosphere.G0)));
+    result.tailForce = longitudinal.tailForce;
+    result.tailDragDelta = longitudinal.tailDragDelta;
 
     result.alphaDeg = THREE.MathUtils.radToDeg(this.alpha);
     result.betaDeg = THREE.MathUtils.radToDeg(this.beta);

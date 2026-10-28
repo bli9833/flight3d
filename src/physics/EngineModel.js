@@ -36,8 +36,8 @@ export class EngineModel {
     this.spoolDownTime = propulsion.spoolDownTimeSec ?? propulsion.spoolDownTime ?? 2.4;
     this.reverseThrustEfficiency = propulsion.reverseThrustEfficiency ?? 0.45;
     this.fuelCapacityKg = propulsion.fuelCapacityKg ?? 14200;
-    this.fuelKg = this.fuelCapacityKg;
-    this.appliedFuelLoadKg = 0;
+    this.massProperties = null;
+    this._fuelKg = this.fuelCapacityKg;
     this.windmillingN1 = propulsion.windmillingN1 ?? 9.0;
     this.momentArmMeters = propulsion.momentArmMeters ?? (this.numEngines > 1 ? 4.5 : 0.0);
 
@@ -58,23 +58,23 @@ export class EngineModel {
     this.throttleCommand = Math.max(0.0, Math.min(1.0, val));
   }
 
-  /**
-   * Shed the fuel burned since the previous call from the airframe mass.
-   * Accounted as a delta against the fuel load so a scenario that replaces
-   * `aero.mass` with its own configured value mid-flight keeps that baseline
-   * instead of being fought by absolute accounting.
-   */
-  shedBurnedFuelMass(aero) {
-    const fuelLoadKg = this.fuelCapacityKg - this.fuelKg;
-    aero.mass += this.appliedFuelLoadKg - fuelLoadKg;
-    this.appliedFuelLoadKg = fuelLoadKg;
+  get fuelKg() { return this.massProperties?.fuelKg ?? this._fuelKg; }
+  set fuelKg(value) {
+    if (!Number.isFinite(value) || value < 0 || value > this.fuelCapacityKg) throw new RangeError('fuel load');
+    if (this.massProperties) this.massProperties.setLoading({ fuelKg: value });
+    else this._fuelKg = value;
   }
 
-  /** Start a fresh segment with full tanks at the aircraft's configured mass. */
+  bindMassProperties(model) {
+    this.massProperties = model;
+    this.fuelCapacityKg = model.capacityKg;
+  }
+
+  /** A preset restores its own initial loading, not necessarily full tanks. */
   refuel(aero) {
-    this.fuelKg = this.fuelCapacityKg;
-    this.appliedFuelLoadKg = 0;
-    aero.mass = aero.massBaselineKg;
+    this.bindMassProperties(aero.massProperties);
+    this.massProperties.reset();
+    aero.syncMassProperties();
   }
 
   setEngineFailure(index, on) {
@@ -188,7 +188,18 @@ export class EngineModel {
     for (let i = 0; i < this.numEngines; i++) {
       stepFuelBurn += this.fuelFlow[i];
     }
-    this.fuelKg = Math.max(0.0, this.fuelKg - stepFuelBurn * dt / 3600.0);
+    const demand = stepFuelBurn * dt / 3600;
+    const supplied = this.massProperties ? this.massProperties.consume(demand) : Math.min(this._fuelKg, demand);
+    if (!this.massProperties) this._fuelKg -= supplied;
+    // A partially supplied tick has proportional combustion thrust. Dry/failed
+    // engines may keep windmilling but do not produce positive net thrust.
+    const supplyFraction = demand > 0 ? supplied / demand : (fuelStarved ? 0 : 1);
+    totalThrust = 0;
+    for (let i = 0; i < this.numEngines; i++) {
+      this.thrust[i] *= this.failed[i] ? 0 : supplyFraction;
+      this.fuelFlow[i] *= supplyFraction;
+      totalThrust += this.thrust[i];
+    }
 
     const makeEngineState = (idx) => {
       if (idx >= this.numEngines) {
@@ -207,7 +218,7 @@ export class EngineModel {
         egt: this.egt[idx],
         fuelFlow: this.fuelFlow[idx],
         thrust: this.thrust[idx],
-        failed: this.failed[idx] || fuelStarved || this.contactDamage[idx] >= 1
+        failed: this.failed[idx] || this.fuelKg <= 0 || this.contactDamage[idx] >= 1
       };
     };
 

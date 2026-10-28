@@ -17,6 +17,10 @@ import { BODY_SUPPORT_POINTS, FALLBACK_BODY_SUPPORT_POINTS } from './physics/gro
 import { constrainBodyContact } from './physics/bodyContactConstraint.js';
 import { AutopilotController } from './physics/Autopilot.js';
 import { solveTrim } from './physics/TrimSolver.js';
+import { rebaseCgVelocity, translateModelOrigin } from './physics/massKinematics.js';
+import { takeoffPerformance } from './physics/TakeoffPerformance.js';
+import { stallSpeedEstimate } from './physics/stallSpeedEstimate.js';
+import { LoadingPanel } from './ui/LoadingPanel.js';
 import { PFDCanvas } from './aircraft/PFDCanvas.js';
 import { NDCanvas } from './aircraft/NDCanvas.js';
 import { EICASCanvas } from './aircraft/EICASCanvas.js';
@@ -171,6 +175,7 @@ class FlightSimulator {
     // 4. Physics Engines
     this.aero = new Aerodynamics();
     this.engines = new EngineModel();
+    this.engines.bindMassProperties(this.aero.massProperties);
     this.gear = new LandingGear();
 
     await startupStage(2, 'startup.world');
@@ -338,6 +343,12 @@ class FlightSimulator {
     this._apForward = new THREE.Vector3();
     // Reusable objects for integratePhysics force/moment math and its telemetry
     // extraction; every one is consumed before the next substep.
+    this._cgBefore = new THREE.Vector3();
+    this._rotationBefore = new THREE.Quaternion();
+    this._performanceClock = 0;
+    this.takeoff = null;
+    this.actualTakeoffMassKg = null;
+    this.loadingPanel = new LoadingPanel(this);
     this._intThrust = new THREE.Vector3();
     this._intGravity = new THREE.Vector3();
     this._intNetForce = new THREE.Vector3();
@@ -568,7 +579,10 @@ class FlightSimulator {
     if (this.telemetry) this.telemetry.warnings = [];
     this.audio?.loadAircraftConfig(config);
     if (this.aero?.loadConfig) this.aero.loadConfig(config);
-    if (this.engines?.loadConfig) this.engines.loadConfig(config);
+    if (this.engines?.loadConfig) {
+      this.engines.loadConfig(config);
+      this.engines.bindMassProperties(this.aero.massProperties);
+    }
     if (this.gear?.loadConfig) this.gear.loadConfig(config);
     if (this.cameraSystem?.loadAircraftConfig) this.cameraSystem.loadAircraftConfig(config);
     if (this.collisionDetector?.loadAircraftConfig) this.collisionDetector.loadAircraftConfig(config);
@@ -1064,11 +1078,15 @@ class FlightSimulator {
       }
     }
 
-    // A preset marks a fresh segment: full tanks at the configured mass and no
-    // engine failures. Restoring from aero.massBaselineKg rather than adding the
-    // previous burn back means a demo-internal preset whose scenario just loaded
-    // its own mass (Lukla's 43 t) starts at that mass, not at it plus the burn.
+    // A fresh segment restores its configured tanks/payload and clears failures.
+    // Lukla's 43 t loading contains 1587 kg of fuel, not a full 14200 kg tank set.
     this.engines.refuel(this.aero);
+    this.aero.massProperties.setConfiguration(this.gear.gearState, this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1));
+    this.aero.syncMassProperties();
+    this.actualTakeoffMassKg = null;
+    this.takeoff = null;
+    this.stallSpeedKnots = undefined;
+    this._hasGroundContact = false;
     this.engines.failed.fill(false);
     this.engines.contactDamage.fill(0);
 
@@ -1083,6 +1101,8 @@ class FlightSimulator {
       // equilibrium installed below.
       this.aero.currentFlapAngle = this.aero.flapAngles[this.aero.flapsIndex];
       this.controls.elevator = this.controls.aileron = this.controls.rudder = 0;
+      this.aero.massProperties.setConfiguration(this.gear.gearState, this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1));
+      this.aero.syncMassProperties();
       this.applyComputedTrim();
       this.engines.settleSpool();
     }
@@ -1100,16 +1120,36 @@ class FlightSimulator {
     this.cameraSystem.snapToTarget(this.aircraft.group);
   }
 
-  /**
-   * Derive the spawn trim state for airborne presets from the steady-state
-   * solver instead of hand-tuned constants: sets the trim wheel, throttle and
-   * pitch attitude to the equilibrium solution for the just-assigned velocity,
-   * altitude and configuration. Falls back to the preset's literal values when
-   * the aircraft cannot hold this state hands-off — no solution at all, or one
-   * the trim wheel lacks the authority to hold. A clamped wheel is not an
-   * equilibrium: it leaves a sustained pitch moment that flies the aircraft off
-   * the preset's path.
-   */
+  // One shared educational performance snapshot for CDU, PFD and loading UI.
+  refreshTakeoffPerformance() {
+    this.stallSpeedKnots = stallSpeedEstimate(this.aero, this.gear.gearState);
+    this.takeoff = takeoffPerformance(this.aero, this.engines, {
+      altitudeMeters: this.position.y, flapsIndex: this.aero.flapsIndex,
+      flapAngle: this.aero.currentFlapAngle,
+    });
+    if (this.telemetry) this.telemetry.takeoff = this.takeoff;
+    return this.takeoff;
+  }
+
+  applyLoading(loading) {
+    if (this.isCrashed || !this.telemetry.onGround || this.linearVelocity.length() > 0.5) {
+      throw new Error('Loading changes require a stopped aircraft on the ground.');
+    }
+    this._cgBefore.copy(this.aero.cg);
+    this.aero.massProperties.setLoading(loading); // validates before any mutation
+    this.aero.syncMassProperties();
+    rebaseCgVelocity(this.linearVelocity, this.angularVelocity, this.quaternion, this._cgBefore, this.aero.cg);
+    this.refreshTakeoffPerformance();
+    Object.assign(this.telemetry, { massKg: this.aero.mass,
+      massRevision: this.aero.massProperties.revision,
+      zeroFuelMassKg: this.aero.massProperties.zeroFuelMassKg,
+      fuelKg: this.engines.fuelKg, cgBody: { ...this.aero.cg } });
+    this.telemetry.stallSpeedKnots = this.stallSpeedKnots;
+    this.updateFlightDisplays(true);
+    if (this.autopilot.master) this.autopilot.refreshTrim(this.readAutopilotState());
+    return this.takeoff;
+  }
+
   applyComputedTrim() {
     const tas = this.linearVelocity.length();
     if (tas < 20) return;
@@ -1347,12 +1387,15 @@ class FlightSimulator {
     if (this.engines.numEngines > 1 && this.gear.bodyDamage?.engineR !== undefined) {
       this.engines.contactDamage[1] = this.gear.bodyDamage.engineR;
     }
+    this._cgBefore.copy(this.aero.cg);
+    this.engines.bindMassProperties(this.aero.massProperties);
+    this.gear.advanceConfiguration(dt);
+    this.aero.advanceFlaps(dt);
     const engineData = this.engines.update(dt, altitudeMeters, tas, atmos.densityRatio);
 
-    // Live mass: the airframe sheds exactly the fuel burned since the last
-    // substep, so a scenario that replaces currentMassKg mid-flight keeps its
-    // baseline and still loses the weight it burns.
-    this.engines.shedBurnedFuelMass(this.aero);
+    this.aero.massProperties.setConfiguration(this.gear.gearState, this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1));
+    this.aero.syncMassProperties();
+    rebaseCgVelocity(this.linearVelocity, this.angularVelocity, this.quaternion, this._cgBefore, this.aero.cg);
 
     // 3. Terrain Height & Ground Clearance
     const groundHeight = this.currentTerrain.getHeight(this.position.x, this.position.z);
@@ -1370,7 +1413,8 @@ class FlightSimulator {
       this.angularVelocity,
       (x, z) => this.currentTerrain.getHeight(x, z),
       (x, z) => (this.currentTerrain.getNormal ? this.currentTerrain.getNormal(x, z) : null),
-      (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true)
+      (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true),
+      this.aero.cg, true
     );
 
     if (gearResult.damageEvents.length || (gearResult.bodyContacts.length && !this.bodyContactStarted)) {
@@ -1415,7 +1459,7 @@ class FlightSimulator {
       heightAboveGround,
       engineData.totalThrust,
       gearResult.gearState,
-      this._aeroResult
+      this._aeroResult, true
     );
 
     // Engine-out asymmetric thrust: the surviving engine's moment about the
@@ -1450,7 +1494,7 @@ class FlightSimulator {
       this.linearVelocity.set(0, 0, 0);
     }
 
-    this.position.addScaledVector(this.linearVelocity, dt);
+    this._rotationBefore.copy(this.quaternion);
 
     // 9. Total Moments Integration: M = I * alpha
     // Moment in body frame: aero moment + landing gear moment
@@ -1482,6 +1526,7 @@ class FlightSimulator {
     ).normalize();
 
     this.quaternion.multiply(deltaRot).normalize();
+    translateModelOrigin(this.position, this.linearVelocity, this._rotationBefore, this.quaternion, this.aero.cg, dt);
 
     // Preserve the incoming pose for obstacle/off-runway collision policy; the
     // terrain constraint must not lift an aircraft out of a fatal collision.
@@ -1512,7 +1557,26 @@ class FlightSimulator {
     const cabinCeilingWorld = this._intCabinUp.set(0, 1, 0).applyQuaternion(this.quaternion);
     const measuredGForce = nonGravForceWorld.dot(cabinCeilingWorld) / (this.aero.mass * Atmosphere.G0);
 
+    if (this._hasGroundContact && this.lastOnGround && !gearResult.onGround && this.actualTakeoffMassKg === null) {
+      this.actualTakeoffMassKg = this.aero.mass;
+      this.refreshTakeoffPerformance();
+    }
+    this._hasGroundContact ||= gearResult.onGround;
+    this._performanceClock += dt;
+    if (this._performanceClock >= 1 || this.stallSpeedKnots === undefined) {
+      if (gearResult.onGround) this.refreshTakeoffPerformance();
+      else this.stallSpeedKnots = stallSpeedEstimate(this.aero, gearResult.gearState);
+      this._performanceClock = 0;
+    }
     this.telemetry = {
+      massRevision: this.aero.massProperties.revision,
+      massKg: this.aero.mass,
+      zeroFuelMassKg: this.aero.massProperties.zeroFuelMassKg,
+      cgBody: { ...this.aero.cg },
+      inertiaBody: { ...this.aero.massProperties.inertia },
+      takeoff: this.takeoff,
+      actualTakeoffMassKg: this.actualTakeoffMassKg,
+      stallSpeedKnots: this.stallSpeedKnots,
       pitchDeg,
       rollDeg,
       headingDeg,
@@ -1648,7 +1712,7 @@ class FlightSimulator {
     constrainBodyContact(this.position, this.quaternion, this.linearVelocity, this.angularVelocity,
       this.aero.mass, { x: this.aero.invIyy, y: this.aero.invIzz, z: this.aero.invIxx },
       (x, z) => this.currentTerrain.getHeight(x, z),
-      (x, z) => this.currentTerrain.getNormal?.(x, z), this.gear.bodySupportPoints);
+      (x, z) => this.currentTerrain.getNormal?.(x, z), this.gear.bodySupportPoints, this.aero.cg);
   }
 
   triggerCrash(crashResult, impactVelocity = this.linearVelocity) {
@@ -1945,6 +2009,7 @@ class FlightSimulator {
     this.updateHUD();
     this.touchControls.updateUI();
     this.diagnostics.update(frameDelta, this.telemetry);
+    this.loadingPanel.update();
 
     this.foliage.update(this.camera.position);
 
