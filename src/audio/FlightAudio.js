@@ -32,6 +32,7 @@ export class FlightAudio {
   }
 
   loadAircraftConfig(config = {}) {
+    this.aircraftId = config.id || 'B738';
     const settings = config.audio || {};
     this.profile = {
       engineType: settings.engineType || 'jet',
@@ -56,6 +57,9 @@ export class FlightAudio {
 
   reset() {
     this.crashed = false;
+    this.alertId = null;
+    this.alertTimer = 0;
+    this.alertElapsed = 0;
     this.lastRadioAlt = 9999;
     this.calledAltitudes.clear();
     this.stallBeepTime = 0;
@@ -608,9 +612,31 @@ export class FlightAudio {
       this.warningGain.gain.setValueAtTime(0.0, now);
     }
 
+    const alert = state.warnings?.[0];
+    this.alertTimer += dt;
+    this.alertElapsed += dt;
+    if (alert?.id !== this.alertId) {
+      if (this.alertId || alert) this.cancelSpeech();
+      this.alertId = alert?.id;
+      this.alertTimer = 99;
+      this.alertElapsed = 0;
+    }
+    if (alert?.voice && this.alertTimer >= 4) {
+      this.cancelSpeech();
+      this.playGpwsCallout(alert.voice);
+      this.alertTimer = 0;
+    }
+    if ((alert?.id === 'overspeed' || alert?.id === 'takeoff-config') && !this.isPiston) {
+      this.warningOsc.frequency.setValueAtTime(800, now);
+      this.warningGain.gain.setValueAtTime((this.alertElapsed % 0.16) < 0.08 ? 0.35 : 0, now);
+    } else if (alert?.id === 'engine' && this.aircraftId === 'B738' && this.alertElapsed < 0.18) {
+      this.warningOsc.frequency.setValueAtTime(1000, now);
+      this.warningGain.gain.setValueAtTime(0.25, now);
+    } else this.warningOsc.frequency.setValueAtTime(680, now);
+
     // 6. Boeing GPWS Altitude Voice Callouts
     const rAlt = state.radioAltFt;
-    if (!this.isPiston && rAlt !== undefined && !state.onGround && state.vsiFpm < -100) {
+    if (this.aircraftId === 'B738' && !alert && rAlt !== undefined && !state.onGround && state.vsiFpm < -100) {
       const callouts = [500, 100, 50, 40, 30, 20, 10];
       for (const call of callouts) {
         if (this.lastRadioAlt > call && rAlt <= call && !this.calledAltitudes.has(call)) {

@@ -53,7 +53,7 @@ export class MCPCanvas {
       this.lnav = state.apModes.includes('HDG');
     }
     if (state.apArmed !== undefined) this.atArm = state.apArmed;
-    if (state.isStalled) this.masterCaution = true;
+    if (state.isStalled || state.warnings?.length) this.masterCaution = true;
     else this.masterCaution = false;
 
     const key = JSON.stringify([this.fdLeft, this.fdRight, this.atArm, this.speed,
