@@ -467,15 +467,44 @@ export class FlightAudio {
     return this.departureRadio.play(stage);
   }
 
+  // Real GPWS/RADALT pronounceers are English-language devices. Browser speech
+  // synthesis otherwise follows the OS locale, so pin an en voice explicitly.
+  pickSynthVoice(synthesis) {
+    let voices = [];
+    try { voices = synthesis.getVoices() ?? []; } catch (e) { return null; }
+    if (!voices.length) return null;
+    const score = (v) => {
+      const lang = (v.lang || '').toLowerCase().replace('_', '-');
+      if (!lang.startsWith('en')) return -1;
+      const google = (v.name || '').toLowerCase().includes('google');
+      const network = v.localService === false;
+      return ((lang === 'en-us' || lang === 'en-gb') ? 4 : 2) + (google && network ? 2 : 0);
+    };
+    let best = null, bestScore = -1;
+    for (const v of voices) {
+      const s = score(v);
+      if (s > bestScore) { best = v; bestScore = s; }
+    }
+    return bestScore >= 0 ? best : null;
+  }
+
   playGpwsCallout(text) {
     if (this.isMuted || this.effectiveVolume === 0 || this.isPiston || this.crashed) return;
     if ('speechSynthesis' in window) {
       try {
+        const synthesis = window.speechSynthesis;
+        if (this.synthVoice === undefined) this.synthVoice = this.pickSynthVoice(synthesis);
+        if (!this.synthVoice && synthesis.onvoiceschanged === null) {
+          synthesis.onvoiceschanged = () => { this.synthVoice = undefined; };
+        }
         const u = new SpeechSynthesisUtterance(text);
-        u.rate = 1.15;
-        u.pitch = 0.95;
+        u.lang = 'en-US';
+        if (this.synthVoice) u.voice = this.synthVoice;
+        // Boeing pronouncer: measured cadence, low flat timbre.
+        u.rate = 0.95;
+        u.pitch = 0.5;
         u.volume = this.effectiveVolume;
-        window.speechSynthesis.speak(u);
+        synthesis.speak(u);
       } catch (e) {}
     }
   }
@@ -637,11 +666,16 @@ export class FlightAudio {
     // 6. Boeing GPWS Altitude Voice Callouts
     const rAlt = state.radioAltFt;
     if (this.aircraftId === 'B738' && !alert && rAlt !== undefined && !state.onGround && state.vsiFpm < -100) {
-      const callouts = [500, 100, 50, 40, 30, 20, 10];
-      for (const call of callouts) {
+      // RADALT pronounce-up spelling; 500 and 100 are doubled like the real device.
+      const callouts = [
+        ['Five hundred, five hundred', 500],
+        ['One hundred, one hundred', 100],
+        ['Fifty', 50], ['Forty', 40], ['Thirty', 30], ['Twenty', 20], ['Ten', 10],
+      ];
+      for (const [text, call] of callouts) {
         if (this.lastRadioAlt > call && rAlt <= call && !this.calledAltitudes.has(call)) {
           this.calledAltitudes.add(call);
-          this.playGpwsCallout(call.toString());
+          this.playGpwsCallout(text);
           break;
         }
       }

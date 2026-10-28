@@ -26,8 +26,12 @@ voice alerts and no Boeing altitude callouts. These fighter thresholds are tunin
 values, not a flight-manual envelope or an Auto-GCAS implementation.
 
 These are simulator approximations, not certified reproductions of proprietary
-GPWS envelopes or exact aircraft recordings. Voice uses browser speech synthesis;
-voice availability, accent and latency depend on the browser/OS. Warning tones
+GPWS envelopes or exact aircraft recordings. Aural alerts use the real pronouncer
+phrase words (`TERRAIN, TERRAIN` / `PULL UP, PULL UP`, `SINK RATE, SINK RATE`,
+doubled `FIVE HUNDRED` / `ONE HUNDRED` RADALT callouts) and are spoken through
+browser speech synthesis pinned to an English voice, since the GPWS announcer is
+an English-language device regardless of OS locale; voice availability, accent and
+latency still depend on the browser/OS. Warning tones
 use Web Audio and require an initial user gesture, like the existing audio.
 Mute, volume and crash silence apply to alerts as well as engine audio.
 
