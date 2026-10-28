@@ -198,7 +198,7 @@ class FlightSimulator {
     this.scene.add(this.ships.group);
 
     // Nepal Tenzing-Hillary (Lukla VNLK) Real-World 30m DEM Terrain & Airport
-    this.luklaTerrain = new LuklaTerrain(22000, 255);
+    this.luklaTerrain = new LuklaTerrain();
     this.luklaTerrain.mesh.visible = false;
     this.scene.add(this.luklaTerrain.mesh);
 

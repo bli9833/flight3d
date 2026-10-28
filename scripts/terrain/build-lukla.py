@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / '.cache/terrain'
 OUT = ROOT / 'public/terrain'
 LAT, LON = 27.6868342, 86.7294519
-SIZE, GRID = 22000, 513
+SIZE, GRID = 44000, 1025
 TILE = 'Copernicus_DSM_COG_10_N27_00_E086_00_DEM'
 URL = f'https://copernicus-dem-30m.s3.amazonaws.com/{TILE}/{TILE}.tif'
 SHA = '4dfc87a0dec44a8a037164ddade45dd24bb53187176b5a14175c265bd6d20e76'
@@ -49,8 +49,9 @@ def main():
                   src_crs=dem.crs, dst_transform=target, dst_crs=LOCAL,
                   dst_nodata=np.nan, resampling=Resampling.bilinear)
         checks = []
-        for row, col in [(256, 256), (200, 256), (300, 230), (256, 200), (220, 300)]:
-            x, z = (col - 256) * spacing, (row - 256) * spacing
+        mid = (GRID - 1) // 2
+        for row, col in [(mid, mid), (mid - 100, mid), (mid + 100, mid - 50), (mid, mid - 100), (mid - 70, mid + 80)]:
+            x, z = (col - mid) * spacing, (row - mid) * spacing
             lon, lat = transform(LOCAL, 'EPSG:4326', [x], [-z])
             px, py = (~dem.transform) * (lon[0], lat[0])
             px, py = px - 0.5, py - 0.5
@@ -84,7 +85,7 @@ def main():
             tile_hashes[f'{zoom}/{y}/{x}'] = hashlib.sha256(tile).hexdigest()
             mosaic.paste(Image.open(io.BytesIO(tile)).convert('RGB'), ((x - min_x) * 256, (y - min_y) * 256))
     source_pixels = np.array(mosaic)
-    image_size = 1536
+    image_size = 2048
     image = np.zeros((image_size, image_size, 3), dtype=np.uint8)
     mosaic_transform = from_bounds(min_x * span - extent, extent - (max_y + 1) * span,
                                    (max_x + 1) * span - extent, extent - min_y * span,

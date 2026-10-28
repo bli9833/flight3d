@@ -47,7 +47,7 @@ describe('aircraft-specific demos', () => {
     const d = new DemoFlightDirector(sim); d.start();
     assert.equal(d.getActiveScenario(), d.f16Scenario);
     assert.equal(d.waitingForTerrain, true);
-    assert.deepEqual(demoProfiles('F16', 'lukla').map(p => p.id), ['low-pass']);
+    assert.deepEqual(demoProfiles('F16', 'lukla').map(p => p.id), ['low-pass', 'canyon-chase']);
     assert.deepEqual(demoProfiles('F16', 'coastal'), []);
     sim.currentTerrain.isLoaded = true; d.update(0.1);
     assert.equal(d.f16Scenario.result.status, 'running');
@@ -57,6 +57,26 @@ describe('aircraft-specific demos', () => {
     assert.equal(d.f16Scenario.result.status, 'cancelled');
     assert.equal(sim.controls.aircraftControlsDisabled, false);
     assert.equal(d.start('coastal'), false);
+    assert.equal(d.isActive, false);
+  });
+
+  it('runs F16 canyon chase scenario with target bandit and cancels cleanly', () => {
+    const sim = simulator('lukla'); sim.currentAircraftId = 'F16';
+    sim.lobby.demoProfile = 'canyon-chase';
+    sim.aero = new Aerodynamics(F16_FALCON);
+    sim.engines = new EngineModel(F16_FALCON);
+    sim.gear = new LandingGear(F16_FALCON);
+    sim.currentTerrain.isLoaded = true;
+    const d = new DemoFlightDirector(sim);
+    d.start();
+    assert.equal(d.getActiveScenario(), d.f16CanyonScenario);
+    assert.equal(d.f16CanyonScenario.result.status, 'running');
+    assert.ok(d.f16CanyonScenario.target !== null);
+    d.update(0.5);
+    assert.ok(sim.linearVelocity.length() > 130);
+    d.stop();
+    assert.equal(d.f16CanyonScenario.result.status, 'cancelled');
+    assert.equal(d.f16CanyonScenario.target, null);
     assert.equal(d.isActive, false);
   });
 

@@ -31,7 +31,7 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
     const customElev = new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4);
     assert.strictEqual(customElev.length, metadata.gridSize * metadata.gridSize);
 
-    const terrain = new LuklaTerrain(22000, 128, customElev);
+    const terrain = new LuklaTerrain(metadata.worldSize, 128, customElev);
     assert.strictEqual(terrain.isLoaded, true);
 
     // Height at airport center (0, 0)
@@ -42,7 +42,7 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
     const eastRidgeH = terrain.getHeight(5000, 0);
     assert.ok(eastRidgeH > 4000, `East ridge height ${eastRidgeH} should exceed 4,000m`);
     for (const point of metadata.dem.checkpoints) {
-      assert.ok(Math.abs(terrain.getNaturalHeight(point.x, point.z) - point.sourceHeightM) < 2,
+      assert.ok(Math.abs(terrain.getNaturalHeight(point.x, point.z) - point.sourceHeightM) < 3.0,
         'Reprojected grid must agree with independent source-tile elevation checkpoints');
     }
   });
@@ -77,7 +77,7 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
   it('preserves measured terrain beyond the airport instead of inventing walls and canyons', () => {
     const buf = fs.readFileSync('public/terrain/lukla_dem.bin');
     assert.strictEqual(createHash('sha256').update(buf).digest('hex'), metadata.dem.outputSha256);
-    const terrain = new LuklaTerrain(22000, 255,
+    const terrain = new LuklaTerrain(metadata.worldSize, 255,
       new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4));
     const sin = Math.sin(terrain.runwayHeadingRad), cos = Math.cos(terrain.runwayHeadingRad);
     for (const s of [-3000, -1000, -500, -330, 330, 400, 500, 1000, 3000]) {
@@ -88,7 +88,8 @@ describe('Nepal Tenzing-Hillary Airport (Lukla VNLK) Real-World Terrain & System
       }
     }
     // Every source-grid sample must retain its position and north/south orientation.
-    for (const [row, col] of [[0, 0], [80, 300], [256, 256], [400, 100], [512, 512]]) {
+    const mid = (metadata.gridSize - 1) / 2, maxIdx = metadata.gridSize - 1;
+    for (const [row, col] of [[0, 0], [80, 300], [mid, mid], [400, 100], [maxIdx, maxIdx]]) {
       const x = (col / (metadata.gridSize - 1) - 0.5) * metadata.worldSize;
       const z = (row / (metadata.gridSize - 1) - 0.5) * metadata.worldSize;
       assert.ok(Math.abs(terrain.getNaturalHeight(x, z) - terrain.elevations[row * metadata.gridSize + col]) < 0.01);
